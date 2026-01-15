@@ -6,6 +6,15 @@ const ADMIN_PREFIX = "/admin";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // 🔧 Feature flag: enable / disable admin auth globally
+  const adminAuthEnabled =
+    process.env.NEXT_PUBLIC_ADMIN_AUTH_ENABLED === "true";
+
+  // 🚧 Auth disabled → allow everything (temporary)
+  if (!adminAuthEnabled) {
+    return NextResponse.next();
+  }
+
   // Only run middleware for admin routes
   if (!pathname.startsWith(ADMIN_PREFIX)) {
     return NextResponse.next();

@@ -20,7 +20,11 @@ import logo from "@/assets/images/lively-meetings.png";
 
 const navItems = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid },
-  { label: "Event Management", href: "/events", icon: CalendarDays },
+  {
+    label: "Event Management",
+    href: "/admin/event-management",
+    icon: CalendarDays,
+  },
   { label: "Registrations", href: "/registrations", icon: UserRoundPlus },
   { label: "Accommodations", href: "/accommodations", icon: Building2 },
   { label: "Payments", href: "/payments", icon: Wallet },
@@ -38,7 +42,7 @@ function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-80 py-4 flex-col items-center border-r border-neutral-100 bg-slate-200 lg:flex xl:h-225">
+    <aside className="hidden w-80 py-4 flex-col items-center border-r border-neutral-100 bg-slate-200 lg:flex">
       <div className="flex items-center justify-center w-full h-fit">
         <Image src={logo} alt="logo" height={60} className="object-contain" />
       </div>

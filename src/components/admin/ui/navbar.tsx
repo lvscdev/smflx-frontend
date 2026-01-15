@@ -40,8 +40,8 @@
 import { Bell } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { MobileSidebar } from "@/components/admin/ui/mobile-sidebar";
-import { AdminBreadcrumbs } from "@/components/admin/ui/Breadcrumbs";
+// import { MobileSidebar } from "@/components/admin/ui/mobile-sidebar";
+// import { AdminBreadcrumbs } from "@/components/admin/ui/Breadcrumbs";
 import { GlobalSearch } from "@/components/admin/ui/global-search";
 
 function AdminNavbar() {

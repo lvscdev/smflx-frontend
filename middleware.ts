@@ -10,6 +10,8 @@ export function middleware(req: NextRequest) {
   const adminAuthEnabled =
     process.env.NEXT_PUBLIC_ADMIN_AUTH_ENABLED === "true";
 
+  console.log("ADMIN AUTH FLAG:", process.env.NEXT_PUBLIC_ADMIN_AUTH_ENABLED);
+
   // 🚧 Auth disabled → allow everything (temporary)
   if (!adminAuthEnabled) {
     return NextResponse.next();

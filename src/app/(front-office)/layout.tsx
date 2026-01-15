@@ -1,21 +1,16 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: 'SMFLX Registration Portal',
-  description: 'Register for WOTH Camp Meeting and other SMFLX events',
+  title: "SMFLX Registration Portal",
+  description: "Register for WOTH Camp Meeting and other SMFLX events",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function FrontOfficeLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="antialiased">
+    <div className="front-office h-full">
+      <div className="flex h-full w-full">
         {children}
-      </body>
-    </html>
+      </div>
+    </div>
   );
 }

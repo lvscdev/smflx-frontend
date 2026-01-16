@@ -1,12 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
 import { Sidebar } from "@/components/front-office/ui/Sidebar";
 import { EmailVerification } from "@/components/front-office/ui/EmailVerification";
 import { ReturningUserLogin } from "@/components/front-office/ui/ReturningUserLogin";
-import { ProfileForm } from "@/components/front-office/ui/ProfileForm";
 import { EventSelection } from "@/components/front-office/ui/EventSelection";
+import { ProfileForm } from "@/components/front-office/ui/ProfileForm";
 import { EventRegistration } from "@/components/front-office/ui/EventRegistration";
 import { Payment } from "@/components/front-office/ui/Payment";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
@@ -14,47 +13,38 @@ import { Dashboard } from "@/components/front-office/ui/Dashboard";
 type View =
   | "verify"
   | "login"
-  | "profile"
   | "event-selection"
+  | "profile"
   | "event-registration"
   | "payment"
   | "dashboard";
 
 export default function HomePage() {
   const [view, setView] = useState<View>("verify");
+  const [email, setEmail] = useState("");
 
-  const [email, setEmail] = useState<string>("");
-
-  // Data we collect along the way
-  const [profile, setProfile] = useState<any>(null);
   const [selectedEvent, setSelectedEvent] = useState<{ id: string; name: string } | null>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [registration, setRegistration] = useState<any>(null);
-  const [accommodation, setAccommodation] = useState<any>(null);
-
-  // You can compute this based on selectedEvent/registration later
-  const paymentAmount = useMemo(() => {
-    // Demo default
-    return 2500;
-  }, []);
 
   const steps = useMemo(() => {
     return [
       { id: 1, title: "Verify Email", description: "Confirm your email address", completed: view !== "verify" && view !== "login" },
-      { id: 2, title: "Profile", description: "Enter personal details", completed: ["event-selection","event-registration","payment","dashboard"].includes(view) },
-      { id: 3, title: "Select Event", description: "Choose your event", completed: ["event-registration","payment","dashboard"].includes(view) },
-      { id: 4, title: "Register", description: "Attendance preferences", completed: ["payment","dashboard"].includes(view) },
-      { id: 5, title: "Payment", description: "Confirm registration", completed: ["dashboard"].includes(view) },
+      { id: 2, title: "Select Event", description: "Choose your event", completed: !!selectedEvent && view !== "event-selection" },
+      { id: 3, title: "Profile", description: "Tell us about you", completed: !!profile && view !== "profile" },
+      { id: 4, title: "Register", description: "Attendance preferences", completed: !!registration && view !== "event-registration" },
+      { id: 5, title: "Payment", description: "Confirm your spot", completed: view === "dashboard" },
     ];
-  }, [view]);
+  }, [view, selectedEvent, profile, registration]);
 
   const currentStep = useMemo(() => {
     switch (view) {
       case "verify":
       case "login":
         return 1;
-      case "profile":
-        return 2;
       case "event-selection":
+        return 2;
+      case "profile":
         return 3;
       case "event-registration":
         return 4;
@@ -67,16 +57,6 @@ export default function HomePage() {
     }
   }, [view]);
 
-  const handleLogout = () => {
-    // Reset flow
-    setEmail("");
-    setProfile(null);
-    setSelectedEvent(null);
-    setRegistration(null);
-    setAccommodation(null);
-    setView("verify");
-  };
-
   return (
     <div className="flex h-screen w-full">
       <Sidebar
@@ -85,13 +65,13 @@ export default function HomePage() {
         onAlreadyRegistered={() => setView("login")}
       />
 
-      {/* Right panel fills height and scrolls inside */}
-      <div className="flex-1 h-full overflow-y-auto bg-white">
+      {/* 🔥 THIS is the wrapper that affects your EmailVerification centering */}
+      <div className="flex-1 h-full flex overflow-y-auto bg-white">
         {view === "verify" && (
           <EmailVerification
             onVerified={(verifiedEmail) => {
               setEmail(verifiedEmail);
-              setView("profile"); // ✅ go to Profile first
+              setView("event-selection");
             }}
             onAlreadyRegistered={() => setView("login")}
           />
@@ -99,56 +79,54 @@ export default function HomePage() {
 
         {view === "login" && (
           <ReturningUserLogin
-            onLoginSuccess={() => setView("dashboard")} // ✅ returning users land on dashboard
-            onCancel={() => setView("verify")} // New Registration
-          />
-        )}
-
-        {view === "profile" && (
-          <ProfileForm
-            initialData={profile}
-            onBack={() => setView("verify")}
-            onComplete={(p) => {
-              setProfile(p);
-              setView("event-selection");
-            }}
+            onLoginSuccess={() => setView("dashboard")}
+            onCancel={() => setView("verify")}
           />
         )}
 
         {view === "event-selection" && (
           <EventSelection
-            userProfile={profile}
-            selectedEventId={selectedEvent?.id}
-            onBack={() => setView("profile")}
             onSelectEvent={(eventId, eventName) => {
               setSelectedEvent({ id: eventId, name: eventName });
+              setView("profile");
+            }}
+            onBack={() => setView("verify")}
+            selectedEventId={selectedEvent?.id}
+            userProfile={profile}
+          />
+        )}
+
+        {view === "profile" && (
+          <ProfileForm
+            onComplete={(p) => {
+              setProfile(p);
               setView("event-registration");
             }}
+            onBack={() => setView("event-selection")}
+            initialData={profile}
           />
         )}
 
         {view === "event-registration" && (
           <EventRegistration
-            initialData={registration}
-            onBack={() => setView("event-selection")}
-            onComplete={(reg) => {
-              // Save event info into registration too (helps dashboard)
-              const regWithEvent = {
-                ...reg,
+            onComplete={(data) => {
+              setRegistration({
+                ...data,
                 eventId: selectedEvent?.id,
                 eventName: selectedEvent?.name,
-              };
-              setRegistration(regWithEvent);
+              });
               setView("payment");
             }}
+            onBack={() => setView("profile")}
+            initialData={registration}
           />
         )}
 
         {view === "payment" && (
           <Payment
-            amount={paymentAmount}
-            onBack={() => setView("event-registration")}
+            amount={2500}
             onComplete={() => setView("dashboard")}
+            onBack={() => setView("event-registration")}
           />
         )}
 
@@ -157,10 +135,14 @@ export default function HomePage() {
             userEmail={email}
             profile={profile}
             registration={registration}
-            accommodation={accommodation}
-            onLogout={handleLogout}
-            onAccommodationUpdate={(data) => setAccommodation(data)}
-            onRegistrationUpdate={(data) => setRegistration(data)}
+            accommodation={null}
+            onLogout={() => {
+              setEmail("");
+              setSelectedEvent(null);
+              setProfile(null);
+              setRegistration(null);
+              setView("verify");
+            }}
           />
         )}
       </div>

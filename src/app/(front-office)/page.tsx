@@ -7,6 +7,7 @@ import { EmailVerification } from "@/components/front-office/ui/EmailVerificatio
 import { ReturningUserLogin } from "@/components/front-office/ui/ReturningUserLogin";
 import { ProfileForm } from "@/components/front-office/ui/ProfileForm";
 import { EventSelection } from "@/components/front-office/ui/EventSelection";
+import { EventRegistration } from "@/components/front-office/ui/EventRegistration";
 import { Payment } from "@/components/front-office/ui/Payment";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
 
@@ -15,90 +16,34 @@ type View =
   | "login"
   | "profile"
   | "event-selection"
+  | "event-registration"
   | "payment"
   | "dashboard";
-
-type SelectedEvent = { id: string; name: string };
-
-type ProfileData = {
-  fullName: string;
-  gender: string;
-  ageRange: string;
-  country: string;
-  state: string;
-  localAssembly: string;
-  address: string;
-  isMinister: string;
-  employmentStatus: string;
-  maritalStatus: string;
-  spouseName?: string;
-  isYAT?: boolean;
-};
-
-type RegistrationData = {
-  eventId: string;
-  eventName: string;
-  attendeeType?: "camper" | "physical" | "online";
-};
-
-const EVENT_PRICES: Record<string, number> = {
-  campmeeting26: 25000,
-  "yat-campmeeting26": 15000,
-  woth25: 0,
-};
 
 export default function HomePage() {
   const [view, setView] = useState<View>("verify");
 
-  const [email, setEmail] = useState("");
-  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [email, setEmail] = useState<string>("");
 
-  const [selectedEvent, setSelectedEvent] = useState<SelectedEvent | null>(null);
-
-  // ✅ what dashboard expects
-  const [registration, setRegistration] = useState<RegistrationData | null>(null);
+  // Data we collect along the way
+  const [profile, setProfile] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<{ id: string; name: string } | null>(null);
+  const [registration, setRegistration] = useState<any>(null);
   const [accommodation, setAccommodation] = useState<any>(null);
 
-  const amount = useMemo(() => {
-    if (!selectedEvent) return 0;
-    return EVENT_PRICES[selectedEvent.id] ?? 25000;
-  }, [selectedEvent]);
+  // You can compute this based on selectedEvent/registration later
+  const paymentAmount = useMemo(() => {
+    // Demo default
+    return 2500;
+  }, []);
 
   const steps = useMemo(() => {
-    const order: View[] = ["verify", "profile", "event-selection", "payment", "dashboard"];
-    const idx = (v: View) => order.indexOf(v);
-
     return [
-      {
-        id: 1,
-        title: "Verify Email",
-        description: "Confirm your email address",
-        completed: view !== "verify" && view !== "login",
-      },
-      {
-        id: 2,
-        title: "Profile",
-        description: "Complete your details",
-        completed: idx(view) > idx("profile"),
-      },
-      {
-        id: 3,
-        title: "Select Event",
-        description: "Choose your event",
-        completed: idx(view) > idx("event-selection"),
-      },
-      {
-        id: 4,
-        title: "Payment",
-        description: "Make payment",
-        completed: idx(view) > idx("payment"),
-      },
-      {
-        id: 5,
-        title: "Dashboard",
-        description: "Finish setup",
-        completed: view === "dashboard",
-      },
+      { id: 1, title: "Verify Email", description: "Confirm your email address", completed: view !== "verify" && view !== "login" },
+      { id: 2, title: "Profile", description: "Enter personal details", completed: ["event-selection","event-registration","payment","dashboard"].includes(view) },
+      { id: 3, title: "Select Event", description: "Choose your event", completed: ["event-registration","payment","dashboard"].includes(view) },
+      { id: 4, title: "Register", description: "Attendance preferences", completed: ["payment","dashboard"].includes(view) },
+      { id: 5, title: "Payment", description: "Confirm registration", completed: ["dashboard"].includes(view) },
     ];
   }, [view]);
 
@@ -111,8 +56,10 @@ export default function HomePage() {
         return 2;
       case "event-selection":
         return 3;
-      case "payment":
+      case "event-registration":
         return 4;
+      case "payment":
+        return 5;
       case "dashboard":
         return 5;
       default:
@@ -120,14 +67,14 @@ export default function HomePage() {
     }
   }, [view]);
 
-  // ✅ Simple logout handler
   const handleLogout = () => {
-    setView("verify");
+    // Reset flow
     setEmail("");
     setProfile(null);
     setSelectedEvent(null);
     setRegistration(null);
     setAccommodation(null);
+    setView("verify");
   };
 
   return (
@@ -138,12 +85,13 @@ export default function HomePage() {
         onAlreadyRegistered={() => setView("login")}
       />
 
-      <div className="flex-1 h-full flex overflow-y-auto bg-white">
+      {/* Right panel fills height and scrolls inside */}
+      <div className="flex-1 h-full overflow-y-auto bg-white">
         {view === "verify" && (
           <EmailVerification
             onVerified={(verifiedEmail) => {
               setEmail(verifiedEmail);
-              setView("profile");
+              setView("profile"); // ✅ go to Profile first
             }}
             onAlreadyRegistered={() => setView("login")}
           />
@@ -151,12 +99,8 @@ export default function HomePage() {
 
         {view === "login" && (
           <ReturningUserLogin
-            onLoginSuccess={() => {
-              // ✅ demo mode: go straight to dashboard
-              // (you can later fetch profile/registration from API)
-              setView("dashboard");
-            }}
-            onCancel={() => setView("verify")}
+            onLoginSuccess={() => setView("dashboard")} // ✅ returning users land on dashboard
+            onCancel={() => setView("verify")} // New Registration
           />
         )}
 
@@ -164,8 +108,8 @@ export default function HomePage() {
           <ProfileForm
             initialData={profile}
             onBack={() => setView("verify")}
-            onComplete={(profileData) => {
-              setProfile(profileData);
+            onComplete={(p) => {
+              setProfile(p);
               setView("event-selection");
             }}
           />
@@ -178,14 +122,23 @@ export default function HomePage() {
             onBack={() => setView("profile")}
             onSelectEvent={(eventId, eventName) => {
               setSelectedEvent({ id: eventId, name: eventName });
+              setView("event-registration");
+            }}
+          />
+        )}
 
-              // ✅ create/update registration object now
-              setRegistration({
-                eventId,
-                eventName,
-                attendeeType: "physical", // demo default; you can change later in registration flow
-              });
-
+        {view === "event-registration" && (
+          <EventRegistration
+            initialData={registration}
+            onBack={() => setView("event-selection")}
+            onComplete={(reg) => {
+              // Save event info into registration too (helps dashboard)
+              const regWithEvent = {
+                ...reg,
+                eventId: selectedEvent?.id,
+                eventName: selectedEvent?.name,
+              };
+              setRegistration(regWithEvent);
               setView("payment");
             }}
           />
@@ -193,23 +146,17 @@ export default function HomePage() {
 
         {view === "payment" && (
           <Payment
-            amount={amount}
-            onBack={() => setView("event-selection")}
+            amount={paymentAmount}
+            onBack={() => setView("event-registration")}
             onComplete={() => setView("dashboard")}
           />
         )}
 
         {view === "dashboard" && (
           <Dashboard
-            userEmail={email || "demo@smflx.com"}
-            profile={profile || { fullName: "Demo User" }}
-            registration={
-              registration || {
-                eventId: "campmeeting26",
-                eventName: "WOTH Camp Meeting 2026",
-                attendeeType: "physical",
-              }
-            }
+            userEmail={email}
+            profile={profile}
+            registration={registration}
             accommodation={accommodation}
             onLogout={handleLogout}
             onAccommodationUpdate={(data) => setAccommodation(data)}

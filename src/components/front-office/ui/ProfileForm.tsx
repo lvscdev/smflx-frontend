@@ -414,21 +414,42 @@ function GridOption({ value, selected, onClick, icon, label, description }: Grid
 }
 
 export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProps) {
-  const [profile, setProfile] = useState<ProfileData>(initialData || {
-    fullName: '',
-    phoneCountryCode: initialData?.phoneCountryCode || (typeof initialData?.phone === 'string' && initialData.phone.startsWith('+') ? initialData.phone.match(/^\+\d{1,4}/)?.[0] : undefined) || '+234',
-    phoneNumber: initialData?.phoneNumber ? (initialData.phoneNumber.startsWith('+') ? initialData.phoneNumber.replace(/^\+\d{1,4}/, '') : initialData.phoneNumber) : (typeof initialData?.phone === 'string' ? initialData.phone.replace(/^\+\d{1,4}/, '') : ''),
-    gender: '',
-    ageRange: '',
-    country: '',
-    state: '',
-    localAssembly: '',
-    address: '',
-    isMinister: '',
-    employmentStatus: '',
-    maritalStatus: '',
-    spouseName: '',
-    isYAT: false,
+  const [profile, setProfile] = useState<ProfileData>(() => {
+    if (initialData) {
+      return {
+        ...initialData,
+        phoneCountryCode:
+          initialData.phoneCountryCode ||
+          (typeof initialData.phone === 'string' && initialData.phone.startsWith('+')
+            ? initialData.phone.match(/^\+\d{1,4}/)?.[0]
+            : undefined) ||
+          '+234',
+        phoneNumber:
+          initialData.phoneNumber
+            ? initialData.phoneNumber.startsWith('+')
+              ? initialData.phoneNumber.replace(/^\+\d{1,4}/, '')
+              : initialData.phoneNumber
+            : typeof initialData.phone === 'string'
+            ? initialData.phone.replace(/^\+\d{1,4}/, '')
+            : '',
+      };
+    }
+    return {
+      fullName: '',
+      phoneCountryCode: '+234',
+      phoneNumber: '',
+      gender: '',
+      ageRange: '',
+      country: '',
+      state: '',
+      localAssembly: '',
+      address: '',
+      isMinister: '',
+      employmentStatus: '',
+      maritalStatus: '',
+      spouseName: '',
+      isYAT: false,
+    };
   });
 
   const [isYAT, setIsYAT] = useState(initialData?.isYAT || false);

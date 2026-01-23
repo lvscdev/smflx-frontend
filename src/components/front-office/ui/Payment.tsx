@@ -4,21 +4,30 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CreditCard, CircleCheck, ArrowLeft } from 'lucide-react';
+import { CreditCard, CircleCheck, ArrowLeft, Copy, Check } from 'lucide-react';
 
 interface PaymentProps {
   amount: number;
   onComplete: () => void;
   onBack: () => void;
+  profile?: any;
+  accommodation?: any;
 }
 
-export function Payment({ amount, onComplete, onBack }: PaymentProps) {
+export function Payment({ amount, onComplete, onBack, profile, accommodation }: PaymentProps) {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [cardName, setCardName] = useState('');
+  const [pairingCode, setPairingCode] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const generatePairingCode = () => {
+    // Generate a random 5-digit code
+    return Math.floor(10000 + Math.random() * 90000).toString();
+  };
 
   const handlePayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,11 +38,25 @@ export function Payment({ amount, onComplete, onBack }: PaymentProps) {
       setPaymentProcessing(false);
       setPaymentComplete(true);
       
+      // Generate and store pairing code for married hotel guests
+      let generatedCode = '';
+      if (profile?.maritalStatus === 'married' && accommodation?.type === 'hotel') {
+        generatedCode = generatePairingCode();
+        setPairingCode(generatedCode);
+        localStorage.setItem('hotel_pairing_code', generatedCode);
+      }
+      
       // Navigate to dashboard after showing success
       setTimeout(() => {
         onComplete();
-      }, 2000);
+      }, generatedCode ? 4000 : 2000); // Give more time to copy code if present
     }, 2000);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(pairingCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const isFormValid = () => {
@@ -65,6 +88,35 @@ export function Payment({ amount, onComplete, onBack }: PaymentProps) {
           <p className="text-gray-600 text-sm mb-4">
             Your registration is now confirmed. Redirecting to dashboard...
           </p>
+          {pairingCode && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+              <p className="text-gray-700 font-medium text-sm mb-3">Share this code with your spouse:</p>
+              <div className="flex items-center justify-center gap-3">
+                <div className="bg-white px-6 py-3 rounded-lg border-2 border-blue-200">
+                  <span className="text-3xl font-bold text-gray-900 tracking-wider">{pairingCode}</span>
+                </div>
+                <button
+                  onClick={copyToClipboard}
+                  className={`p-3 rounded-lg transition-colors ${
+                    copied ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-5 h-5" />
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-5 h-5" />
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-3 text-center">
+                Your spouse can use this code to skip payment
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );

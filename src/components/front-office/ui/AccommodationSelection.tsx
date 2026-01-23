@@ -1,13 +1,14 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Bed, Users, ArrowLeft, Check } from 'lucide-react';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Bed, Users, ArrowLeft, Check } from "lucide-react";
+import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
+import { PairingCodeModal } from "@/components/front-office/ui/PairingCodeModal";
 
 interface AccommodationData {
   type: string;
@@ -17,7 +18,8 @@ interface AccommodationData {
   roomType?: string;
   roomMembers?: string[];
   price?: number;
-  priceCategory?: string;
+  priceCategory?: 'employed' | 'unemployed-student';
+  isPaired?: boolean;
 }
 
 interface AccommodationSelectionProps {
@@ -25,6 +27,7 @@ interface AccommodationSelectionProps {
   onComplete: (data: AccommodationData) => void;
   onBack: () => void;
   initialData?: AccommodationData | null;
+  profile?: any;
 }
 
 const campFacilities = [
@@ -152,15 +155,42 @@ const sharedApartments = [
   },
 ];
 
-export function AccommodationSelection({ accommodationType, onComplete, onBack, initialData }: AccommodationSelectionProps) {
+export function AccommodationSelection({ accommodationType, onComplete, onBack, initialData, profile }: AccommodationSelectionProps) {
   const [selection, setSelection] = useState<AccommodationData>(initialData || {
     type: accommodationType,
   });
   const [newMember, setNewMember] = useState('');
+  const [showPairingModal, setShowPairingModal] = useState(false);
+
+  // Calculate price based on marital status
+  // Students: 10,000, Employed/Unemployed: 15,000
+  const getCampPrice = () => {
+    if (profile?.maritalStatus === 'student') {
+      return 10000;
+    }
+    return 15000; // For employed, unemployed, single, married, divorced, widowed
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if user is married and selecting hotel accommodation
+    if (accommodationType === 'hotel' && profile?.maritalStatus === 'married') {
+      setShowPairingModal(true);
+    } else {
+      onComplete(selection);
+    }
+  };
+
+  const handleProceedToPayment = () => {
+    setShowPairingModal(false);
     onComplete(selection);
+  };
+
+  const handleCodeVerified = () => {
+    setShowPairingModal(false);
+    // Mark as paired and skip payment - pass special flag
+    onComplete({ ...selection, isPaired: true });
   };
 
   const addRoomMember = () => {
@@ -213,86 +243,37 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
               <div className="space-y-3">
                 <label className="block text-sm text-gray-700 font-medium">Select Camp Facility *</label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {campFacilities.map((facility) => (
-                    <button
-                      key={facility.id}
-                      type="button"
-                      onClick={() => setSelection({ ...selection, facility: facility.id })}
-                      className={`p-5 rounded-2xl border transition-all duration-200 text-left ${
-                        selection.facility === facility.id
-                          ? 'border-gray-900 bg-gray-50'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="aspect-4/3 w-full rounded-xl overflow-hidden mb-4">
-                        <ImageWithFallback
-                          src={facility.image}
-                          alt={facility.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        {facility.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {facility.spaces} Spaces Left
-                      </p>
-                    </button>
-                  ))}
+                  {campFacilities.map((facility) => {
+                    const price = getCampPrice();
+                    return (
+                      <button
+                        key={facility.id}
+                        type="button"
+                        onClick={() => setSelection({ ...selection, facility: facility.id, price })}
+                        className={`p-5 rounded-2xl border transition-all duration-200 text-left ${
+                          selection.facility === facility.id
+                            ? 'border-gray-900 bg-gray-50'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="aspect-[4/3] w-full rounded-xl overflow-hidden mb-4">
+                          <ImageWithFallback
+                            src={facility.image}
+                            alt={facility.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <h3 className="font-semibold text-gray-900 mb-1">
+                          {facility.name}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {facility.spaces} Spaces Left
+                        </p>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-
-              {/* Price Selection - Show after facility is selected */}
-              {selection.facility && (
-                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <label className="block text-sm text-gray-700 font-medium">Select Price Category *</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Employed Price */}
-                    <button
-                      type="button"
-                      onClick={() => setSelection({ ...selection, price: 15000, priceCategory: 'employed' })}
-                      className={`relative p-6 rounded-2xl border transition-all duration-200 text-left ${
-                        selection.price === 15000
-                          ? 'border-gray-900 bg-gray-50 shadow-md'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      {selection.price === 15000 && (
-                        <div className="absolute top-3 right-3 w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center">
-                          <Check className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-                      <div className="mb-2">
-                        <h3 className="font-semibold text-gray-900 text-lg mb-1">Employed</h3>
-                        <p className="text-sm text-gray-500">For those currently employed</p>
-                      </div>
-                      <div className="text-2xl font-bold text-gray-900">₦15,000</div>
-                    </button>
-
-                    {/* Unemployed/Students Price */}
-                    <button
-                      type="button"
-                      onClick={() => setSelection({ ...selection, price: 10000, priceCategory: 'unemployed-student' })}
-                      className={`relative p-6 rounded-2xl border transition-all duration-200 text-left ${
-                        selection.price === 10000
-                          ? 'border-gray-900 bg-gray-50 shadow-md'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      {selection.price === 10000 && (
-                        <div className="absolute top-3 right-3 w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center">
-                          <Check className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-                      <div className="mb-2">
-                        <h3 className="font-semibold text-gray-900 text-lg mb-1">Unemployed/Students</h3>
-                        <p className="text-sm text-gray-500">For students and unemployed</p>
-                      </div>
-                      <div className="text-2xl font-bold text-gray-900">₦10,000</div>
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           )}
 
@@ -338,7 +319,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                               <Check className="w-4 h-4 text-white" />
                             </div>
                           )}
-                          <div className="aspect-4/3 w-full rounded-xl overflow-hidden mb-4">
+                          <div className="aspect-[4/3] w-full rounded-xl overflow-hidden mb-4">
                             <ImageWithFallback
                               src={room.image}
                               alt={room.name}
@@ -409,7 +390,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                               <Check className="w-4 h-4 text-white" />
                             </div>
                           )}
-                          <div className="aspect-4/3 w-full rounded-xl overflow-hidden mb-4">
+                          <div className="aspect-[4/3] w-full rounded-xl overflow-hidden mb-4">
                             <ImageWithFallback
                               src={room.image}
                               alt={room.name}
@@ -456,11 +437,22 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              Continue to Payment
+              {accommodationType === 'hostel' && selection.price 
+                ? `Pay ₦${selection.price.toLocaleString('en-NG')}`
+                : 'Continue to Payment'
+              }
             </button>
           </div>
         </form>
       </div>
+      {showPairingModal && (
+        <PairingCodeModal
+          isOpen={showPairingModal}
+          onClose={() => setShowPairingModal(false)}
+          onProceedToPayment={handleProceedToPayment}
+          onCodeVerified={handleCodeVerified}
+        />
+      )}
     </div>
   );
 }

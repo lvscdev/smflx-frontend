@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Wifi, ArrowLeft, Tent, Users, Monitor, Building2, Home, Check, Radio, Youtube, Facebook } from 'lucide-react';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MapPin, Wifi, ArrowLeft, Tent, Users, Monitor, Building2, Home, Check, Radio, Youtube, Facebook } from "lucide-react";
 
 interface RegistrationData {
   attendeeType: string;
@@ -33,7 +33,7 @@ function GridOption({ value, selected, onClick, icon, label, description, gradie
     <button
       type="button"
       onClick={onClick}
-      className={`relative p-4 rounded-xl border transition-all duration-300 text-left bg-linear-to-br ${gradientFrom} ${gradientTo} ${
+      className={`relative p-4 rounded-xl border transition-all duration-300 text-left bg-gradient-to-br ${gradientFrom} ${gradientTo} ${
         selected
           ? 'border-gray-700 shadow-sm'
           : 'border-gray-200 hover:border-gray-400'
@@ -94,7 +94,7 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
   };
 
   return (
-    <div className="flex-1 overflow-auto px-4 lg:px-8 py-8 lg:py-[60.32px] lg:pt-18 lg:pr-8 lg:pb-8 lg:pl-8">
+    <div className="flex-1 overflow-auto px-4 lg:px-8 py-8 lg:py-[60.32px] lg:pt-[72px] lg:pr-[32px] lg:pb-[32px] lg:pl-[32px]">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6 lg:mb-8">
           <h1 className="text-2xl lg:text-3xl mb-2">Event Registration</h1>

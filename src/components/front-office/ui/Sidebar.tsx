@@ -73,7 +73,7 @@ export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesL
   }, []);
 
   return (
-    <div className="w-full lg:w-[42%] relative overflow-hidden flex flex-col h-32 lg:h-full">
+    <div className="w-full lg:w-[42%] relative overflow-hidden flex flex-col shrink-0 h-24 sm:h-27.5 lg:h-full">
       {/* Background Image */}
       <div className="absolute inset-0">
         <Image src={backgroundImage} alt="" fill priority className="object-cover" />

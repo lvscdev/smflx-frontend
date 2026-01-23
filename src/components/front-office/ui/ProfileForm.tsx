@@ -6,6 +6,127 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Check, User, Users, Briefcase, Home as HomeIcon, Heart, Search, ChevronDown, X } from 'lucide-react';
+import iso3166_2 from "iso-3166-2.json";
+
+const dialCodes = [
+  { code: "+93", label: "🇦🇫 +93" },   
+  { code: "+355", label: "🇦🇱 +355" },
+  { code: "+213", label: "🇩🇿 +213" }, 
+  { code: "+1-684", label: "🇦🇸 +1-684" }, 
+  { code: "+376", label: "🇦🇩 +376" }, 
+  { code: "+244", label: "🇦🇴 +244" }, 
+  { code: "+1-264", label: "🇦🇮 +1-264" }, 
+  { code: "+672", label: "🇦🇶 +672" }, 
+  { code: "+1-268", label: "🇦🇬 +1-268" }, 
+  { code: "+54", label: "🇦🇷 +54" }, 
+  { code: "+374", label: "🇦🇲 +374" }, 
+  { code: "+297", label: "🇦🇼 +297" }, 
+  { code: "+61", label: "🇦🇺 +61" }, 
+  { code: "+43", label: "🇦🇹 +43" }, 
+  { code: "+994", label: "🇦🇿 +994" }, 
+  { code: "+1-242", label: "🇧🇸 +1-242" }, 
+  { code: "+973", label: "🇧🇭 +973" }, 
+  { code: "+880", label: "🇧🇩 +880" }, 
+  { code: "+1-246", label: "🇧🇧 +1-246" }, 
+  { code: "+375", label: "🇧🇾 +375" }, 
+  { code: "+32", label: "🇧🇪 +32" }, 
+  { code: "+501", label: "🇧🇿 +501" }, 
+  { code: "+229", label: "🇧🇯 +229" }, 
+  { code: "+1-441", label: "🇧🇲 +1-441" }, 
+  { code: "+975", label: "🇧🇹 +975" }, 
+  { code: "+591", label: "🇧🇴 +591" }, 
+  { code: "+387", label: "🇧🇦 +387" }, 
+  { code: "+267", label: "🇧🇼 +267" }, 
+  { code: "+55", label: "🇧🇷 +55" }, 
+  { code: "+246", label: "🇮🇴 +246" }, 
+  { code: "+673", label: "🇧🇳 +673" }, 
+  { code: "+359", label: "🇧🇬 +359" }, 
+  { code: "+226", label: "🇧🇫 +226" }, 
+  { code: "+257", label: "🇧🇮 +257" }, 
+  { code: "+855", label: "🇰🇭 +855" }, 
+  { code: "+237", label: "🇨🇲 +237" }, 
+  { code: "+1", label: "🇨🇦 +1" }, 
+  { code: "+238", label: "🇨🇻 +238" }, 
+  { code: "+1-345", label: "🇰🇾 +1-345" }, 
+  { code: "+236", label: "🇨🇫 +236" },
+  { code: "+235", label: "🇹🇩 +235" }, 
+  { code: "+56", label: "🇨🇱 +56" },
+  { code: "+86", label: "🇨🇳 +86" }, 
+  { code: "+57", label: "🇨🇴 +57" }, 
+  { code: "+269", label: "🇰🇲 +269" }, 
+  { code: "+242", label: "🇨🇬 +242" }, 
+  { code: "+243", label: "🇨🇩 +243" }, 
+  { code: "+506", label: "🇨🇷 +506" }, 
+  { code: "+225", label: "🇨🇮 +225" },
+  { code: "+385", label: "🇭🇷 +385" }, 
+  { code: "+53", label: "🇨🇺 +53" }, 
+  { code: "+357", label: "🇨🇾 +357" }, 
+  { code: "+420", label: "🇨🇿 +420" }, 
+  { code: "+45", label: "🇩🇰 +45" }, 
+  { code: "+253", label: "🇩🇯 +253" }, 
+  { code: "+1-767", label: "🇩🇲 +1-767" }, 
+  { code: "+1-809", label: "🇩🇴 +1-809" }, 
+  { code: "+593", label: "🇪🇨 +593" }, 
+  { code: "+20", label: "🇪🇬 +20" }, 
+  { code: "+503", label: "🇸🇻 +503" }, 
+  { code: "+240", label: "🇬🇶 +240" }, 
+  { code: "+291", label: "🇪🇷 +291" }, 
+  { code: "+372", label: "🇪🇪 +372" }, 
+  { code: "+251", label: "🇪🇹 +251" }, 
+  { code: "+358", label: "🇫🇮 +358" }, 
+  { code: "+33", label: "🇫🇷 +33" }, 
+  { code: "+49", label: "🇩🇪 +49" }, 
+  { code: "+233", label: "🇬🇭 +233" }, 
+  { code: "+30", label: "🇬🇷 +30" }, 
+  { code: "+299", label: "🇬🇱 +299" }, 
+  { code: "+1-473", label: "🇬🇩 +1-473" }, 
+  { code: "+852", label: "🇭🇰 +852" }, 
+  { code: "+36", label: "🇭🇺 +36" }, 
+  { code: "+91", label: "🇮🇳 +91" }, 
+  { code: "+62", label: "🇮🇩 +62" }, 
+  { code: "+98", label: "🇮🇷 +98" }, 
+  { code: "+964", label: "🇮🇶 +964" }, 
+  { code: "+353", label: "🇮🇪 +353" }, 
+  { code: "+972", label: "🇮🇱 +972" }, 
+  { code: "+39", label: "🇮🇹 +39" }, 
+  { code: "+81", label: "🇯🇵 +81" }, 
+  { code: "+254", label: "🇰🇪 +254" }, 
+  { code: "+82", label: "🇰🇷 +82" }, 
+  { code: "+961", label: "🇱🇧 +961" }, 
+  { code: "+231", label: "🇱🇷 +231" }, 
+  { code: "+218", label: "🇱🇾 +218" }, 
+  { code: "+60", label: "🇲🇾 +60" }, 
+  { code: "+234", label: "🇳🇬 +234" }, 
+  { code: "+212", label: "🇲🇦 +212" }, 
+  { code: "+31", label: "🇳🇱 +31" }, 
+  { code: "+64", label: "🇳🇿 +64" }, 
+  { code: "+47", label: "🇳🇴 +47" }, 
+  { code: "+92", label: "🇵🇰 +92" }, 
+  { code: "+63", label: "🇵🇭 +63" }, 
+  { code: "+48", label: "🇵🇱 +48" }, 
+  { code: "+351", label: "🇵🇹 +351" }, 
+  { code: "+974", label: "🇶🇦 +974" }, 
+  { code: "+40", label: "🇷🇴 +40" }, 
+  { code: "+7", label: "🇷🇺 +7" }, 
+  { code: "+966", label: "🇸🇦 +966" }, 
+  { code: "+221", label: "🇸🇳 +221" }, 
+  { code: "+65", label: "🇸🇬 +65" }, 
+  { code: "+27", label: "🇿🇦 +27" }, 
+  { code: "+34", label: "🇪🇸 +34" }, 
+  { code: "+94", label: "🇱🇰 +94" }, 
+  { code: "+46", label: "🇸🇪 +46" }, 
+  { code: "+41", label: "🇨🇭 +41" },
+  { code: "+66", label: "🇹🇭 +66" }, 
+  { code: "+90", label: "🇹🇷 +90" }, 
+  { code: "+256", label: "🇺🇬 +256" }, 
+  { code: "+380", label: "🇺🇦 +380" }, 
+  { code: "+971", label: "🇦🇪 +971" }, 
+  { code: "+44", label: "🇬🇧 +44" }, 
+  { code: "+1", label: "🇺🇸 +1" }, 
+  { code: "+84", label: "🇻🇳 +84" }, 
+  { code: "+260", label: "🇿🇲 +260" }, 
+  { code: "+263", label: "🇿🇼 +263" }, 
+];
 
 const countries = [
   { code: 'AF', name: 'Afghanistan', flag: '🇦🇫' },
@@ -228,6 +349,9 @@ const countryStates: Record<string, string[]> = {
 
 interface ProfileData {
   fullName: string;
+  phoneCountryCode?: string;
+  phoneNumber: string; 
+  phone?: string; 
   gender: string;
   ageRange: string;
   country: string;
@@ -292,6 +416,8 @@ function GridOption({ value, selected, onClick, icon, label, description }: Grid
 export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProps) {
   const [profile, setProfile] = useState<ProfileData>(initialData || {
     fullName: '',
+    phoneCountryCode: initialData?.phoneCountryCode || (typeof initialData?.phone === 'string' && initialData.phone.startsWith('+') ? initialData.phone.match(/^\+\d{1,4}/)?.[0] : undefined) || '+234',
+    phoneNumber: initialData?.phoneNumber ? (initialData.phoneNumber.startsWith('+') ? initialData.phoneNumber.replace(/^\+\d{1,4}/, '') : initialData.phoneNumber) : (typeof initialData?.phone === 'string' ? initialData.phone.replace(/^\+\d{1,4}/, '') : ''),
     gender: '',
     ageRange: '',
     country: '',
@@ -343,12 +469,16 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onComplete(profile);
+    const code = profile.phoneCountryCode || "+234";
+    const local = (profile.phoneNumber || "").trim();
+    const full = (code + local).replace(/\s+/g, "");
+    onComplete({ ...profile, phoneCountryCode: code, phoneNumber: local, phone: full });
   };
 
   const isFormValid = () => {
     const requiredFields = [
       'fullName',
+      'phoneNumber',
       'gender',
       'ageRange',
       'country',
@@ -415,6 +545,32 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
                 }
                 label="Female"
                 description="Select if you identify as female"
+              />
+            </div>
+          </div>
+
+          {/* Phone Number */}
+          <div>
+            <label className="text-sm text-gray-600 mb-2 block">Phone Number *</label>
+            <div className="flex gap-3">
+              <select
+                value={profile.phoneCountryCode || "+234"}
+                onChange={(e) => setProfile({ ...profile, phoneCountryCode: e.target.value })}
+                className="h-10 w-[140px] rounded-md border border-gray-200 bg-white px-3 text-sm"
+              >
+                {dialCodes.map((d) => (
+                  <option key={d.code} value={d.code}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="tel"
+                value={profile.phoneNumber || ""}
+                onChange={(e) => setProfile({ ...profile, phoneNumber: e.target.value })}
+                placeholder="8012345678"
+                className="flex-1 px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
             </div>
           </div>

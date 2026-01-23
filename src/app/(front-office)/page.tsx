@@ -113,7 +113,7 @@ export default function HomePage() {
   const showSidebar = view !== "dashboard";
 
   return (
-    <div className="flex h-screen w-full">
+    <div className="flex flex-col lg:flex-row h-screen w-full">
       {showSidebar && (
         <Sidebar
           currentStep={currentStep}
@@ -123,7 +123,7 @@ export default function HomePage() {
       )}
 
       {/* ✅ keep flex-col to preserve vertical centering of verification/login pages */}
-      <div className="flex-1 h-full flex flex-col overflow-y-auto bg-white">
+      <div className="flex-1 min-h-0 flex flex-col overflow-y-auto bg-white">
         {view === "verify" && (
           <EmailVerification
             onVerified={(verifiedEmail) => {

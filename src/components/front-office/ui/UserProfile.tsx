@@ -5,6 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, User, Users, Briefcase, Home as HomeIcon, Heart, ChevronDown, X, Edit2, Search, Save, Trash2, Plus } from 'lucide-react';
+
+const dialCodes = [
+  { code: '+234', label: '🇳🇬 +234' },
+  { code: '+233', label: '🇬🇭 +233' },
+  { code: '+27', label: '🇿🇦 +27' },
+  { code: '+1', label: '🇺🇸 +1' },
+  { code: '+44', label: '🇬🇧 +44' },
+];
+
 import { DependentsModal } from './DependentsModal';
 import { DeleteDependentConfirmation } from './DeleteDependentConfirmation';
 
@@ -244,6 +253,21 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
   
   const [formData, setFormData] = useState({
     fullName: profile?.fullName || '',
+    phoneCountryCode:
+      profile?.phoneCountryCode ||
+      (typeof profile?.phone === "string" && profile.phone.startsWith("+")
+        ? profile.phone.match(/^\+\d{1,4}/)?.[0]
+        : undefined) ||
+      "+234",
+    phoneNumber:
+      profile?.phoneNumber
+        ? profile.phoneNumber.startsWith("+")
+          ? profile.phoneNumber.replace(/^\+\d{1,4}/, "")
+          : profile.phoneNumber
+        : typeof profile?.phone === "string"
+          ? profile.phone.replace(/^\+\d{1,4}/, "")
+          : "",
+
     gender: profile?.gender || '',
     ageRange: profile?.ageRange || '',
     country: profile?.country || '',
@@ -292,13 +316,31 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
   }, [isCountryDropdownOpen, isStateDropdownOpen]);
 
   const handleSaveProfile = () => {
-    onUpdate(formData);
+    const code = formData.phoneCountryCode || "+234";
+    const local = (formData.phoneNumber || "").trim();
+    const full = (code + local).replace(/\s+/g, "");
+    onUpdate({ ...profile, ...formData, phoneCountryCode: code, phoneNumber: local, phone: full });
     setIsEditingProfile(false);
   };
 
   const handleCancelProfile = () => {
     setFormData({
       fullName: profile?.fullName || '',
+      phoneCountryCode:
+        profile?.phoneCountryCode ||
+        (typeof profile?.phone === "string" && profile.phone.startsWith("+")
+          ? profile.phone.match(/^\+\d{1,4}/)?.[0]
+          : undefined) ||
+        "+234",
+      phoneNumber:
+        profile?.phoneNumber
+          ? profile.phoneNumber.startsWith("+")
+            ? profile.phoneNumber.replace(/^\+\d{1,4}/, "")
+            : profile.phoneNumber
+          : typeof profile?.phone === "string"
+            ? profile.phone.replace(/^\+\d{1,4}/, "")
+            : "",
+
       gender: profile?.gender || '',
       ageRange: profile?.ageRange || '',
       country: profile?.country || '',
@@ -468,7 +510,7 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                 </div>
 
                 <div className="space-y-6">
-                  {/* Email & Phone - Read Only */}
+                  {/* Email & Phone */}
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
                       <Label className="text-sm text-gray-600 mb-2 block">Email Address</Label>
@@ -476,11 +518,36 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                         {userEmail}
                       </div>
                     </div>
+
                     <div>
-                      <Label className="text-sm text-gray-600 mb-2 block">Phone Number</Label>
-                      <div className="px-4 py-3 bg-gray-100 rounded-lg text-gray-700">
-                        {userPhone}
-                      </div>
+                      <Label className="text-sm text-gray-600 mb-2 block">Phone Number *</Label>
+                      {isEditingProfile ? (
+                        <div className="flex gap-3">
+                          <select
+                            value={formData.phoneCountryCode || "+234"}
+                            onChange={(e) => setFormData({ ...formData, phoneCountryCode: e.target.value })}
+                            className="h-10 w-[140px] rounded-md border border-gray-200 bg-white px-3 text-sm"
+                          >
+                            {dialCodes.map((d) => (
+                              <option key={d.code} value={d.code}>
+                                {d.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          <Input
+                            type="tel"
+                            value={formData.phoneNumber || ""}
+                            onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                            placeholder="8012345678"
+                            className="flex-1"
+                          />
+                        </div>
+                      ) : (
+                        <div className="px-4 py-3 bg-gray-100 rounded-lg text-gray-700">
+                          {profile?.phone || userPhone}
+                        </div>
+                      )}
                     </div>
                   </div>
 

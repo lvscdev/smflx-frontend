@@ -520,13 +520,14 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                       <Edit2 className="w-4 h-4" />
                       Edit
                     </button>
-                  ) : (
-                    {profileSaveError && (
-                      <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
-                        {profileSaveError}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
+	                  ) : (
+	                    <>
+	                      {profileSaveError && (
+	                        <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
+	                          {profileSaveError}
+	                        </div>
+	                      )}
+	                      <div className="flex gap-2">
                       <button
                         onClick={handleCancelProfile}
                         className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"
@@ -540,7 +541,8 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                         <Save className="w-4 h-4" />
                         Save
                       </button>
-                    </div>
+	                      </div>
+	                    </>
                   )}
                 </div>
 

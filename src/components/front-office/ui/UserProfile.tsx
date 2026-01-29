@@ -16,6 +16,7 @@ const dialCodes = [
 
 import { DependentsModal } from './DependentsModal';
 import { DeleteDependentConfirmation } from './DeleteDependentConfirmation';
+import { normalizeDialCode, sanitizeLocalPhone, validateProfileBasics } from '@/lib/validation/profile';
 
 const countries = [
   { code: 'AF', name: 'Afghanistan', flag: '🇦🇫' },
@@ -249,6 +250,7 @@ interface UserProfileProps {
 export function UserProfile({ profile, userEmail, userPhone, dependents, onBack, onUpdate, onUpdateDependents }: UserProfileProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'dependents'>('profile');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState('');
   const [editingDependentId, setEditingDependentId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
@@ -317,10 +319,36 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
   }, [isCountryDropdownOpen, isStateDropdownOpen]);
 
   const handleSaveProfile = () => {
-    const code = formData.phoneCountryCode || "+234";
-    const local = (formData.phoneNumber || "").trim();
-    const full = (code + local).replace(/\s+/g, "");
-    onUpdate({ ...profile, ...formData, phoneCountryCode: code, phoneNumber: local, phone: full });
+    setProfileSaveError('');
+
+    const validated = validateProfileBasics({
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      gender: formData.gender,
+      phoneCountryCode: formData.phoneCountryCode,
+      phoneNumber: formData.phoneNumber,
+    });
+
+    if (!validated.ok) {
+      setProfileSaveError(validated.message);
+      return;
+    }
+
+    const code = validated.normalized.phoneCountryCode;
+    const local = validated.normalized.phoneNumber;
+    const full = validated.normalized.phoneFull;
+
+    onUpdate({
+      ...profile,
+      ...formData,
+      firstName: validated.normalized.firstName,
+      lastName: validated.normalized.lastName,
+      gender: validated.normalized.gender,
+      phoneCountryCode: code,
+      phoneNumber: local,
+      phone: full,
+    });
+
     setIsEditingProfile(false);
   };
 
@@ -493,6 +521,11 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                       Edit
                     </button>
                   ) : (
+                    {profileSaveError && (
+                      <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
+                        {profileSaveError}
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <button
                         onClick={handleCancelProfile}
@@ -527,7 +560,7 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                         <div className="flex gap-3">
                           <select
                             value={formData.phoneCountryCode || "+234"}
-                            onChange={(e) => setFormData({ ...formData, phoneCountryCode: e.target.value })}
+                            onChange={(e) => setFormData({ ...formData, phoneCountryCode: normalizeDialCode(e.target.value) })}
                             className="h-10 w-[140px] rounded-md border border-gray-200 bg-white px-3 text-sm"
                           >
                             {dialCodes.map((d) => (
@@ -540,7 +573,7 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                           <Input
                             type="tel"
                             value={formData.phoneNumber || ""}
-                            onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                            onChange={(e) => setFormData({ ...formData, phoneNumber: sanitizeLocalPhone(e.target.value, formData.phoneCountryCode || '+234') })}
                             placeholder="8012345678"
                             className="flex-1"
                           />

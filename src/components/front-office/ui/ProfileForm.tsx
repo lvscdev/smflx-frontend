@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Check, User, Users, Briefcase, Home as HomeIcon, Heart, Search, ChevronDown, X } from 'lucide-react';
 import iso3166_2 from "iso-3166-2.json";
 import { updateMe } from '@/lib/api';
+import { normalizeDialCode, sanitizeLocalPhone, validateProfileBasics } from '@/lib/validation/profile';
 
 const dialCodes = [
   { code: "+93", label: "🇦🇫 +93" },   
@@ -506,13 +507,28 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError('');
-    const code = profile.phoneCountryCode || "+234";
-    const local = (profile.phoneNumber || "").trim();
-    const full = (code + local).replace(/\s+/g, "");
+
+    // Frontend validation + normalization
+    const validated = validateProfileBasics({
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      gender: profile.gender,
+      phoneCountryCode: profile.phoneCountryCode,
+      phoneNumber: profile.phoneNumber,
+    });
+
+    if (!validated.ok) {
+      setSubmitError(validated.message);
+      return;
+    }
+
+    const code = validated.normalized.phoneCountryCode;
+    const local = validated.normalized.phoneNumber;
+    const full = validated.normalized.phoneFull;
 
     // Map UI model to backend user update payload
-    const firstName = (profile.firstName || '').trim();
-    const lastName = (profile.lastName || '').trim();
+    const firstName = validated.normalized.firstName;
+    const lastName = validated.normalized.lastName;
 
     const payload = {
       ...(firstName ? { firstName } : {}),
@@ -643,7 +659,7 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
             <div className="flex gap-3">
               <select
                 value={profile.phoneCountryCode || "+234"}
-                onChange={(e) => setProfile({ ...profile, phoneCountryCode: e.target.value })}
+                onChange={(e) => setProfile({ ...profile, phoneCountryCode: normalizeDialCode(e.target.value) })}
                 className="h-10 w-[140px] rounded-md border border-gray-200 bg-white px-3 text-sm"
               >
                 {dialCodes.map((d) => (
@@ -656,7 +672,7 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
               <input
                 type="tel"
                 value={profile.phoneNumber || ""}
-                onChange={(e) => setProfile({ ...profile, phoneNumber: e.target.value })}
+                onChange={(e) => setProfile({ ...profile, phoneNumber: sanitizeLocalPhone(e.target.value, profile.phoneCountryCode || '+234') })}
                 placeholder="8012345678"
                 className="flex-1 px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
               />

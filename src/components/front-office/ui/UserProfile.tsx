@@ -252,7 +252,8 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
   const [editingDependentId, setEditingDependentId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
-    fullName: profile?.fullName || '',
+    firstName: profile?.firstName || '',
+    lastName: profile?.lastName || '',
     phoneCountryCode:
       profile?.phoneCountryCode ||
       (typeof profile?.phone === "string" && profile.phone.startsWith("+")
@@ -325,7 +326,8 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
 
   const handleCancelProfile = () => {
     setFormData({
-      fullName: profile?.fullName || '',
+      firstName: profile?.firstName || '',
+    lastName: profile?.lastName || '',
       phoneCountryCode:
         profile?.phoneCountryCode ||
         (typeof profile?.phone === "string" && profile.phone.startsWith("+")
@@ -551,22 +553,41 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                     </div>
                   </div>
 
-                  {/* Full Name */}
-                  <div>
-                    <Label className="text-sm text-gray-600 mb-2 block">Full Name *</Label>
-                    {isEditingProfile ? (
-                      <Input
-                        type="text"
-                        value={formData.fullName}
-                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        placeholder="Enter your full name"
-                        className="w-full"
-                      />
-                    ) : (
-                      <div className="px-4 py-3 bg-gray-50 rounded-lg text-gray-900">
-                        {formData.fullName}
-                      </div>
-                    )}
+                  {/* Name */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-sm text-gray-600 mb-2 block">First Name *</Label>
+                      {isEditingProfile ? (
+                        <Input
+                          type="text"
+                          value={formData.firstName}
+                          onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                          placeholder="Enter your first name"
+                          className="w-full"
+                        />
+                      ) : (
+                        <div className="px-4 py-3 bg-gray-50 rounded-lg text-gray-900">
+                          {formData.firstName || '-'}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label className="text-sm text-gray-600 mb-2 block">Last Name *</Label>
+                      {isEditingProfile ? (
+                        <Input
+                          type="text"
+                          value={formData.lastName}
+                          onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                          placeholder="Enter your last name"
+                          className="w-full"
+                        />
+                      ) : (
+                        <div className="px-4 py-3 bg-gray-50 rounded-lg text-gray-900">
+                          {formData.lastName || '-'}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Gender */}

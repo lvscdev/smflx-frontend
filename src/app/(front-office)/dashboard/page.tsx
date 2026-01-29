@@ -11,7 +11,8 @@ export default function DashboardPage() {
   const [userData, setUserData] = useState({
     email: 'user@example.com',
     profile: {
-      fullName: 'John Doe',
+      firstName: 'John',
+      lastName: 'Doe',
       gender: 'male',
       ageRange: '23-29',
       country: 'Nigeria',

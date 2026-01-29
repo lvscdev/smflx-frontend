@@ -349,7 +349,8 @@ const countryStates: Record<string, string[]> = {
 };
 
 interface ProfileData {
-  fullName: string;
+  firstName: string;
+  lastName: string;
   phoneCountryCode?: string;
   phoneNumber: string; 
   phone?: string; 
@@ -370,7 +371,6 @@ interface ProfileFormProps {
   onComplete: (profile: ProfileData) => void;
   onBack: () => void;
   initialData?: ProfileData | null;
-  verifiedEmail: string;
 }
 
 interface GridOptionProps {
@@ -415,11 +415,21 @@ function GridOption({ value, selected, onClick, icon, label, description }: Grid
   );
 }
 
-export function ProfileForm({ onComplete, onBack, initialData, verifiedEmail }: ProfileFormProps) {
+export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProps) {
   const [profile, setProfile] = useState<ProfileData>(() => {
     if (initialData) {
       return {
         ...initialData,
+        firstName:
+          initialData.firstName ||
+          (typeof (initialData as any).fullName === 'string'
+            ? ((initialData as any).fullName as string).trim().split(/\s+/).filter(Boolean)[0] || ''
+            : ''),
+        lastName:
+          initialData.lastName ||
+          (typeof (initialData as any).fullName === 'string'
+            ? ((initialData as any).fullName as string).trim().split(/\s+/).filter(Boolean).slice(1).join(' ')
+            : ''),
         phoneCountryCode:
           initialData.phoneCountryCode ||
           (typeof initialData.phone === 'string' && initialData.phone.startsWith('+')
@@ -437,7 +447,8 @@ export function ProfileForm({ onComplete, onBack, initialData, verifiedEmail }: 
       };
     }
     return {
-      fullName: '',
+      firstName: '',
+      lastName: '',
       phoneCountryCode: '+234',
       phoneNumber: '',
       gender: '',
@@ -500,11 +511,10 @@ export function ProfileForm({ onComplete, onBack, initialData, verifiedEmail }: 
     const full = (code + local).replace(/\s+/g, "");
 
     // Map UI model to backend user update payload
-    const [firstName, ...rest] = (profile.fullName || '').trim().split(/\s+/).filter(Boolean);
-    const lastName = rest.join(' ');
+    const firstName = (profile.firstName || '').trim();
+    const lastName = (profile.lastName || '').trim();
 
     const payload = {
-      email: verifiedEmail,
       ...(firstName ? { firstName } : {}),
       ...(lastName ? { lastName } : {}),
       ...(full ? { phoneNumber: full } : {}),
@@ -536,7 +546,8 @@ export function ProfileForm({ onComplete, onBack, initialData, verifiedEmail }: 
 
   const isFormValid = () => {
     const requiredFields = [
-      'fullName',
+      'firstName',
+      'lastName',
       'phoneNumber',
       'gender',
       'ageRange',
@@ -574,16 +585,29 @@ export function ProfileForm({ onComplete, onBack, initialData, verifiedEmail }: 
               {submitError}
             </div>
           )}
-          {/* Full Name */}
-          <div className="space-y-2">
-            <label htmlFor="fullName" className="block text-sm text-gray-700 font-medium">Full Name *</label>
-            <input
-              id="fullName"
-              value={profile.fullName}
-              onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
-              placeholder="Enter your full name"
-              className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
-            />
+                    {/* Name */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="firstName" className="block text-sm text-gray-700 font-medium">First Name *</label>
+              <input
+                id="firstName"
+                value={profile.firstName}
+                onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+                placeholder="Enter your first name"
+                className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="lastName" className="block text-sm text-gray-700 font-medium">Last Name *</label>
+              <input
+                id="lastName"
+                value={profile.lastName}
+                onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
+                placeholder="Enter your last name"
+                className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+            </div>
           </div>
 
           {/* Gender - Grid Selector */}

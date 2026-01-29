@@ -172,7 +172,7 @@ export function Dashboard({
     };
   }, [isDropdownOpen]);
 
-  const firstName = profile?.fullName ? profile.fullName.split(' ')[0] : 'User';
+  const firstName = (profile?.firstName || (profile as any)?.fullName?.split(' ')?.[0] || 'User');
 
   const attendeeType = registration?.attendeeType as 'camper' | 'physical' | 'online' | undefined;
   const isNonCamper = attendeeType === 'physical' || attendeeType === 'online';

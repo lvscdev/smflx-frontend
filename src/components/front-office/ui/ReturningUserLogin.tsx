@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { generateLoginOtp, validateOtp } from "@/lib/api";
 import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
+import { toUserMessage } from "@/lib/errors/userMessages";
 
 interface ReturningUserLoginProps {
   onLoginSuccess: () => void;
@@ -17,28 +18,30 @@ export function ReturningUserLogin({ onLoginSuccess, onCancel }: ReturningUserLo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const sendCode = async () => {
-    setError("");
-    const trimmed = email.trim();
+  
 
-    if (!trimmed || !trimmed.includes("@")) {
-      setError("Please enter a valid email address");
-      return;
-    }
+const sendCode = async () => {
+  setError("");
+  const trimmed = email.trim();
 
-    setLoading(true);
-    try {
-      const { reference } = await generateLoginOtp(trimmed);
-      setOtpReference(reference);
-      setStep("code");
-    } catch (err: any) {
-      setError(err?.message || "Failed to send verification code");
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!trimmed || !trimmed.includes("@")) {
+    setError("Please enter a valid email address");
+    return;
+  }
 
-  const handleEmailSubmit = (e: FormEvent) => {
+  setLoading(true);
+  try {
+    const { reference } = await generateLoginOtp(trimmed);
+    setOtpReference(reference);
+    setStep("code");
+  } catch (err: any) {
+    setError(toUserMessage(err, { feature: "otp", action: "send" }));
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleEmailSubmit = (e: FormEvent) => {
     e.preventDefault();
     sendCode();
   };
@@ -46,7 +49,7 @@ export function ReturningUserLogin({ onLoginSuccess, onCancel }: ReturningUserLo
   const handleCodeSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-
+    
     if (code.length !== 6) {
       setError('Please enter a valid 6-digit code');
       return;
@@ -64,17 +67,15 @@ export function ReturningUserLogin({ onLoginSuccess, onCancel }: ReturningUserLo
         otp: code,
         otpReference,
       });
-
       setAuthToken(token);
       try {
         localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(userDetails));
       } catch {
         // ignore
       }
-
       onLoginSuccess();
     } catch (err: any) {
-      setError(err?.message || 'Invalid code. Please try again');
+      setError(toUserMessage(err, { feature: "otp", action: "verify" }));
     } finally {
       setLoading(false);
     }
@@ -88,8 +89,8 @@ export function ReturningUserLogin({ onLoginSuccess, onCancel }: ReturningUserLo
           <div className="text-center mb-6 lg:mb-8">
             <h1 className="text-2xl lg:text-3xl mb-3">Welcome Back</h1>
             <p className="text-gray-600 text-sm">
-              {step === 'email'
-                ? 'Enter your registered email to access your dashboard'
+              {step === 'email' 
+                ? 'Enter your registered email to access your dashboard' 
                 : 'Enter the verification code sent to your email'}
             </p>
           </div>
@@ -119,33 +120,27 @@ export function ReturningUserLogin({ onLoginSuccess, onCancel }: ReturningUserLo
 
               <button
                 type="submit"
-                disabled={!email || loading}
-                className={`w-full py-3 rounded-lg transition-colors ${
-                  email && !loading
+                className={`w-full px-6 py-3 rounded-lg transition-colors ${
+                  !loading
                     ? 'bg-red-600 text-white hover:bg-red-700'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
+                disabled={loading}
               >
-                {loading ? 'Sending...' : 'Send Verification Code'}
+                {loading ? 'Sending...' : 'Continue'}
               </button>
 
               <button
                 type="button"
                 onClick={onCancel}
-                className="underline w-full py-3 text-gray-600 hover:text-gray-900 transition-colors"
+                className="w-full px-6 py-3 text-gray-600 hover:text-gray-900 underline underline-offset-4 transition-colors"
+                disabled={loading}
               >
                 New Registration
               </button>
             </form>
           ) : (
             <form onSubmit={handleCodeSubmit} className="space-y-6">
-              <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-lg text-sm">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <p>Verification code sent to {email}</p>
-              </div>
-
               <div>
                 <label htmlFor="code" className="block text-sm mb-2 text-gray-700">
                   Verification Code
@@ -153,12 +148,16 @@ export function ReturningUserLogin({ onLoginSuccess, onCancel }: ReturningUserLo
                 <input
                   id="code"
                   type="text"
-                  placeholder="Enter 6-digit code"
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-center text-2xl tracking-widest"
+                  disabled={loading}
                   maxLength={6}
-                  className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-center text-xl tracking-widest"
                 />
+                <p className="text-sm text-gray-500 mt-2 text-center">
+                  Check your email: <span className="font-medium text-gray-700">{email}</span>
+                </p>
               </div>
 
               {error && (
@@ -167,22 +166,33 @@ export function ReturningUserLogin({ onLoginSuccess, onCancel }: ReturningUserLo
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={code.length !== 6 || loading}
-                className={`w-full py-3 rounded-lg transition-colors ${
-                  code.length === 6 && !loading
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                {loading ? 'Verifying...' : 'Verify & Continue'}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep('email')}
+                  className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  disabled={loading}
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  className={`flex-1 px-6 py-3 rounded-lg transition-colors ${
+                    !loading
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                  disabled={loading}
+                >
+                  {loading ? 'Verifying...' : 'Verify & Login'}
+                </button>
+              </div>
 
               <button
                 type="button"
                 onClick={sendCode}
-                className="underline w-full py-3 text-gray-600 hover:text-gray-900 transition-colors"
+                className="w-full text-sm text-gray-600 hover:text-gray-900 underline underline-offset-4 transition-colors"
+                disabled={loading}
               >
                 Resend verification code
               </button>

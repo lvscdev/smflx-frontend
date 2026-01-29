@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { generateRegistrantOtp, validateOtp } from "@/lib/api";
 import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
+import { toUserMessage } from "@/lib/errors/userMessages";
 
 interface EmailVerificationProps {
   onVerified: (email: string) => void;
@@ -31,7 +32,7 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
       setOtpReference(reference);
       setVerificationSent(true);
     } catch (err: any) {
-      setError(err?.message || 'Failed to send verification code');
+      setError(toUserMessage(err, { feature: "otp", action: "send" }));
     } finally {
       setIsVerifying(false);
     }
@@ -56,7 +57,6 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
         otp: verificationCode,
         otpReference,
       });
-
       // Persist session for Stage 2/3 API calls
       setAuthToken(token);
       try {
@@ -64,10 +64,9 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
       } catch {
         // ignore
       }
-
       onVerified(email.trim());
     } catch (err: any) {
-      setError(err?.message || 'Invalid code. Please try again');
+      setError(toUserMessage(err, { feature: "otp", action: "verify" }));
     } finally {
       setIsVerifying(false);
     }

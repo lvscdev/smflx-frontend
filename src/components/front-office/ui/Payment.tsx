@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ArrowLeft, CreditCard } from 'lucide-react';
 import { initiateRegistrationPayment } from '@/lib/api';
+import { toUserMessage } from '@/lib/errors/userMessages';
 
 interface PaymentProps {
   amount: number;
@@ -70,7 +71,7 @@ export function Payment({ amount, onBack, profile, accommodation, registration }
       // ✅ SAME TAB redirect
       window.location.href = checkoutUrl;
     } catch (err: any) {
-      setError(err?.message || 'Unable to start payment checkout. Please try again.');
+      setError(toUserMessage(err, { feature: 'payment', action: 'init' }));
     } finally {
       setPaymentProcessing(false);
     }

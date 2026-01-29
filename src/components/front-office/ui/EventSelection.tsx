@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Calendar, Clock, ArrowLeft, RefreshCcw } from "lucide-react";
 import { listActiveEvents, type Event as ApiEvent } from "@/lib/api";
+import { toUserMessage } from "@/lib/errors/userMessages";
 
 interface Event {
   id: string;
@@ -44,6 +45,7 @@ export function EventSelection({
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string>("");
+  const [isEmpty, setIsEmpty] = useState(false);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -52,11 +54,10 @@ export function EventSelection({
       const apiEvents = await listActiveEvents();
       const mapped = (apiEvents || []).map(mapApiEvent);
       setEvents(mapped);
-      if (mapped.length === 0) {
-        setLoadError("No active events found.");
-      }
+      setIsEmpty(mapped.length === 0);
     } catch (e: any) {
-      setLoadError(e?.message || "Failed to load events");
+      setIsEmpty(false);
+      setLoadError(toUserMessage(e, { feature: "events", action: "list" }));
       setEvents([]);
     } finally {
       setLoading(false);
@@ -99,7 +100,16 @@ export function EventSelection({
           </div>
         )}
 
-        {!loading && !loadError && filteredEvents.length === 0 && (
+        {!loading && !loadError && isEmpty && (
+          <div className="mb-6 p-6 rounded-2xl border border-gray-200 bg-gray-50 text-center">
+            <div className="text-base text-gray-900 mb-1">No events available</div>
+            <div className="text-sm text-gray-600">
+              There are currently no events open for registration. Please check back later.
+            </div>
+          </div>
+        )}
+
+        {!loading && !loadError && !isEmpty && filteredEvents.length === 0 && (
           <div className="text-center text-sm text-gray-600 mb-6">No events available for your profile.</div>
         )}
 

@@ -93,7 +93,8 @@ export type Event = {
 };
 
 export async function listActiveEvents() {
-  return apiRequest<Event[]>('/events/active', { method: 'GET', auth: false });
+  // Swagger marks this as bearerAuth-protected; default apiRequest auth=true
+  return apiRequest<Event[]>('/events/active', { method: 'GET' });
 }
 
 // --- Event registrations ---

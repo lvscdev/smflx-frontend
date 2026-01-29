@@ -190,16 +190,20 @@ export function DependentsModal({
 
                 <div>
                   <label className="block text-sm text-gray-700 font-medium mb-2">
-                    Age *
+                    Age (5–12) *
                   </label>
                   <Input
                     type="text"
                     value={currentDependent.age}
                     onChange={(e) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, age: sanitizeDependentAge(e.target.value) }); }}
-                    placeholder="Enter age"
-                    min="0"
-                    max="120"
+                    placeholder="Enter age (5–12)"
+                    inputMode="numeric"
+                    min="5"
+                    max="12"
                   />
+                  <p className="mt-2 text-xs text-gray-600">
+                    Dependents must be <span className="font-medium">5–12</span>. Age <span className="font-medium">13+</span> must register as an attendee.
+                  </p>
                 </div>
 
                 <div>

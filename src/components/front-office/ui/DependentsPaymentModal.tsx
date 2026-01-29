@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, CreditCard } from 'lucide-react';
 import { initiateDependentsPayment } from '@/lib/api';
+import { toUserMessage } from '@/lib/errors/userMessages';
 
 interface DependentsPaymentModalProps {
   isOpen: boolean;
@@ -56,6 +57,10 @@ export function DependentsPaymentModal({
         .map((d) => d?.dependentId || d?.id || d?.dependentRegistrationId)
         .filter(Boolean);
 
+      if (!dependentIds.length) {
+        throw new Error('No dependents selected for payment.');
+      }
+
       if (!userId || !resolvedEventId) {
         throw new Error('Missing user/event context for payment checkout.');
       }
@@ -74,18 +79,18 @@ export function DependentsPaymentModal({
       // ✅ SAME TAB redirect
       window.location.href = checkoutUrl;
     } catch (err: any) {
-      setError(err?.message || 'Unable to start dependents payment checkout. Please try again.');
+      setError(toUserMessage(err, { feature: 'payment', action: 'init' }));
     } finally {
       setPaymentProcessing(false);
     }
   };
 
-  const isFormValid = () => {
-    return cardNumber.length === 19 && expiryDate.length === 5 && cvv.length === 3 && cardName.trim();
-  };
+  // Payment happens on the gateway page. We keep the card fields for UI parity,
+  // but we must not block the user from proceeding.
+  const isFormValid = () => true;
 
   const formatCardNumber = (value: string) => {
-    const cleaned = value.replace(/\s/g, '');
+    const cleaned = value.replace(/\D/g, '');
     const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
     return formatted.slice(0, 19);
   };
@@ -134,11 +139,19 @@ export function DependentsPaymentModal({
             </div>
           </div>
 
+          <div className="mb-6 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+            You’ll complete payment on the secure checkout page after you click <span className="font-medium">Proceed to Checkout</span>.
+          </div>
+
           {error && (
             <div className="mb-6 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
               {error}
             </div>
           )}
+
+          <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+            You’ll complete payment on the secure checkout page after you continue.
+          </div>
 
           <form onSubmit={handlePayment} className="space-y-6">
             <div className="space-y-2">
@@ -166,6 +179,7 @@ export function DependentsPaymentModal({
                   placeholder="1234 5678 9012 3456"
                   className="w-full px-4 py-3 pr-12 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
                   maxLength={19}
+                  inputMode="numeric"
                 />
                 <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               </div>
@@ -183,6 +197,7 @@ export function DependentsPaymentModal({
                   placeholder="MM/YY"
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
                   maxLength={5}
+                  inputMode="numeric"
                 />
               </div>
               <div className="space-y-2">
@@ -197,6 +212,7 @@ export function DependentsPaymentModal({
                   placeholder="123"
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
                   maxLength={3}
+                  inputMode="numeric"
                 />
               </div>
             </div>

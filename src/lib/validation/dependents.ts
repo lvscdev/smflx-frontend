@@ -12,6 +12,8 @@ export function sanitizeDependentAge(age: string): string {
   // keep digits only, max 3 chars
   const d = digitsOnly(age, 3);
   if (!d) return '';
+  // Clamp broadly to avoid extreme values while typing.
+  // The actual allowed range for dependents is enforced in validateDependentDraft.
   const n = clampNumber(parseInt(d, 10), 0, 120);
   return String(n);
 }
@@ -29,7 +31,17 @@ export function validateDependentDraft(d: DependentDraft): ValidationResult {
 
   const n = parseInt(age, 10);
   if (Number.isNaN(n)) return { ok: false, message: 'Please enter a valid age.' };
-  if (n < 0 || n > 120) return { ok: false, message: 'Please enter an age between 0 and 120.' };
+  // Business rule: dependents must be ages 5–12.
+  if (n >= 13) {
+    return {
+      ok: false,
+      message:
+        'Ages 13 and above must register as an attendee. Please register them separately.',
+    };
+  }
+  if (n < 5 || n > 12) {
+    return { ok: false, message: 'Dependents must be between 5 and 12 years old.' };
+  }
 
   if (!gender) return { ok: false, message: 'Please select the dependent’s gender.' };
 

@@ -370,6 +370,7 @@ interface ProfileFormProps {
   onComplete: (profile: ProfileData) => void;
   onBack: () => void;
   initialData?: ProfileData | null;
+  verifiedEmail: string;
 }
 
 interface GridOptionProps {
@@ -414,7 +415,7 @@ function GridOption({ value, selected, onClick, icon, label, description }: Grid
   );
 }
 
-export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProps) {
+export function ProfileForm({ onComplete, onBack, initialData, verifiedEmail }: ProfileFormProps) {
   const [profile, setProfile] = useState<ProfileData>(() => {
     if (initialData) {
       return {
@@ -503,6 +504,7 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
     const lastName = rest.join(' ');
 
     const payload = {
+      email: verifiedEmail,
       ...(firstName ? { firstName } : {}),
       ...(lastName ? { lastName } : {}),
       ...(full ? { phoneNumber: full } : {}),

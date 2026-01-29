@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ArrowLeft, CreditCard } from 'lucide-react';
 import { initiateRegistrationPayment } from '@/lib/api';
 import { toUserMessage } from '@/lib/errors/userMessages';
+import { validatePaymentContext } from '@/lib/validation/payment';
 
 interface PaymentProps {
   amount: number;
@@ -31,8 +32,9 @@ export function Payment({ amount, onBack, profile, accommodation, registration }
       const eventId = registration?.eventId;
       const registrationId = registration?.registrationId;
 
-      if (!userId || !eventId) {
-        throw new Error('Missing user/event context for payment checkout.');
+      const ctxRes = validatePaymentContext({ amount, userId, eventId });
+      if (!ctxRes.ok) {
+        throw new Error(ctxRes.message);
       }
 
             const reference = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)

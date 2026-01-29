@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Bed, Users, ArrowLeft, Check } from "lucide-react";
 import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
 import { PairingCodeModal } from "@/components/front-office/ui/PairingCodeModal";
+import { validateAccommodationSelection } from "@/lib/validation/accommodation";
 
 interface AccommodationData {
   type: string;
@@ -161,6 +162,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
   });
   const [newMember, setNewMember] = useState('');
   const [showPairingModal, setShowPairingModal] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Calculate price based on marital status
   // Students: 10,000, Employed/Unemployed: 15,000
@@ -173,7 +175,14 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const res = validateAccommodationSelection(accommodationType, selection);
+    if (!res.ok) {
+      setFormError(res.message);
+      return;
+    }
+    setFormError(null);
+
     // Check if user is married and selecting hotel accommodation
     if (accommodationType === 'hotel' && profile?.maritalStatus === 'married') {
       setShowPairingModal(true);
@@ -237,6 +246,11 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {formError && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {formError}
+            </div>
+          )}
           {/* Hostel Flow */}
           {accommodationType === 'hostel' && (
             <>
@@ -249,7 +263,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                       <button
                         key={facility.id}
                         type="button"
-                        onClick={() => setSelection({ ...selection, facility: facility.id, price })}
+                        onClick={() => { setFormError(null); setSelection({ ...selection, facility: facility.id, price }); }}
                         className={`p-5 rounded-2xl border transition-all duration-200 text-left ${
                           selection.facility === facility.id
                             ? 'border-gray-900 bg-gray-50'
@@ -285,7 +299,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                 <select
                   id="hotel"
                   value={selection.facility}
-                  onChange={(e) => setSelection({ ...selection, facility: e.target.value, roomType: '', price: undefined })}
+                  onChange={(e) => { setFormError(null); setSelection({ ...selection, facility: e.target.value, roomType: '', price: undefined }); }}
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
                 >
                   <option value="">Choose a hotel</option>
@@ -307,7 +321,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                         <button
                           key={room.id}
                           type="button"
-                          onClick={() => setSelection({ ...selection, roomType: room.id, price: room.price })}
+                          onClick={() => { setFormError(null); setSelection({ ...selection, roomType: room.id, price: room.price }); }}
                           className={`relative p-5 rounded-2xl border transition-all duration-200 text-left ${
                             selection.roomType === room.id
                               ? 'border-gray-900 bg-gray-50 shadow-md'
@@ -356,7 +370,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                 <select
                   id="apartment"
                   value={selection.facility}
-                  onChange={(e) => setSelection({ ...selection, facility: e.target.value, roomType: '' })}
+                  onChange={(e) => { setFormError(null); setSelection({ ...selection, facility: e.target.value, roomType: '' }); }}
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
                 >
                   <option value="">Choose an apartment</option>
@@ -378,7 +392,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                         <button
                           key={room.id}
                           type="button"
-                          onClick={() => setSelection({ ...selection, roomType: room.id, price: room.price })}
+                          onClick={() => { setFormError(null); setSelection({ ...selection, roomType: room.id, price: room.price }); }}
                           className={`relative p-5 rounded-2xl border transition-all duration-200 text-left ${
                             selection.roomType === room.id
                               ? 'border-gray-900 bg-gray-50 shadow-md'

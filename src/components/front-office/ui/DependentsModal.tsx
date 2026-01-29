@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, Plus, Trash2, Check, Users, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { validateDependentDraft, sanitizeDependentAge } from '@/lib/validation/dependents';
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from '@/components/ui/alert-dialog';
 
 interface Dependent {
@@ -43,18 +44,22 @@ export function DependentsModal({
     age: '',
     gender: ''
   });
+  const [currentFormError, setCurrentFormError] = useState<string | null>(null);
   const [showingForm, setShowingForm] = useState(existingDependents.length === 0);
 
   if (!isOpen) return null;
 
   const handleAddDependent = () => {
-    if (!currentDependent.name || !currentDependent.age || !currentDependent.gender) {
+    const res = validateDependentDraft(currentDependent);
+    if (!res.ok) {
+      setCurrentFormError(res.message);
       return;
     }
+    setCurrentFormError(null);
 
     const newDependent: Dependent = {
       id: Date.now().toString(),
-      name: currentDependent.name,
+      name: currentDependent.name.trim(),
       age: currentDependent.age,
       gender: currentDependent.gender,
       isRegistered: false
@@ -132,7 +137,7 @@ export function DependentsModal({
   const selectedCount = unregisteredDependents.length;
   const totalAmount = selectedCount * 7000;
 
-  const isFormValid = currentDependent.name && currentDependent.age && currentDependent.gender;
+  const isFormValid = validateDependentDraft(currentDependent).ok;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -164,6 +169,12 @@ export function DependentsModal({
           {showingForm && (
             <div className="bg-gray-50 rounded-xl p-6 mb-6">
               <h3 className="font-semibold mb-4">Add Dependent</h3>
+              {currentFormError && (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {currentFormError}
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm text-gray-700 font-medium mb-2">
@@ -172,7 +183,7 @@ export function DependentsModal({
                   <Input
                     type="text"
                     value={currentDependent.name}
-                    onChange={(e) => setCurrentDependent({ ...currentDependent, name: e.target.value })}
+                    onChange={(e) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, name: e.target.value }); }}
                     placeholder="Enter full name"
                   />
                 </div>
@@ -182,9 +193,9 @@ export function DependentsModal({
                     Age *
                   </label>
                   <Input
-                    type="number"
+                    type="text"
                     value={currentDependent.age}
-                    onChange={(e) => setCurrentDependent({ ...currentDependent, age: e.target.value })}
+                    onChange={(e) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, age: sanitizeDependentAge(e.target.value) }); }}
                     placeholder="Enter age"
                     min="0"
                     max="120"
@@ -198,7 +209,7 @@ export function DependentsModal({
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => setCurrentDependent({ ...currentDependent, gender: 'male' })}
+                      onClick={() => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, gender: 'male' }); }}
                       className={`py-3 px-4 rounded-lg border-2 transition-colors ${
                         currentDependent.gender === 'male'
                           ? 'border-blue-600 bg-blue-50 text-blue-700'
@@ -209,7 +220,7 @@ export function DependentsModal({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setCurrentDependent({ ...currentDependent, gender: 'female' })}
+                      onClick={() => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, gender: 'female' }); }}
                       className={`py-3 px-4 rounded-lg border-2 transition-colors ${
                         currentDependent.gender === 'female'
                           ? 'border-blue-600 bg-blue-50 text-blue-700'

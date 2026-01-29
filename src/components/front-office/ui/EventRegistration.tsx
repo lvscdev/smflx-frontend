@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from "react";
+import { validateEventRegistration } from "@/lib/validation/eventRegistration";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -72,9 +73,16 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
     attendeeType: '',
     accommodationType: '',
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const res = validateEventRegistration(registration);
+    if (!res.ok) {
+      setFormError(res.message);
+      return;
+    }
+    setFormError(null);
     onComplete(registration);
   };
 
@@ -104,6 +112,11 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {formError && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {formError}
+            </div>
+          )}
           {/* Attendee Type - Grid Selector */}
           <div className="space-y-3">
             <label className="block text-sm text-gray-700 font-medium">Attendee Type *</label>
@@ -111,7 +124,7 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
               <GridOption
                 value="camper"
                 selected={registration.attendeeType === 'camper'}
-                onClick={() => setRegistration({ ...registration, attendeeType: 'camper', accommodationType: '' })}
+                onClick={() => { setFormError(null); setRegistration({ ...registration, attendeeType: 'camper', accommodationType: '' }); }}
                 icon={<Tent className="w-5 h-5" />}
                 label="Camper"
                 description="Stay on-site with full camping experience"
@@ -119,7 +132,7 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
               <GridOption
                 value="physical"
                 selected={registration.attendeeType === 'physical'}
-                onClick={() => setRegistration({ ...registration, attendeeType: 'physical', accommodationType: '' })}
+                onClick={() => { setFormError(null); setRegistration({ ...registration, attendeeType: 'physical', accommodationType: '' }); }}
                 icon={<MapPin className="w-5 h-5" />}
                 label="Physical Attendance"
                 description="Attend in person without camping"
@@ -128,7 +141,7 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
                 <GridOption
                   value="online"
                   selected={registration.attendeeType === 'online'}
-                  onClick={() => setRegistration({ ...registration, attendeeType: 'online', accommodationType: '' })}
+                  onClick={() => { setFormError(null); setRegistration({ ...registration, attendeeType: 'online', accommodationType: '' }); }}
                   icon={<Monitor className="w-5 h-5" />}
                   label="Online Participant"
                   description="Join us virtually via live stream"
@@ -216,7 +229,7 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
                 <GridOption
                   value="hostel"
                   selected={registration.accommodationType === 'hostel'}
-                  onClick={() => setRegistration({ ...registration, accommodationType: 'hostel' })}
+                  onClick={() => { setFormError(null); setRegistration({ ...registration, accommodationType: 'hostel' }); }}
                   icon={<Tent className="w-5 h-5" />}
                   label="Hostel (Camper)"
                   description={`${accommodationSpaces.hostel} spaces available`}
@@ -224,7 +237,7 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
                 <GridOption
                   value="hotel"
                   selected={registration.accommodationType === 'hotel'}
-                  onClick={() => setRegistration({ ...registration, accommodationType: 'hotel' })}
+                  onClick={() => { setFormError(null); setRegistration({ ...registration, accommodationType: 'hotel' }); }}
                   icon={<Building2 className="w-5 h-5" />}
                   label="Hotel"
                   description={`${accommodationSpaces.hotel} spaces available`}
@@ -232,7 +245,7 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
                 <GridOption
                   value="shared"
                   selected={registration.accommodationType === 'shared'}
-                  onClick={() => setRegistration({ ...registration, accommodationType: 'shared' })}
+                  onClick={() => { setFormError(null); setRegistration({ ...registration, accommodationType: 'shared' }); }}
                   icon={<Users className="w-5 h-5" />}
                   label="Shared Apartment"
                   description={`${accommodationSpaces.shared} spaces available`}

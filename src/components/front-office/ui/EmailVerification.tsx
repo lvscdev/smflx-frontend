@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { generateRegistrantOtp, validateOtp } from "@/lib/api";
+import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
 
 interface EmailVerificationProps {
   onVerified: (email: string) => void;
@@ -55,9 +56,15 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
         otp: verificationCode,
         otpReference,
       });
+
       // Persist session for Stage 2/3 API calls
-      localStorage.setItem('smflx_token', token);
-      localStorage.setItem('smflx_user', JSON.stringify(userDetails));
+      setAuthToken(token);
+      try {
+        localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(userDetails));
+      } catch {
+        // ignore
+      }
+
       onVerified(email.trim());
     } catch (err: any) {
       setError(err?.message || 'Invalid code. Please try again');

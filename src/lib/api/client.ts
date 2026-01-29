@@ -49,12 +49,25 @@ export class ApiError extends Error {
   }
 }
 
-function getToken(): string | null {
+export const AUTH_TOKEN_STORAGE_KEY = 'smflx_token';
+export const AUTH_USER_STORAGE_KEY = 'smflx_user';
+
+export function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    return localStorage.getItem('smflx_token');
+    return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
   } catch {
     return null;
+  }
+}
+
+export function setAuthToken(token: string | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!token) localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    else localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  } catch {
+    // ignore storage errors (private mode / quota)
   }
 }
 
@@ -78,7 +91,7 @@ export async function apiRequest<T>(
 
   const auth = opts?.auth !== false; // default true
   if (auth) {
-    const token = getToken();
+    const token = getAuthToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
@@ -96,10 +109,7 @@ export async function apiRequest<T>(
   }
 
   if (!res.ok) {
-    const msg =
-      json?.message ||
-      json?.error ||
-      `Request failed (${res.status})`;
+    const msg = json?.message || json?.error || `Request failed (${res.status})`;
     throw new ApiError(msg, { status: res.status, code: json?.code, details: json });
   }
 

@@ -1,8 +1,19 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import {Home, Tent, User, LogOut, X, Building2, Hotel, Users, Facebook, Instagram, Twitter, Youtube, Radio} from 'lucide-react';
+import {Home, Tent, User, LogOut, X, Building2, Hotel, Users, Facebook, Instagram, Twitter, Youtube, Radio, Loader2} from 'lucide-react';
 import Image from 'next/image';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { AccommodationSelection } from './AccommodationSelection';
 import { Payment } from './Payment';
 import { DependentsBanner } from './DependentsBanner';
@@ -11,6 +22,7 @@ import { DependentsPaymentModal } from './DependentsPaymentModal';
 import { DependentsSection } from './DependentsSection';
 import { DependentRegistrationSuccess } from './DependentRegistrationSuccess';
 import { UserProfile } from './UserProfile';
+import { getUserDashboard, addDependent as apiAddDependent, removeDependent as apiRemoveDependent } from '@/lib/api';
 
 const eventBgImage = '/assets/images/event-bg.png';
 const badgeImage = '/assets/images/badge.png';
@@ -44,6 +56,8 @@ export function Dashboard({
   const [activeDashboardPage, setActiveDashboardPage] = useState<'dashboard' | 'user-profile'>('dashboard');
   const [localProfile, setLocalProfile] = useState<any>(profile);
 
+  const [dashboardLoadError, setDashboardLoadError] = useState<string | null>(null);
+
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
@@ -56,11 +70,54 @@ export function Dashboard({
 
   // Dependents state
   const [dependents, setDependents] = useState<any[]>([]);
+  const [removingDependentId, setRemovingDependentId] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [dependentToDelete, setDependentToDelete] = useState<any>(null);
   const [isDependentsModalOpen, setIsDependentsModalOpen] = useState(false);
   const [isDependentsPaymentModalOpen, setIsDependentsPaymentModalOpen] = useState(false);
   const [selectedDependentsForPayment, setSelectedDependentsForPayment] = useState<any[]>([]);
   const [isRegistrationSuccessModalOpen, setIsRegistrationSuccessModalOpen] = useState(false);
   const [registeredDependentName, setRegisteredDependentName] = useState('');
+
+  // Stage 2: hydrate dashboard data from API when available
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data: any = await getUserDashboard();
+        if (!mounted) return;
+
+        const deps =
+          data?.dependants ||
+          data?.dependents ||
+          data?.dependentRegistrations ||
+          [];
+        if (Array.isArray(deps) && deps.length > 0) {
+          setDependents(
+            deps.map((d: any) => ({
+              id: d?.id || d?.dependantId || crypto.randomUUID(),
+              name: d?.name,
+              age: d?.age,
+              gender: d?.gender?.toString()?.toLowerCase() || 'male',
+              isRegistered: d?.isRegistered ?? true,
+              isPaid: d?.isPaid ?? (d?.paymentStatus === 'PAID' ? true : false),
+            }))
+          );
+        }
+
+        // Optionally hydrate profile from API
+        if (data?.user && typeof data.user === 'object') {
+          setLocalProfile((prev: any) => ({ ...prev, ...data.user }));
+        }
+      } catch (err: any) {
+        if (!mounted) return;
+        setDashboardLoadError(err?.message || 'Failed to load dashboard data.');
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
@@ -159,9 +216,85 @@ export function Dashboard({
   // Check if there are unregistered dependents
   const hasUnregisteredDependents = dependents.some((d) => !d.isRegistered);
 
-  const handleSaveDependents = (updatedDependents: any[]) => {
-    setDependents(updatedDependents);
-  };
+const handleSaveDependents = async (updatedDependents: any[]) => {
+  // optimistic UI
+  const prev = dependents;
+  setDependents(updatedDependents);
+
+  // Stage 2: persist newly added dependents (no demo fallbacks)
+  try {
+    const eventId = registration?.eventId || registration?.event?.eventId;
+    if (!eventId) {
+      throw new Error('Missing eventId: cannot save dependents.');
+    }
+
+    const prevIds = new Set(prev.map((d: any) => d.id));
+    const toCreate = updatedDependents.filter((d: any) => !prevIds.has(d.id));
+
+    for (const d of toCreate) {
+      const gender = (d?.gender || 'male').toString().toUpperCase();
+      const normalizedGender = gender === 'FEMALE' ? 'FEMALE' : 'MALE';
+      await apiAddDependent({
+        eventId,
+        name: d?.name,
+        age: Number(d?.age || 0),
+        gender: normalizedGender,
+      });
+    }
+  } catch (err: any) {
+    // revert optimistic update and surface error
+    setDependents(prev);
+    setDashboardLoadError(err?.message || 'Failed to save dependents. Please try again.');
+  }
+};
+
+const handleRemoveDependent = (dependentId: string) => {
+  const dependent = dependents.find((d) => d.id === dependentId);
+  if (!dependent) return;
+
+  // Open confirmation dialog instead of window.confirm
+  setDependentToDelete(dependent);
+  setConfirmDeleteOpen(true);
+};
+
+const confirmRemoveDependent = async () => {
+  if (!dependentToDelete) return;
+
+  const dependentId = dependentToDelete.id;
+  const dependentName = dependentToDelete.name;
+
+  // Prevent double-click / parallel deletes
+  if (removingDependentId) return;
+  setRemovingDependentId(dependentId);
+
+  const prev = dependents;
+  setDependents((ds) => ds.filter((d) => d.id !== dependentId));
+
+  try {
+    await apiRemoveDependent(dependentId);
+    
+    // ✅ SUCCESS TOAST
+    toast.success(`${dependentName} removed successfully`, {
+      description: "The dependent has been removed from your registration.",
+    });
+  } catch (err: any) {
+    setDependents(prev);
+    const msg =
+      err?.message ||
+      `Failed to remove ${dependentName}. Please try again.`;
+    setDashboardLoadError(msg);
+    
+    // Error toast
+    toast.error("Failed to remove dependent", {
+      description: msg,
+    });
+    
+    throw err;
+  } finally {
+    setRemovingDependentId(null);
+    setDependentToDelete(null);
+  }
+};
 
   const handleRegisterDependent = (id: string) => {
     const updatedDependents = dependents.map((d) => (d.id === id ? { ...d, isRegistered: true } : d));
@@ -229,9 +362,11 @@ export function Dashboard({
               onClick={() => setIsDropdownOpen((v) => !v)}
               className="w-10 h-10 lg:w-12 lg:h-12 rounded-full overflow-hidden border-2 border-gray-200 hover:border-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
             >
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1615843423179-bea071facf96?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200"
                 alt="User Avatar"
+                width={200}
+                height={200}
                 className="w-full h-full object-cover"
               />
             </button>
@@ -264,6 +399,13 @@ export function Dashboard({
           </div>
         </div>
       </header>
+
+      {dashboardLoadError && (
+        <div className="mx-4 lg:mx-8 mt-4 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
+          {dashboardLoadError}
+        </div>
+      )}
+
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 lg:px-8 py-6 lg:py-10">
@@ -376,9 +518,11 @@ export function Dashboard({
               </div>
 
               <div className="rounded-2xl overflow-hidden h-35 lg:h-40">
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1694595437436-2ccf5a95591f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1080"
                   alt="Accommodation"
+                  width={1080}
+                  height={400}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -411,9 +555,11 @@ export function Dashboard({
               </div>
 
               <div className="w-full lg:w-48 h-32 lg:h-40 rounded-2xl overflow-hidden shrink-0">
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400"
                   alt="Accommodation"
+                  width={400}
+                  height={160}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -425,21 +571,21 @@ export function Dashboard({
         <div className="mb-6">
           <h3 className="text-lg lg:text-xl font-semibold mb-4">Resources</h3>
           <div className="grid md:grid-cols-3 gap-4">
-            <div className="bg-linear-to-br from-indigo-900 via-purple-900 to-purple-800 rounded-2xl p-6 text-white cursor-pointer hover:opacity-90 transition-opacity min-h-[120px] flex items-end">
+            <div className="bg-linear-to-br from-indigo-900 via-purple-900 to-purple-800 rounded-2xl p-6 text-white cursor-pointer hover:opacity-90 transition-opacity min-h-30 flex items-end">
               <div>
                 <h4 className="font-semibold text-lg">WOTH SMFLX</h4>
                 <p className="text-base opacity-90">2025 Messages</p>
               </div>
             </div>
 
-            <div className="bg-linear-to-br from-amber-900 via-orange-900 to-red-900 rounded-2xl p-6 text-white cursor-pointer hover:opacity-90 transition-opacity min-h-[120px] flex items-end">
+            <div className="bg-linear-to-br from-amber-900 via-orange-900 to-red-900 rounded-2xl p-6 text-white cursor-pointer hover:opacity-90 transition-opacity min-h-30 flex items-end">
               <div>
                 <h4 className="font-semibold text-lg">WOTH 2025 Teens</h4>
                 <p className="text-base opacity-90">an YA Messages</p>
               </div>
             </div>
 
-            <div className="bg-linear-to-br from-purple-700 via-pink-600 to-teal-500 rounded-2xl p-6 text-white cursor-pointer hover:opacity-90 transition-opacity min-h-[120px] flex items-end">
+            <div className="bg-linear-to-br from-purple-700 via-pink-600 to-teal-500 rounded-2xl p-6 text-white cursor-pointer hover:opacity-90 transition-opacity min-h-30 flex items-end">
               <div>
                 <h4 className="font-semibold text-lg">Photo</h4>
                 <p className="text-base opacity-90">Gallery</p>
@@ -638,7 +784,14 @@ export function Dashboard({
               )}
 
               {modalStep === 3 && (
-                <Payment amount={accommodationData?.price || 250} onComplete={handlePaymentComplete} onBack={handleModalBack} />
+                <Payment
+                  amount={accommodationData?.price || 250}
+                  onComplete={handlePaymentComplete}
+                  onBack={handleModalBack}
+                  profile={localProfile}
+                  accommodation={accommodationData}
+                  registration={registration}
+                />
               )}
             </div>
           </div>
@@ -647,6 +800,7 @@ export function Dashboard({
 
       {/* Dependents Modal */}
       <DependentsModal
+                onRemoveDependent={handleRemoveDependent}
         isOpen={isDependentsModalOpen}
         onClose={() => setIsDependentsModalOpen(false)}
         existingDependents={dependents}
@@ -659,6 +813,7 @@ export function Dashboard({
         isOpen={isDependentsPaymentModalOpen}
         onClose={() => setIsDependentsPaymentModalOpen(false)}
         dependents={selectedDependentsForPayment}
+        eventId={registration?.eventId || registration?.event?.eventId}
         onPaymentComplete={handleDependentsPaymentComplete}
       />
 
@@ -668,6 +823,29 @@ export function Dashboard({
         dependentName={registeredDependentName}
         onClose={() => setIsRegistrationSuccessModalOpen(false)}
       />
+
+      {/* Confirmation Dialog for Remove Dependent */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Dependent</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove {dependentToDelete?.name || 'this dependent'}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDependentToDelete(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemoveDependent}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

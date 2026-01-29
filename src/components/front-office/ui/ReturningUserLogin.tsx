@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { generateLoginOtp, validateOtp } from "@/lib/api";
 
 interface ReturningUserLoginProps {
   onLoginSuccess: () => void;
@@ -11,25 +12,31 @@ export function ReturningUserLogin({ onLoginSuccess, onCancel }: ReturningUserLo
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
+  const [otpReference, setOtpReference] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   
 
-const sendCode = () => {
+const sendCode = async () => {
   setError("");
+  const trimmed = email.trim();
 
-  if (!email || !email.includes("@")) {
+  if (!trimmed || !trimmed.includes("@")) {
     setError("Please enter a valid email address");
     return;
   }
 
   setLoading(true);
-  // Demo: simulate sending code
-  setTimeout(() => {
-    setLoading(false);
+  try {
+    const { reference } = await generateLoginOtp(trimmed);
+    setOtpReference(reference);
     setStep("code");
-  }, 1000);
+  } catch (err: any) {
+    setError(err?.message || "Failed to send verification code");
+  } finally {
+    setLoading(false);
+  }
 };
 
 const handleEmailSubmit = (e: FormEvent) => {
@@ -37,7 +44,7 @@ const handleEmailSubmit = (e: FormEvent) => {
     sendCode();
   };
 
-  const handleCodeSubmit = (e: FormEvent) => {
+  const handleCodeSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     
@@ -46,12 +53,26 @@ const handleEmailSubmit = (e: FormEvent) => {
       return;
     }
 
+    if (!otpReference) {
+      setError('Please resend the code and try again');
+      return;
+    }
+
     setLoading(true);
-    // Simulate code verification
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const { token, userDetails } = await validateOtp({
+        email: email.trim(),
+        otp: code,
+        otpReference,
+      });
+      localStorage.setItem('smflx_token', token);
+      localStorage.setItem('smflx_user', JSON.stringify(userDetails));
       onLoginSuccess();
-    }, 1000);
+    } catch (err: any) {
+      setError(err?.message || 'Invalid code. Please try again');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

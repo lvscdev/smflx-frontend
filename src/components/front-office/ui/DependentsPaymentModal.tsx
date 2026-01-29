@@ -1,23 +1,33 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
-import { X, CreditCard, CircleCheck } from 'lucide-react';
+import { X, CreditCard } from 'lucide-react';
+import { initiateDependentsPayment } from '@/lib/api';
 
 interface DependentsPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   dependents: any[];
   onPaymentComplete: () => void;
+  eventId?: string;
 }
 
-export function DependentsPaymentModal({ 
-  isOpen, 
-  onClose, 
-  dependents, 
-  onPaymentComplete 
+/**
+ * Stage 3 requirement:
+ * - Initiate checkout and redirect in the SAME TAB using checkoutUrl.
+ * - No demo simulations / fallbacks.
+ */
+export function DependentsPaymentModal({
+  isOpen,
+  onClose,
+  dependents,
+  eventId,
+  onPaymentComplete,
 }: DependentsPaymentModalProps) {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
-  const [paymentComplete, setPaymentComplete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Kept only for UI parity (gateway collects payment on its own page)
   const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
@@ -27,21 +37,47 @@ export function DependentsPaymentModal({
 
   const totalAmount = dependents.length * 7000;
 
-  const handlePayment = (e: React.FormEvent) => {
+  const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setPaymentProcessing(true);
-    
-    // Simulate payment processing
-    setTimeout(() => {
+
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('smflx_user') : null;
+      const user = raw ? JSON.parse(raw) : null;
+      const userId = user?.userId;
+
+      const resolvedEventId =
+        eventId ||
+        dependents?.[0]?.eventId ||
+        dependents?.[0]?.event?.eventId;
+
+      const dependentIds = (dependents || [])
+        .map((d) => d?.dependentId || d?.id || d?.dependentRegistrationId)
+        .filter(Boolean);
+
+      if (!userId || !resolvedEventId) {
+        throw new Error('Missing user/event context for payment checkout.');
+      }
+
+      const resp = await initiateDependentsPayment({
+        userId,
+        eventId: resolvedEventId,
+        dependentIds,
+        amount: totalAmount,
+        currency: 'NGN',
+      });
+
+      const checkoutUrl = resp?.checkoutUrl;
+      if (!checkoutUrl) throw new Error('Dependents payment initiation succeeded but checkoutUrl was not returned.');
+
+      // ✅ SAME TAB redirect
+      window.location.href = checkoutUrl;
+    } catch (err: any) {
+      setError(err?.message || 'Unable to start dependents payment checkout. Please try again.');
+    } finally {
       setPaymentProcessing(false);
-      setPaymentComplete(true);
-      
-      // Complete after showing success
-      setTimeout(() => {
-        onPaymentComplete();
-        onClose();
-      }, 2000);
-    }, 2000);
+    }
   };
 
   const isFormValid = () => {
@@ -62,24 +98,6 @@ export function DependentsPaymentModal({
     return cleaned;
   };
 
-  if (paymentComplete) {
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CircleCheck className="w-10 h-10 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-semibold mb-2">Payment Successful!</h2>
-            <p className="text-gray-600 text-sm">
-              Your dependents have been registered successfully.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-auto">
@@ -92,14 +110,14 @@ export function DependentsPaymentModal({
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0"
+            disabled={paymentProcessing}
+            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-60"
           >
             <X className="w-5 h-5 text-gray-600" />
           </button>
         </div>
 
         <div className="p-6">
-          {/* Dependents Summary */}
           <div className="mb-6 p-4 bg-gray-50 rounded-xl">
             <h3 className="font-semibold mb-3">Registering:</h3>
             <div className="space-y-2">
@@ -116,7 +134,12 @@ export function DependentsPaymentModal({
             </div>
           </div>
 
-          {/* Payment Form */}
+          {error && (
+            <div className="mb-6 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handlePayment} className="space-y-6">
             <div className="space-y-2">
               <label htmlFor="cardName" className="block text-sm text-gray-700 font-medium">
@@ -187,7 +210,7 @@ export function DependentsPaymentModal({
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {paymentProcessing ? 'Processing Payment...' : `Pay ₦${totalAmount.toLocaleString('en-NG')}`}
+              {paymentProcessing ? 'Redirecting to checkout…' : `Proceed to Checkout (₦${totalAmount.toLocaleString('en-NG')})`}
             </button>
           </form>
         </div>

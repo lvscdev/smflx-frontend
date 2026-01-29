@@ -128,7 +128,7 @@ export default function HomePage() {
           <EmailVerification
             onVerified={(verifiedEmail) => {
               setEmail(verifiedEmail);
-              setView("profile"); // ✅ verify -> profile
+              setView("profile"); 
             }}
             onAlreadyRegistered={() => setView("login")}
           />

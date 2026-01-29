@@ -1,0 +1,55 @@
+import { NextRequest, NextResponse } from "next/server";
+
+const BACKEND_BASE_URL =
+  process.env.SMFLX_BACKEND_BASE_URL ??
+  "https://loveseal-events-backend.onrender.com";
+
+function buildTargetUrl(pathSegments: string[]) {
+  const path = pathSegments.map(encodeURIComponent).join("/");
+  return `${BACKEND_BASE_URL}/${path}`;
+}
+
+async function proxy(req: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
+  const { path = [] } = await context.params;
+
+  const incomingUrl = new URL(req.url);
+  const target = new URL(buildTargetUrl(path));
+  target.search = incomingUrl.search;
+
+  // Build safe upstream headers
+  const headers = new Headers(req.headers);
+  headers.delete("host");
+  headers.delete("connection");
+  headers.delete("content-length");
+  headers.delete("accept-encoding"); // critical
+  headers.set("accept-encoding", "identity"); // critical
+
+  const body =
+    req.method === "GET" || req.method === "HEAD"
+      ? undefined
+      : await req.arrayBuffer();
+
+  const upstream = await fetch(target.toString(), {
+    method: req.method,
+    headers,
+    body: body ? Buffer.from(body) : undefined,
+  });
+
+  // Read as raw bytes so we control headers
+  const buf = await upstream.arrayBuffer();
+
+  // Copy headers but remove encoding/length
+  const outHeaders = new Headers(upstream.headers);
+  outHeaders.delete("content-encoding"); // critical
+  outHeaders.delete("content-length");   // critical
+
+  return new NextResponse(buf, {
+    status: upstream.status,
+    headers: outHeaders,
+  });
+}
+
+export async function GET(req: NextRequest, ctx: any) { return proxy(req, ctx); }
+export async function POST(req: NextRequest, ctx: any) { return proxy(req, ctx); }
+export async function PUT(req: NextRequest, ctx: any) { return proxy(req, ctx); }
+export async function DELETE(req: NextRequest, ctx: any) { return proxy(req, ctx); }

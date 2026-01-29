@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Check, User, Users, Briefcase, Home as HomeIcon, Heart, Search, ChevronDown, X } from 'lucide-react';
 import iso3166_2 from "iso-3166-2.json";
+import { updateMe } from '@/lib/api';
 
 const dialCodes = [
   { code: "+93", label: "🇦🇫 +93" },   
@@ -453,6 +454,8 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
   });
 
   const [isYAT, setIsYAT] = useState(initialData?.isYAT || false);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const [countrySearch, setCountrySearch] = useState('');
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
@@ -488,11 +491,44 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError('');
     const code = profile.phoneCountryCode || "+234";
     const local = (profile.phoneNumber || "").trim();
     const full = (code + local).replace(/\s+/g, "");
+
+    // Map UI model to backend user update payload
+    const [firstName, ...rest] = (profile.fullName || '').trim().split(/\s+/).filter(Boolean);
+    const lastName = rest.join(' ');
+
+    const payload = {
+      ...(firstName ? { firstName } : {}),
+      ...(lastName ? { lastName } : {}),
+      ...(full ? { phoneNumber: full } : {}),
+      ...(profile.gender ? { gender: profile.gender.toUpperCase() } : {}),
+      ...(profile.ageRange ? { ageRange: profile.ageRange } : {}),
+      ...(profile.localAssembly ? { localAssembly: profile.localAssembly } : {}),
+      ...(profile.maritalStatus ? { maritalStatus: profile.maritalStatus.toUpperCase() } : {}),
+      ...(profile.employmentStatus ? { employmentStatus: profile.employmentStatus.toUpperCase().replace('-', '_') } : {}),
+      ...(profile.state ? { stateOfResidence: profile.state } : {}),
+    };
+    let ok = true;
+
+    setSubmitLoading(true);
+
+    try {
+      // Update profile server-side (token required)
+      await updateMe(payload);
+    } catch (err: any) {
+      ok = false;
+      setSubmitError(err?.message || 'Failed to save profile. Please try again.');
+    } finally {
+      setSubmitLoading(false);
+    }
+
+    if (!ok) return;
+
     onComplete({ ...profile, phoneCountryCode: code, phoneNumber: local, phone: full });
   };
 
@@ -531,6 +567,11 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {submitError && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
+              {submitError}
+            </div>
+          )}
           {/* Full Name */}
           <div className="space-y-2">
             <label htmlFor="fullName" className="block text-sm text-gray-700 font-medium">Full Name *</label>
@@ -897,14 +938,14 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
             </button>
             <button
               type="submit"
-              disabled={!isFormValid()}
+              disabled={!isFormValid() || submitLoading}
               className={`flex-1 py-3 rounded-lg transition-colors ${
-                isFormValid()
+                isFormValid() && !submitLoading
                   ? 'bg-red-600 text-white hover:bg-red-700'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              Save Profile & Continue
+              {submitLoading ? 'Saving...' : 'Save Profile & Continue'}
             </button>
           </div>
         </form>

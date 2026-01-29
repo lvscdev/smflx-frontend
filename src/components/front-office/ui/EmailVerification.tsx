@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { generateRegistrantOtp, validateOtp } from "@/lib/api";
 
 interface EmailVerificationProps {
   onVerified: (email: string) => void;
@@ -12,24 +13,56 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
+  const [otpReference, setOtpReference] = useState<string>('');
+  const [error, setError] = useState('');
 
-  const handleSendVerification = (e: React.FormEvent) => {
+  const handleSendVerification = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      setIsVerifying(true);
-      // Simulate sending verification email
-      setTimeout(() => {
-        setIsVerifying(false);
-        setVerificationSent(true);
-      }, 1000);
+    setError('');
+    if (!email || !email.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const { reference } = await generateRegistrantOtp(email.trim());
+      setOtpReference(reference);
+      setVerificationSent(true);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to send verification code');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
-  const handleVerify = (e: React.FormEvent) => {
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate verification
-    if (verificationCode.length === 6) {
-      onVerified(email);
+    setError('');
+    if (verificationCode.length !== 6) {
+      setError('Please enter the 6-digit code');
+      return;
+    }
+    if (!otpReference) {
+      setError('Please resend the code and try again');
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const { token, userDetails } = await validateOtp({
+        email: email.trim(),
+        otp: verificationCode,
+        otpReference,
+      });
+      // Persist session for Stage 2/3 API calls
+      localStorage.setItem('smflx_token', token);
+      localStorage.setItem('smflx_user', JSON.stringify(userDetails));
+      onVerified(email.trim());
+    } catch (err: any) {
+      setError(err?.message || 'Invalid code. Please try again');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -54,6 +87,12 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
               Enter your email to access the SMFLX registration portal
             </p>
           </div>
+
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
+          )}
 
           {!verificationSent ? (
             <form onSubmit={handleSendVerification} className="space-y-6">

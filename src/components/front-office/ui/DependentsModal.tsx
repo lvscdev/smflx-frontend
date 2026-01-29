@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from 'react';
-import { X, Plus, Trash2, Check, Users } from 'lucide-react';
+import { X, Plus, Trash2, Check, Users, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
+import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from '@/components/ui/alert-dialog';
 
 interface Dependent {
   id: string;
@@ -19,6 +21,7 @@ interface DependentsModalProps {
   onRegisterAndPay?: (dependents: Dependent[]) => void;
   onSave?: (dependents: Dependent[]) => void;
   onAddDependents?: (dependents: Dependent[]) => void;
+  onRemoveDependent?: (dependentId: string) => Promise<void> | void;
 }
 
 export function DependentsModal({
@@ -28,8 +31,13 @@ export function DependentsModal({
   onSave,
   onRegisterAndPay,
   onAddDependents,
+  onRemoveDependent,
 }: DependentsModalProps) {
   const [dependents, setDependents] = useState<Dependent[]>(existingDependents.length > 0 ? existingDependents : []);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [dependentToDelete, setDependentToDelete] = useState<Dependent | null>(null);
   const [currentDependent, setCurrentDependent] = useState({
     name: '',
     age: '',
@@ -58,7 +66,47 @@ export function DependentsModal({
   };
 
   const handleRemoveDependent = (id: string) => {
-    setDependents(dependents.filter(d => d.id !== id));
+    const dependent = dependents.find((d) => d.id === id);
+    if (!dependent) return;
+
+    // Open confirmation dialog
+    setDependentToDelete(dependent);
+    setConfirmDeleteOpen(true);
+  };
+
+  const confirmRemoveDependent = async () => {
+    if (!dependentToDelete) return;
+    const id = dependentToDelete.id;
+    const name = dependentToDelete.name;
+
+    if (removingId) return;
+    setRemovingId(id);
+    setRemoveError(null);
+
+    const prev = dependents;
+    setDependents((ds) => ds.filter((d) => d.id !== id));
+
+    try {
+      await Promise.resolve(onRemoveDependent?.(id));
+      
+      // ✅ SUCCESS TOAST
+      toast.success(`${name} removed successfully`, {
+        description: "The dependent has been removed.",
+      });
+    } catch (err: any) {
+      // rollback local state if parent/API fails
+      setDependents(prev);
+      const msg = err?.message || 'Failed to remove dependent. Please try again.';
+      setRemoveError(msg);
+      
+      // Error toast
+      toast.error("Failed to remove dependent", {
+        description: msg,
+      });
+    } finally {
+      setRemovingId(null);
+      setDependentToDelete(null);
+    }
   };
 
   const handleSave = () => {
@@ -89,6 +137,11 @@ export function DependentsModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          {removeError && (
+            <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {removeError}
+            </div>
+          )}
         {/* Header */}
         <div className="p-6 border-b flex items-center justify-between">
           <div>
@@ -213,9 +266,15 @@ export function DependentsModal({
                       </div>
                       <button
                         onClick={() => handleRemoveDependent(dependent.id)}
-                        className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                        disabled={removingId === dependent.id}
+                        className="p-2 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={removingId === dependent.id ? "Removing..." : "Remove dependent"}
                       >
-                        <Trash2 className="w-4 h-4 text-red-600" />
+                        {removingId === dependent.id ? (
+                          <Loader2 className="w-4 h-4 text-red-600 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        )}
                       </button>
                     </div>
                   ))}
@@ -242,6 +301,29 @@ export function DependentsModal({
           </button>
         </div>
       </div>
+
+      {/* Confirmation Dialog for Remove Dependent */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Dependent</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove {dependentToDelete?.name || 'this dependent'}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDependentToDelete(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemoveDependent}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -256,7 +256,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                             : 'border-gray-200 bg-white hover:border-gray-300'
                         }`}
                       >
-                        <div className="aspect-[4/3] w-full rounded-xl overflow-hidden mb-4">
+                        <div className="aspect-4/3 w-full rounded-xl overflow-hidden mb-4">
                           <ImageWithFallback
                             src={facility.image}
                             alt={facility.name}
@@ -319,7 +319,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                               <Check className="w-4 h-4 text-white" />
                             </div>
                           )}
-                          <div className="aspect-[4/3] w-full rounded-xl overflow-hidden mb-4">
+                          <div className="aspect-4/3 w-full rounded-xl overflow-hidden mb-4">
                             <ImageWithFallback
                               src={room.image}
                               alt={room.name}
@@ -390,7 +390,7 @@ export function AccommodationSelection({ accommodationType, onComplete, onBack, 
                               <Check className="w-4 h-4 text-white" />
                             </div>
                           )}
-                          <div className="aspect-[4/3] w-full rounded-xl overflow-hidden mb-4">
+                          <div className="aspect-4/3 w-full rounded-xl overflow-hidden mb-4">
                             <ImageWithFallback
                               src={room.image}
                               alt={room.name}

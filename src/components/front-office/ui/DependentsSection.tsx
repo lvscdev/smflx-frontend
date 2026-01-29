@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, X, CreditCard, UserCheck, Wallet } from 'lucide-react';
+import { Trash2, Loader2 } from 'lucide-react';
 
 interface Dependent {
   id: string;

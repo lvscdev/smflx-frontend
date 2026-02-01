@@ -25,7 +25,7 @@ function RootLayout({ children }: { children: React.ReactNode }) {
       className={`${urbanist.variable} ${merriweather.variable} h-full`}
     >
       <body className="h-full bg-color font-body">
-        <Toaster position="top-right" theme="dark" richColors />
+        <Toaster position="top-right" theme="light" richColors />
         {children}
       </body>
     </html>

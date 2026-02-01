@@ -1,15 +1,35 @@
 @import "tailwindcss";
+@plugin "tailwind-scrollbar";
+
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* @custom-variant dark (&: is(.dark *)); */
+
+@keyframes skeleton-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-skeleton {
+  animation: skeleton-pulse 2.2s ease-in-out infinite;
+}
 
 :root {
   --bg-color: #ffffff;
   --navbar-bg: #f1f5f9;
   --sidebar-bg: #e2e8f0;
   --brand-red: #d43d25;
+  --brand-blue: #1c70a8;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
+  --base-color: #0a0a0b;
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -46,13 +66,16 @@
   --navbar-bg: var(--navbar-bg);
   --bg-color: var(--bg-color);
   --sidebar-bg: var(--sidebar-bg);
+  --color-base: var(--base-color);
   --color-brand-red: var(--brand-red);
   --color-brand-red-foreground: #fdedec;
   --color-brand-blue-50: #e9f1fe;
   --color-brand-blue-200: #83bffb;
+  --color-brand-blue-400: #2489cc;
   --color-brand-blue-500: #1c70a8;
   --color-brand-yellow-50: #fdeee2;
   --color-brand-yellow-200: #f4ad41;
+  --color-brand-yellow-500: #a7762a;
   --font-heading: var(--font-merriweather);
   --font-body: var(--font-urbanist);
   --color-sidebar-ring: var(--sidebar-ring);

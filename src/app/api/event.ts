@@ -1,6 +1,8 @@
 export type EventYearStatus = "Open" | "Ongoing" | "Ended";
 
 export interface EventYear {
+  id: string;
+  theme: string;
   year: number;
   startDate: string;
   endDate: string;
@@ -11,6 +13,8 @@ export interface EventYear {
 
 export async function getCurrentEvent(): Promise<EventYear | null> {
   return {
+    id: "1",
+    theme: "WOTHSMFLX 2026",
     year: 2026,
     startDate: "2026-07-15",
     endDate: "2026-07-20",
@@ -21,6 +25,8 @@ export async function getCurrentEvent(): Promise<EventYear | null> {
 }
 export async function getOngoingEvent(): Promise<EventYear | null> {
   return {
+    id: "200",
+    theme: "WOTHSMFLX 2026",
     year: 2026,
     startDate: "2026-07-15",
     endDate: "2026-07-20",
@@ -30,9 +36,11 @@ export async function getOngoingEvent(): Promise<EventYear | null> {
   };
 }
 
-export async function getPastEvents(): Promise<EventYear[]> {
+export async function getPastEvents(): Promise<EventYear[] | null> {
   return [
     {
+      id: "12",
+      theme: "WOTHSMFLX 2025",
       year: 2025,
       startDate: "2025-07-16",
       endDate: "2025-07-21",
@@ -41,6 +49,8 @@ export async function getPastEvents(): Promise<EventYear[]> {
       status: "Ended",
     },
     {
+      id: "34",
+      theme: "WOTHSMFLX 2024",
       year: 2024,
       startDate: "2024-07-16",
       endDate: "2024-07-21",
@@ -49,4 +59,17 @@ export async function getPastEvents(): Promise<EventYear[]> {
       status: "Ended",
     },
   ];
+}
+
+export async function getEventById(eventId: string): Promise<EventYear | null> {
+  const current = await getCurrentEvent();
+  if (current?.id === eventId) return current;
+
+  const ongoing = await getOngoingEvent();
+  if (ongoing?.id === eventId) return ongoing;
+
+  const past = await getPastEvents();
+  const match = past?.find(e => e.id === eventId);
+
+  return match ?? null;
 }

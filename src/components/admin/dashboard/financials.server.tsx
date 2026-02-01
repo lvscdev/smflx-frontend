@@ -55,7 +55,7 @@ function Metric({ label, value, icon }: any) {
       </div>
       <div>
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="text-lg font-semibold">{value}</p>
+        <p className="text-lg font-semibold font-heading">{value}</p>
       </div>
     </div>
   );

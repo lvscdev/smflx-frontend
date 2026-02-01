@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logoutAdmin } from "@/features/admin/auth/server-actions";
+import { toast } from "sonner";
+import { useTransition } from "react";
+
 import {
   LayoutGrid,
   CalendarDays,
@@ -13,6 +17,7 @@ import {
   Settings,
   LogOut,
   UsersRound,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -22,11 +27,11 @@ const navItems = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid },
   {
     label: "Event Management",
-    href: "/admin/event-management",
+    href: "/admin/events",
     icon: CalendarDays,
   },
-  { label: "Registrations", href: "/registrations", icon: UserRoundPlus },
-  { label: "Accommodations", href: "/accommodations", icon: Building2 },
+  { label: "Registrations", href: "/admin/registrations", icon: UserRoundPlus },
+  { label: "Accommodations", href: "/admin/accommodations", icon: Building2 },
   { label: "Payments", href: "/payments", icon: Wallet },
   { label: "User Management", href: "/users", icon: UsersRound },
   {
@@ -40,6 +45,20 @@ const navItems = [
 
 function AdminSidebar() {
   const pathname = usePathname();
+  const [isPending, startTransition] = useTransition();
+
+  function handleLogout() {
+    const toastId = toast.loading("Logging out…");
+
+    setTimeout(() => {
+      startTransition(async () => {
+        // ✅ dismiss toast BEFORE redirect happens
+        toast.dismiss(toastId);
+
+        await logoutAdmin(); // redirect happens here
+      });
+    }, 2000);
+  }
 
   return (
     <aside className="hidden w-80 py-4 flex-col items-center border-r border-neutral-100 bg-slate-200 lg:flex">
@@ -60,7 +79,7 @@ function AdminSidebar() {
                 "flex items-center gap-3 px-8 py-4 font-normal text-base transition",
                 active
                   ? "border-l-[6px] border-brand-red text-brand-red"
-                  : "text-slate-700 hover:text-brand-red"
+                  : "text-slate-700 hover:text-brand-red",
               )}
             >
               <Icon className="h-6 w-6" />
@@ -71,9 +90,19 @@ function AdminSidebar() {
       </nav>
 
       <div className="border-t w-full p-4 self-start">
-        <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-red-600 hover:bg-red-50">
-          <LogOut className="h-4 w-4" />
-          Logout
+        <button
+          onClick={handleLogout}
+          disabled={isPending}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+        >
+          {isPending ? (
+            <Loader2 />
+          ) : (
+            <span>
+              <LogOut className="h-4 w-4" />
+              Logout
+            </span>
+          )}
         </button>
       </div>
     </aside>

@@ -54,9 +54,9 @@ function Stat({ title, value, icon }: any) {
         <div className="flex justify-between w-full">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
-            <h4 className="text-2xl font-heading font-semibold">
+            <p className="text-2xl font-heading font-semibold">
               {value || "–"}
-            </h4>
+            </p>
           </div>
           <div
             className={`rounded-sm ${

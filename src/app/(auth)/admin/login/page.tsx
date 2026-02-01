@@ -1,4 +1,4 @@
-import { AdminLoginForm } from "@/components/admin/auth/AdminLoginForm";
+import { AdminLoginForm } from "@/components/admin/auth/email-entry-form";
 import Image from "next/image";
 import AdminFormImage from "@/assets/images/admin-form-image.png";
 

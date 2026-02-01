@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
+import { WhatsAppFloat } from "@/components/front-office/ui/WhatsAppFloat";
 import { Sidebar } from "@/components/front-office/ui/Sidebar";
 import { EmailVerification } from "@/components/front-office/ui/EmailVerification";
 import { ReturningUserLogin } from "@/components/front-office/ui/ReturningUserLogin";
@@ -307,6 +307,9 @@ export default function HomePage() {
             onProfileUpdate={(data) => setProfile(data)}
           />
         )}
+      </div>
+      <div className="flex flex-col lg:flex-row h-screen w-full">
+          <WhatsAppFloat />
       </div>
     </div>
   );

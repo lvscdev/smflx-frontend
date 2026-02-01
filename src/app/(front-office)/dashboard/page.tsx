@@ -1,70 +1,22 @@
-'use client';
+/**
+ * This route intentionally redirects to the main flow page.
+ *
+ * The real Dashboard component is rendered by the main flow orchestrator
+ * at src/app/(front-office)/page.tsx once the user reaches the "dashboard"
+ * view state. Navigating directly to /dashboard would bypass all session
+ * context, so we send users back to "/" where the flow resumes correctly.
+ */
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Dashboard } from '@/components/front-office/ui/Dashboard';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const router = useRouter();
-  
-  // TODO: Replace with actual data from your API/database
-  const [userData, setUserData] = useState({
-    email: 'user@example.com',
-    profile: {
-      firstName: 'John',
-      lastName: 'Doe',
-      gender: 'male',
-      ageRange: '23-29',
-      country: 'Nigeria',
-      state: 'Lagos',
-      localAssembly: 'Word of Truth Assembly',
-      address: '123 Main Street, Lagos',
-      isMinister: 'no',
-      employmentStatus: 'employed',
-      maritalStatus: 'single',
-    },
-    registration: {
-      eventName: 'WOTH Camp Meeting 2026',
-      attendeeType: 'camper',
-      accommodationType: 'hostel',
-    },
-    accommodation: {
-      type: 'hostel',
-      facility: 'dansol-high',
-      bed: 'B-101',
-      price: 15000,
-    },
-  });
 
-  const handleLogout = () => {
-    // TODO: Add your logout logic here
-    // Clear session, tokens, etc.
-    router.push('/');
-  };
+  useEffect(() => {
+    router.replace("/");
+  }, [router]);
 
-  const handleAccommodationUpdate = (data: any) => {
-    setUserData({
-      ...userData,
-      accommodation: data,
-    });
-  };
-
-  const handleRegistrationUpdate = (data: any) => {
-    setUserData({
-      ...userData,
-      registration: data,
-    });
-  };
-
-  return (
-    <Dashboard
-      userEmail={userData.email}
-      profile={userData.profile}
-      registration={userData.registration}
-      accommodation={userData.accommodation}
-      onLogout={handleLogout}
-      onAccommodationUpdate={handleAccommodationUpdate}
-      onRegistrationUpdate={handleRegistrationUpdate}
-    />
-  );
+  return null;
 }

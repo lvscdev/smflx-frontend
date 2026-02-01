@@ -8,7 +8,7 @@ import { validatePaymentContext } from '@/lib/validation/payment';
 
 interface PaymentProps {
   amount: number;
-  onComplete: () => void;
+  onComplete?: () => void;
   onBack: () => void;
   profile?: any;
   accommodation?: any;

@@ -308,9 +308,7 @@ export default function HomePage() {
           />
         )}
       </div>
-      <div className="flex flex-col lg:flex-row h-screen w-full">
-          <WhatsAppFloat />
-      </div>
+      <WhatsAppFloat />
     </div>
   );
 }

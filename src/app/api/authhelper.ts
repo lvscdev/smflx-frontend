@@ -1,5 +1,2 @@
-function calculateSum() {
-  const a = 1 + 1;
-  return a;
-}
-export { calculateSum };
+// Reserved for future auth helper utilities.
+export {};

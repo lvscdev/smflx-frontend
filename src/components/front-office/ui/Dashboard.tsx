@@ -288,8 +288,6 @@ const confirmRemoveDependent = async () => {
     toast.error("Failed to remove dependent", {
       description: msg,
     });
-    
-    throw err;
   } finally {
     setRemovingDependentId(null);
     setDependentToDelete(null);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Check, Users, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -46,6 +46,17 @@ export function DependentsModal({
   });
   const [currentFormError, setCurrentFormError] = useState<string | null>(null);
   const [showingForm, setShowingForm] = useState(existingDependents.length === 0);
+
+  // Sync local list from parent every time the modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setDependents(existingDependents);
+      setShowingForm(existingDependents.length === 0);
+      setRemoveError(null);
+      setCurrentFormError(null);
+      setCurrentDependent({ name: '', age: '', gender: '' });
+    }
+  }, [isOpen, existingDependents]);
 
   if (!isOpen) return null;
 
@@ -310,7 +321,7 @@ export function DependentsModal({
         <div className="p-6 border-t bg-gray-50">
           <button
             onClick={handleSave}
-            className="w-full py-3 bg-[rgb(255,0,0)] text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="w-full py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
           >
             Save Dependents
           </button>

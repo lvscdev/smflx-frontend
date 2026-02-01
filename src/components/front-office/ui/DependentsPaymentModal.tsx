@@ -149,9 +149,6 @@ export function DependentsPaymentModal({
             </div>
           )}
 
-          <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-            You’ll complete payment on the secure checkout page after you continue.
-          </div>
 
           <form onSubmit={handlePayment} className="space-y-6">
             <div className="space-y-2">

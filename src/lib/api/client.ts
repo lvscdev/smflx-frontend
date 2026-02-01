@@ -109,10 +109,6 @@ export async function apiRequest<T>(
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  if (typeof window !== "undefined") {
-  console.log("[apiRequest]", url, "auth=", auth, "token?", !!getAuthToken());
-  }
-
   const res = await fetch(url, {
     method: opts?.method || 'GET',
     headers,

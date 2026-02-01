@@ -217,6 +217,7 @@ export default function HomePage() {
 
         {view === "profile" && (
           <ProfileForm
+            email={email}
             initialData={profile}
             onBack={() => setView("verify")}
             onComplete={(data) => {

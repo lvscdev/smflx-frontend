@@ -369,6 +369,7 @@ interface ProfileData {
 }
 
 interface ProfileFormProps {
+  email: string;
   onComplete: (profile: ProfileData) => void;
   onBack: () => void;
   initialData?: ProfileData | null;
@@ -416,7 +417,7 @@ function GridOption({ value, selected, onClick, icon, label, description }: Grid
   );
 }
 
-export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProps) {
+export function ProfileForm({ email, onComplete, onBack, initialData }: ProfileFormProps) {
   const [profile, setProfile] = useState<ProfileData>(() => {
     if (initialData) {
       return {
@@ -530,7 +531,13 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
     const firstName = validated.normalized.firstName;
     const lastName = validated.normalized.lastName;
 
+  if (!email || !email.includes("@")) {
+  setSubmitError("Your email is missing. Please verify your email again.");
+  return;
+}
+
     const payload = {
+      email: email.trim(),
       ...(firstName ? { firstName } : {}),
       ...(lastName ? { lastName } : {}),
       ...(full ? { phoneNumber: full } : {}),
@@ -663,7 +670,7 @@ export function ProfileForm({ onComplete, onBack, initialData }: ProfileFormProp
                 className="h-10 w-[140px] rounded-md border border-gray-200 bg-white px-3 text-sm"
               >
                 {dialCodes.map((d) => (
-                  <option key={d.code} value={d.code}>
+                  <option key={`${d.code}-${d.label}`} value={d.code}>
                     {d.label}
                   </option>
                 ))}

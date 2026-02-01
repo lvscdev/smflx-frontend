@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { generateRegistrantOtp, validateOtp } from "@/lib/api";
 import { setTokenCookie } from "@/lib/auth/session";
 import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
@@ -11,27 +11,54 @@ interface EmailVerificationProps {
   onAlreadyRegistered: () => void;
 }
 
-export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVerificationProps) {
-  const [email, setEmail] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [otpReference, setOtpReference] = useState<string>('');
-  const [error, setError] = useState('');
+const RESEND_COOLDOWN_SECONDS = 45;
 
-  const handleSendVerification = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (!email || !email.includes('@')) {
-      setError('Please enter a valid email address');
+export function EmailVerification({
+  onVerified,
+  onAlreadyRegistered,
+}: EmailVerificationProps) {
+  const [email, setEmail] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [otpReference, setOtpReference] = useState<string>("");
+
+  const [error, setError] = useState("");
+
+  // Resend cooldown
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = window.setInterval(() => {
+      setResendCooldown((s) => Math.max(0, s - 1));
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [resendCooldown]);
+
+  const isValidEmail = (value: string) => {
+    const v = value.trim();
+    return !!v && v.includes("@");
+  };
+
+  const sendVerificationCode = async () => {
+    setError("");
+
+    const trimmed = email.trim();
+    if (!isValidEmail(trimmed)) {
+      setError("Please enter a valid email address");
       return;
     }
 
+    if (resendCooldown > 0) return;
+
     setIsVerifying(true);
     try {
-      const { reference } = await generateRegistrantOtp(email.trim());
+      const { reference } = await generateRegistrantOtp(trimmed);
       setOtpReference(reference);
       setVerificationSent(true);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {
       setError(toUserMessage(err, { feature: "otp", action: "send" }));
     } finally {
@@ -39,39 +66,57 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
     }
   };
 
+  const handleSendVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendVerificationCode();
+  };
+
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
+
     if (verificationCode.length !== 6) {
-      setError('Please enter the 6-digit code');
+      setError("Please enter the 6-digit code");
       return;
     }
     if (!otpReference) {
-      setError('Please resend the code and try again');
+      setError("Please resend the code and try again");
       return;
     }
 
     setIsVerifying(true);
     try {
+      const trimmed = email.trim();
       const { token, userDetails } = await validateOtp({
-        email: email.trim(),
+        email: trimmed,
         otp: verificationCode,
         otpReference,
       });
+
       // Persist session for Stage 2/3 API calls
       setAuthToken(token);
       setTokenCookie(token);
+
       try {
         localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(userDetails));
       } catch {
         // ignore
       }
-      onVerified(email.trim());
+
+      onVerified(trimmed);
     } catch (err: any) {
       setError(toUserMessage(err, { feature: "otp", action: "verify" }));
     } finally {
       setIsVerifying(false);
     }
+  };
+
+  const handleChangeEmail = () => {
+    setVerificationSent(false);
+    setVerificationCode("");
+    setOtpReference("");
+    setError("");
+    setResendCooldown(0);
   };
 
   return (
@@ -105,7 +150,10 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
           {!verificationSent ? (
             <form onSubmit={handleSendVerification} className="space-y-6">
               <div>
-                <label htmlFor="email" className="block text-sm mb-2 text-gray-700">
+                <label
+                  htmlFor="email"
+                  className="block text-sm mb-2 text-gray-700"
+                >
                   Email Address
                 </label>
                 <input
@@ -117,28 +165,43 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
                 />
               </div>
+
               <button
                 type="submit"
-                disabled={!email || isVerifying}
+                disabled={!isValidEmail(email) || isVerifying}
                 className={`w-full py-3 rounded-lg transition-colors ${
-                  email && !isVerifying
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  isValidEmail(email) && !isVerifying
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
-                {isVerifying ? 'Sending...' : 'Send Verification Code'}
+                {isVerifying ? "Sending..." : "Send Verification Code"}
               </button>
             </form>
           ) : (
             <form onSubmit={handleVerify} className="space-y-6">
               <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-lg text-sm">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 <p>Verification code sent to {email}</p>
               </div>
+
               <div>
-                <label htmlFor="code" className="block text-sm mb-2 text-gray-700">
+                <label
+                  htmlFor="code"
+                  className="block text-sm mb-2 text-gray-700"
+                >
                   Verification Code
                 </label>
                 <input
@@ -146,26 +209,45 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
                   type="text"
                   placeholder="Enter 6-digit code"
                   value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onChange={(e) =>
+                    setVerificationCode(
+                      e.target.value.replace(/\D/g, "").slice(0, 6)
+                    )
+                  }
                   maxLength={6}
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-center text-xl tracking-widest"
                 />
               </div>
+
               <button
                 type="submit"
-                disabled={verificationCode.length !== 6}
+                disabled={verificationCode.length !== 6 || isVerifying}
                 className={`w-full py-3 rounded-lg transition-colors ${
-                  verificationCode.length === 6
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  verificationCode.length === 6 && !isVerifying
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
-                Verify & Continue
+                {isVerifying ? "Verifying..." : "Verify & Continue"}
               </button>
+
+              {/* ✅ Resend OTP */}
               <button
                 type="button"
-                onClick={() => setVerificationSent(false)}
+                onClick={sendVerificationCode}
+                className="w-full text-sm text-gray-600 hover:text-gray-900 underline underline-offset-4 transition-colors disabled:no-underline disabled:text-gray-400 disabled:hover:text-gray-400"
+                disabled={isVerifying || resendCooldown > 0}
+              >
+                {resendCooldown > 0
+                  ? `Resend code in ${resendCooldown}s`
+                  : "Resend verification code"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleChangeEmail}
                 className="underline w-full py-3 text-gray-600 hover:text-gray-900 transition-colors"
+                disabled={isVerifying}
               >
                 Change Email
               </button>

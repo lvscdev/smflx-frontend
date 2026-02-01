@@ -494,7 +494,7 @@ export function AdminOtpForm() {
 
         <Button
           type="submit"
-          className="w-full"
+          className="w-full bg-brand-red hover:bg-brand-red/80"
           disabled={isVerifying || isResending}
         >
           {isVerifying ? (

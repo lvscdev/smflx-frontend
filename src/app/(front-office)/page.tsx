@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Sidebar } from "@/components/front-office/ui/Sidebar";
 import { EmailVerification } from "@/components/front-office/ui/EmailVerification";
@@ -12,6 +12,8 @@ import { AccommodationSelection } from "@/components/front-office/ui/Accommodati
 import { Payment } from "@/components/front-office/ui/Payment";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
 
+import { getAuthToken, setAuthToken } from "@/lib/api/client";
+
 type View =
   | "verify"
   | "login"
@@ -21,6 +23,36 @@ type View =
   | "accommodation"
   | "payment"
   | "dashboard";
+
+const FLOW_STATE_KEY = "smflx_flow_state_v1";
+
+function safeLoadFlowState() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(FLOW_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeSaveFlowState(state: any) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(FLOW_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore
+  }
+}
+
+function safeClearFlowState() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(FLOW_STATE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 export default function HomePage() {
   const [view, setView] = useState<View>("verify");
@@ -35,6 +67,45 @@ export default function HomePage() {
 
   const [registration, setRegistration] = useState<any>(null);
   const [accommodation, setAccommodation] = useState<any>(null);
+
+  // ✅ Rehydrate session + resume flow if user already verified once (token exists)
+  useEffect(() => {
+    const token = getAuthToken();
+    if (!token) return;
+
+    const saved = safeLoadFlowState();
+
+    if (saved) {
+      // restore data
+      setEmail(saved.email || "");
+      setProfile(saved.profile ?? null);
+      setSelectedEvent(saved.selectedEvent ?? null);
+      setRegistration(saved.registration ?? null);
+      setAccommodation(saved.accommodation ?? null);
+
+      // restore view (fallback to dashboard)
+      const nextView: View = saved.view || "dashboard";
+      setView(nextView);
+      return;
+    }
+
+    // token exists but no saved flow state => go to dashboard by default
+    setView("dashboard");
+  }, []);
+
+  // ✅ Save progress (only after auth screens)
+  useEffect(() => {
+    if (view === "verify" || view === "login") return;
+
+    safeSaveFlowState({
+      view,
+      email,
+      profile,
+      selectedEvent,
+      registration,
+      accommodation,
+    });
+  }, [view, email, profile, selectedEvent, registration, accommodation]);
 
   // ✅ Only campers pay (from accommodation selection price)
   const paymentAmount = useMemo(() => {
@@ -128,7 +199,7 @@ export default function HomePage() {
           <EmailVerification
             onVerified={(verifiedEmail) => {
               setEmail(verifiedEmail);
-              setView("profile"); 
+              setView("profile");
             }}
             onAlreadyRegistered={() => setView("login")}
           />
@@ -136,7 +207,10 @@ export default function HomePage() {
 
         {view === "login" && (
           <ReturningUserLogin
-            onLoginSuccess={() => setView("dashboard")}
+            onLoginSuccess={(userEmail) => {
+              if (userEmail) setEmail(userEmail);
+              setView("dashboard");
+            }}
             onCancel={() => setView("verify")}
           />
         )}
@@ -217,6 +291,9 @@ export default function HomePage() {
             registration={registration}
             accommodation={accommodation}
             onLogout={() => {
+              setAuthToken(null);
+              safeClearFlowState();
+
               setEmail("");
               setProfile(null);
               setSelectedEvent(null);

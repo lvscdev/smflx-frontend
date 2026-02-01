@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { generateRegistrantOtp, validateOtp } from "@/lib/api";
+import { setTokenCookie } from "@/lib/auth/session";
 import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
 import { toUserMessage } from "@/lib/errors/userMessages";
 
@@ -59,6 +60,7 @@ export function EmailVerification({ onVerified, onAlreadyRegistered }: EmailVeri
       });
       // Persist session for Stage 2/3 API calls
       setAuthToken(token);
+      setTokenCookie(token);
       try {
         localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(userDetails));
       } catch {

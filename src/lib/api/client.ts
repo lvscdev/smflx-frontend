@@ -52,13 +52,27 @@ export class ApiError extends Error {
 export const AUTH_TOKEN_STORAGE_KEY = 'smflx_token';
 export const AUTH_USER_STORAGE_KEY = 'smflx_user';
 
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+  if (!match) return null;
+  return decodeURIComponent(match.split("=")[1] || "");
+}
+
 export function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    const t = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    if (t) return t;
   } catch {
-    return null;
+    // ignore
   }
+
+  // 2) cookie fallback (same key name)
+  return readCookie(AUTH_TOKEN_STORAGE_KEY);
 }
 
 export function setAuthToken(token: string | null) {
@@ -93,6 +107,10 @@ export async function apiRequest<T>(
   if (auth) {
     const token = getAuthToken();
     if (token) headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (typeof window !== "undefined") {
+  console.log("[apiRequest]", url, "auth=", auth, "token?", !!getAuthToken());
   }
 
   const res = await fetch(url, {

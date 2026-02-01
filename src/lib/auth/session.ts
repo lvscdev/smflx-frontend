@@ -1,6 +1,6 @@
 "use client";
 
-const TOKEN_COOKIE = "smflx_auth_token";
+const TOKEN_COOKIE = "smflx_token";
 const LAST_STATE_KEY = "smflx_last_state";
 
 export function setTokenCookie(token: string, days = 7) {

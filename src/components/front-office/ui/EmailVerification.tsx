@@ -92,6 +92,11 @@ export function EmailVerification({
         otp: verificationCode,
         otpReference,
       });
+    
+    if (!token || typeof token !== "string") {
+        throw new Error("Invalid session token received. Please try again.");
+      }
+
 
       // Persist session for Stage 2/3 API calls
       setAuthToken(token);

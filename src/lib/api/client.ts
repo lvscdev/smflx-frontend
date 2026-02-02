@@ -85,6 +85,10 @@ export function setAuthToken(token: string | null) {
   }
 }
 
+function normalizeToken(raw: string): string {
+return raw.trim().replace(/^bearer\s+/i, "");
+}
+
 export async function apiRequest<T>(
   path: string,
   opts?: {
@@ -106,7 +110,7 @@ export async function apiRequest<T>(
   const auth = opts?.auth !== false; // default true
   if (auth) {
     const token = getAuthToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (token) headers.Authorization = `Bearer ${normalizeToken(token)}`;
   }
 
   const res = await fetch(url, {

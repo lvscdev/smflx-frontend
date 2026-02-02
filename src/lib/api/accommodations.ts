@@ -45,6 +45,23 @@ export type GetAccommodationsResponse = {
   };
 };
 
+// Newer facility schema (from the current swagger) is much flatter and does not include
+// room/bed-space breakdown for users.
+type AccommodationCategory = { id: string; name: string };
+type AccommodationFacilityRecord = {
+  id?: string;
+  facilityId?: string;
+  _id?: string;
+  eventId?: string;
+  facilityName?: string;
+  accommodationCategoryId?: string;
+  available?: boolean;
+  employedUserPrice?: number;
+  selfEmployedUserPrice?: number;
+  unemployedUserPrice?: number;
+  totalCapacity?: number;
+};
+
 export type BookAccommodationPayload = {
   eventId: string;
   accommodationType: 'HOSTEL' | 'HOTEL';
@@ -81,15 +98,68 @@ export async function getAccommodations(params: {
   eventId: string;
   type: 'HOSTEL' | 'HOTEL';
 }): Promise<GetAccommodationsResponse> {
-  const queryParams = new URLSearchParams({
-    eventId: params.eventId,
-    type: params.type,
-  });
+  // Preferred path (per current swagger):
+  // 1) GET /accommodation/categories
+  // 2) GET /accommodation/facility/{categoryId}
+  // This is tagged as "Admin" in docs, but in practice may be available to users.
+  // If it is not available (401/403/404), we fall back to the legacy /accommodations endpoint.
 
-  return apiRequest<GetAccommodationsResponse>(
-    `/accommodations?${queryParams.toString()}`,
-    { method: 'GET' }
-  );
+  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+  const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
+
+  try {
+    const categoriesResp = await apiRequest<any>('/accommodation/categories', { method: 'GET' });
+    const categories: AccommodationCategory[] =
+      categoriesResp?.data || categoriesResp?.categories || categoriesResp || [];
+
+    const match = (categories || []).find((c) => {
+      const name = normalize(String(c?.name || ''));
+      return name.includes(want);
+    });
+
+    if (!match?.id) throw new Error('Accommodation categories not available');
+
+    const facilitiesResp = await apiRequest<any>(`/accommodation/facility/${match.id}`, { method: 'GET' });
+    const raw: AccommodationFacilityRecord[] = facilitiesResp?.data || facilitiesResp?.facilities || facilitiesResp || [];
+
+    const facilities: Facility[] = (raw || [])
+      .filter((f) => !f?.eventId || f.eventId === params.eventId)
+      .map((f) => {
+        const facilityId = String(f?.id || f?.facilityId || f?._id || '');
+        return {
+          facilityId,
+          name: String(f?.facilityName || 'Accommodation Facility'),
+          description: undefined,
+          location: undefined,
+          images: undefined,
+          totalSpaces: Number(f?.totalCapacity ?? 0) || 0,
+          // Swagger only exposes availability boolean + total capacity. We can't safely compute remaining.
+          availableSpaces: f?.available === false ? 0 : Number(f?.totalCapacity ?? 0) || 0,
+          rooms: [],
+          amenities: undefined,
+        };
+      })
+      .filter((f) => f.facilityId);
+
+    return {
+      facilities,
+      metadata: {
+        eventId: params.eventId,
+        accommodationType: params.type,
+        totalAvailable: facilities.reduce((sum, f) => sum + (f.availableSpaces || 0), 0),
+      },
+    };
+  } catch {
+    const queryParams = new URLSearchParams({
+      eventId: params.eventId,
+      type: params.type,
+    });
+
+    return apiRequest<GetAccommodationsResponse>(
+      `/accommodations?${queryParams.toString()}`,
+      { method: 'GET' }
+    );
+  }
 }
 
 /**

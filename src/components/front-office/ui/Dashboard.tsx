@@ -23,7 +23,12 @@ import { DependentsPaymentModal } from './DependentsPaymentModal';
 import { DependentsSection } from './DependentsSection';
 import { DependentRegistrationSuccess } from './DependentRegistrationSuccess';
 import { UserProfile } from './UserProfile';
-import { getUserDashboard, addDependent as apiAddDependent, removeDependent as apiRemoveDependent } from '@/lib/api';
+import {
+  getUserDashboard,
+  addDependent as apiAddDependent,
+  removeDependent as apiRemoveDependent,
+  getAccommodations,
+} from '@/lib/api';
 import { toUserMessage } from '@/lib/errors';
 
 const eventBgImage = '/assets/images/event-bg.png';
@@ -109,6 +114,57 @@ export function Dashboard({
   const [modalStep, setModalStep] = useState(1); // 1: Type selection, 2: Facility selection, 3: Payment
   const [selectedAccommodationType, setSelectedAccommodationType] = useState('');
   const [accommodationData, setAccommodationData] = useState<any>(null);
+
+  // Availability summary (best-effort) for the accommodation type picker.
+  // Note: the current API docs expose facility `totalCapacity` + `available` but do not expose
+  // real-time remaining spaces/rooms, so we avoid showing misleading "X left" numbers.
+  const [availabilitySummary, setAvailabilitySummary] = useState<{
+    loading: boolean;
+    hostel?: { availableFacilities: number; totalCapacity: number };
+    hotel?: { availableFacilities: number; totalCapacity: number };
+    error?: string | null;
+  }>({ loading: false, error: null });
+
+  useEffect(() => {
+    const eventId = registration?.eventId;
+    if (!isAccommodationModalOpen || modalStep !== 1 || !eventId) return;
+
+    let cancelled = false;
+    (async () => {
+      setAvailabilitySummary((prev) => ({ ...prev, loading: true, error: null }));
+      try {
+        const [hostel, hotel] = await Promise.all([
+          getAccommodations({ eventId, type: 'HOSTEL' }).catch(() => ({ facilities: [] })),
+          getAccommodations({ eventId, type: 'HOTEL' }).catch(() => ({ facilities: [] })),
+        ]);
+
+        if (cancelled) return;
+
+        const summarize = (items: any[]) => {
+          const availableFacilities = items.filter((i) => (Number(i?.availableSpaces ?? 0) || 0) > 0).length;
+          const totalCapacity = items.reduce(
+            (sum, i) => sum + (Number(i?.totalSpaces ?? i?.availableSpaces ?? 0) || 0),
+            0
+          );
+          return { availableFacilities, totalCapacity };
+        };
+
+        setAvailabilitySummary({
+          loading: false,
+          hostel: summarize((hostel as any)?.facilities || []),
+          hotel: summarize((hotel as any)?.facilities || []),
+          error: null,
+        });
+      } catch (err: any) {
+        if (cancelled) return;
+        setAvailabilitySummary({ loading: false, error: toUserMessage(err, { feature: 'generic' }) });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
 
   // Dependents state
   const [dependents, setDependents] = useState<any[]>([]);
@@ -751,7 +807,7 @@ const confirmRemoveDependent = async () => {
               {modalStep === 1 && (
                 <div className="p-6 lg:p-8">
                   <p className="text-gray-600 mb-6">Choose your preferred accommodation type</p>
-                  <div className="grid md:grid-cols-3 gap-4 lg:gap-6">
+                  <div className="grid md:grid-cols-2 gap-4 lg:gap-6">
                     <button
                       onClick={() => handleAccommodationType('hostel')}
                       className="group bg-white border-2 border-gray-200 hover:border-purple-500 rounded-2xl p-6 transition-all hover:shadow-lg"
@@ -761,7 +817,13 @@ const confirmRemoveDependent = async () => {
                           <Building2 className="w-8 h-8 text-purple-600" />
                         </div>
                         <h3 className="text-lg font-semibold mb-2">Hostel/Camp</h3>
-                        <p className="text-sm text-gray-600">242 spaces left</p>
+                        <p className="text-sm text-gray-600">
+                          {availabilitySummary.loading
+                            ? 'Loading availability…'
+                            : availabilitySummary.hostel
+                              ? `${availabilitySummary.hostel.availableFacilities} facilities available · capacity ${availabilitySummary.hostel.totalCapacity}`
+                              : 'View available facilities'}
+                        </p>
                       </div>
                     </button>
 
@@ -774,36 +836,35 @@ const confirmRemoveDependent = async () => {
                           <Hotel className="w-8 h-8 text-blue-600" />
                         </div>
                         <h3 className="text-lg font-semibold mb-2">Hotel</h3>
-                        <p className="text-sm text-gray-600">18 rooms left</p>
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={() => handleAccommodationType('shared')}
-                      className="group bg-white border-2 border-gray-200 hover:border-purple-500 rounded-2xl p-6 transition-all hover:shadow-lg"
-                    >
-                      <div className="flex flex-col items-center text-center">
-                        <div className="w-16 h-16 rounded-full bg-linear-to-br from-pink-100 to-red-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                          <Users className="w-8 h-8 text-pink-600" />
-                        </div>
-                        <h3 className="text-lg font-semibold mb-2">Shared Apartment</h3>
-                        <p className="text-sm text-gray-600">12 apartments left</p>
+                        <p className="text-sm text-gray-600">
+                          {availabilitySummary.loading
+                            ? 'Loading availability…'
+                            : availabilitySummary.hotel
+                              ? `${availabilitySummary.hotel.availableFacilities} facilities available · capacity ${availabilitySummary.hotel.totalCapacity}`
+                              : 'View available facilities'}
+                        </p>
                       </div>
                     </button>
                   </div>
+
+                  {availabilitySummary.error && (
+                    <p className="mt-4 text-sm text-amber-700">
+                      {availabilitySummary.error}
+                    </p>
+                  )}
                 </div>
               )}
 
               {modalStep === 2 && (
                 <AccommodationSelection
                   accommodationType={selectedAccommodationType}
-                  eventId={registration?.eventId || (registration as any)?.event?.eventId || ''}
-                  registrationId={registration?.registrationId}
+                  eventId={registration?.eventId}
+                  registrationId={registration?.id || registration?.registrationId}
+                  profile={localProfile}
                   onComplete={handleFacilitySelection}
                   onBack={handleModalBack}
                 />
               )}
-
 
               {modalStep === 3 && (
                 <Payment

@@ -93,9 +93,13 @@ export type Event = {
 };
 
 export async function listActiveEvents() {
-  return apiRequest<any[]>("/events/user/active", { method: "GET" });
-}
+  const res = await apiRequest<{ activeEvents: any[] }>(
+    "/events/user/active",
+    { method: "GET" }
+  );
 
+  return res.activeEvents;
+}
 
 // --- Event registrations ---
 

@@ -65,12 +65,6 @@ function GridOption({ value, selected, onClick, icon, label, description, gradie
   );
 }
 
-const accommodationSpaces = {
-  hostel: 45,
-  hotel: 12,
-  shared: 8,
-};
-
 export function EventRegistration({ onComplete, onBack, initialData, isSubmitting, serverError }: EventRegistrationProps) {
   const [registration, setRegistration] = useState<RegistrationData>(initialData || {
     attendeeType: '',
@@ -254,7 +248,7 @@ export function EventRegistration({ onComplete, onBack, initialData, isSubmittin
                   onClick={() => { setFormError(null); setRegistration({ ...registration, accommodationType: 'hostel' }); }}
                   icon={<Tent className="w-5 h-5" />}
                   label="Hostel (Camper)"
-                  description={`${accommodationSpaces.hostel} spaces available`}
+                  description="Availability shown on next step"
                 />
                 <GridOption
                   value="hotel"
@@ -262,7 +256,7 @@ export function EventRegistration({ onComplete, onBack, initialData, isSubmittin
                   onClick={() => { setFormError(null); setRegistration({ ...registration, accommodationType: 'hotel' }); }}
                   icon={<Building2 className="w-5 h-5" />}
                   label="Hotel"
-                  description={`${accommodationSpaces.hotel} spaces available`}
+                  description="Availability shown on next step"
                 />
                 <GridOption
                   value="shared"
@@ -270,7 +264,7 @@ export function EventRegistration({ onComplete, onBack, initialData, isSubmittin
                   onClick={() => { setFormError(null); setRegistration({ ...registration, accommodationType: 'shared' }); }}
                   icon={<Users className="w-5 h-5" />}
                   label="Shared Apartment"
-                  description={`${accommodationSpaces.shared} spaces available`}
+                  description="Availability shown on next step"
                 />
               </div>
             </div>

@@ -14,6 +14,7 @@ interface RegistrationData {
 }
 
 interface EventRegistrationProps {
+  eventId?: string | null;
   onComplete: (data: RegistrationData) => void | Promise<void>;
   onBack: () => void;
   initialData?: RegistrationData | null;
@@ -65,7 +66,7 @@ function GridOption({ value, selected, onClick, icon, label, description, gradie
   );
 }
 
-export function EventRegistration({ onComplete, onBack, initialData, isSubmitting, serverError }: EventRegistrationProps) {
+export function EventRegistration({ eventId: _eventId, onComplete, onBack, initialData, isSubmitting, serverError }: EventRegistrationProps) {
   const [registration, setRegistration] = useState<RegistrationData>(initialData || {
     attendeeType: '',
     accommodationType: '',

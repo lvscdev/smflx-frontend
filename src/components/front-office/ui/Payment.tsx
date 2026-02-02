@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { ArrowLeft, CreditCard } from 'lucide-react';
+import { InlineAlert } from './InlineAlert';
 import { initiateRegistrationPayment } from '@/lib/api';
-import { toUserMessage } from '@/lib/errors/userMessages';
+import { toUserMessage } from '@/lib/errors';
 import { validatePaymentContext } from '@/lib/validation/payment';
 
 interface PaymentProps {
@@ -19,8 +20,7 @@ export function Payment({ amount, onBack, profile, accommodation, registration }
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const startCheckout = async () => {
     setError(null);
     setPaymentProcessing(true);
 
@@ -30,14 +30,13 @@ export function Payment({ amount, onBack, profile, accommodation, registration }
 
       const userId = profile?.userId || user?.userId;
       const eventId = registration?.eventId;
-      const registrationId = registration?.registrationId;
 
       const ctxRes = validatePaymentContext({ amount, userId, eventId });
       if (!ctxRes.ok) {
         throw new Error(ctxRes.message);
       }
 
-            const reference = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+      const reference = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
         ? crypto.randomUUID()
         : `smflx_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
@@ -54,7 +53,6 @@ export function Payment({ amount, onBack, profile, accommodation, registration }
       }
 
       // Persist enough context to resume deterministically on return from checkout.
-      // (Does not change flow order; only prevents "back to verify" on return.)
       try {
         localStorage.setItem(
           'smflx_pending_payment_ctx',
@@ -79,6 +77,12 @@ export function Payment({ amount, onBack, profile, accommodation, registration }
     }
   };
 
+  const handleCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (paymentProcessing) return;
+    await startCheckout();
+  };
+
   return (
     <div className="flex-1 overflow-auto p-4 lg:p-8">
       <div className="max-w-2xl mx-auto">
@@ -95,9 +99,17 @@ export function Payment({ amount, onBack, profile, accommodation, registration }
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
+          <InlineAlert
+            variant="error"
+            title="Payment couldn’t start"
+            actionLabel="Try again"
+            onAction={() => {
+              if (!paymentProcessing) void startCheckout();
+            }}
+            className="mb-6"
+          >
             {error}
-          </div>
+          </InlineAlert>
         )}
 
         <form onSubmit={handleCheckout} className="space-y-4">

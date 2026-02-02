@@ -1,472 +1,576 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bed, Users, ArrowLeft, Check } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Bed, Users, ArrowLeft, Check, AlertCircle, Loader2, MapPin } from "lucide-react";
 import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
 import { PairingCodeModal } from "@/components/front-office/ui/PairingCodeModal";
-import { validateAccommodationSelection } from "@/lib/validation/accommodation";
+import { getAccommodations, bookAccommodation } from "@/lib/api";
+import type { Facility, Room, BedSpace } from "@/lib/api";
+import { ApiError } from "@/lib/api/client";
 
 interface AccommodationData {
   type: string;
-  facility?: string;
-  room?: string;
-  bed?: string;
-  roomType?: string;
-  roomMembers?: string[];
+  facilityId?: string;
+  facilityName?: string;
+  roomId?: string;
+  roomNumber?: string;
+  bedSpaceId?: string;
+  bedNumber?: string;
   price?: number;
-  priceCategory?: 'employed' | 'unemployed-student';
+  bookingId?: string;
   isPaired?: boolean;
 }
 
 interface AccommodationSelectionProps {
   accommodationType: string;
-  onComplete: (data: AccommodationData) => void;
+  eventId: string;
+  registrationId?: string;
+  onComplete: (data: AccommodationData) => Promise<void> | void;
   onBack: () => void;
   initialData?: AccommodationData | null;
   profile?: any;
+  isSubmitting?: boolean;
+  serverError?: string | null;
 }
 
-const campFacilities = [
-  { 
-    id: 'dansol-high', 
-    name: 'Dansol High', 
-    spaces: 102,
-    image: 'https://images.unsplash.com/photo-1761417327344-66e899ed9a63?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3N0ZWwlMjBidWlsZGluZyUyMGV4dGVyaW9yfGVufDF8fHx8MTc2NzgxNTU5NHww&ixlib=rb-4.1.0&q=80&w=1080'
-  },
-  { 
-    id: 'dansol-annex', 
-    name: 'Dansol Annex', 
-    spaces: 86,
-    image: 'https://images.unsplash.com/photo-1748143175931-77bd21b43bc6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkb3JtaXRvcnklMjBidWlsZGluZyUyMGNhbXB1c3xlbnwxfHx8fDE3Njc4MTU1OTV8MA&ixlib=rb-4.1.0&q=80&w=1080'
-  },
-  { 
-    id: 'akin-osiyemi', 
-    name: 'Akin Osiyemi', 
-    spaces: 54,
-    image: 'https://images.unsplash.com/photo-1695979164037-f093c6824b84?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdHVkZW50JTIwYWNjb21tb2RhdGlvbiUyMGJ1aWxkaW5nfGVufDF8fHx8MTc2Nzc5MjU3Mnww&ixlib=rb-4.1.0&q=80&w=1080'
-  },
-];
-
-const hotels = [
-  { 
-    id: 'grand', 
-    name: 'Grand Plaza Hotel',
-    location: 'Victoria Island, Lagos',
-    roomTypes: [
-      { 
-        id: 'standard', 
-        name: 'Standard Room', 
-        price: 150000,
-        roomsLeft: 8,
-        image: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      },
-      { 
-        id: 'deluxe', 
-        name: 'Deluxe Room', 
-        price: 250000,
-        roomsLeft: 5,
-        image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      },
-      { 
-        id: 'suite', 
-        name: 'Suite', 
-        price: 400000,
-        roomsLeft: 2,
-        image: 'https://images.unsplash.com/photo-1591088398332-8a7791972843?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      }
-    ]
-  },
-  { 
-    id: 'royal', 
-    name: 'Royal Inn',
-    location: 'Agidingbi, Ikeja Lagos',
-    roomTypes: [
-      { 
-        id: 'standard', 
-        name: 'Standard Room', 
-        price: 120000,
-        roomsLeft: 12,
-        image: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      },
-      { 
-        id: 'deluxe', 
-        name: 'Deluxe Room', 
-        price: 200000,
-        roomsLeft: 4,
-        image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      }
-    ]
-  },
-];
-
-const sharedApartments = [
-  { 
-    id: 'downtown', 
-    name: 'Downtown Apartments',
-    location: 'Lekki Phase 1, Lagos',
-    roomTypes: [
-      { 
-        id: '2-bedroom', 
-        name: '2-Bedroom', 
-        price: 180000,
-        roomsLeft: 6,
-        image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      },
-      { 
-        id: '3-bedroom', 
-        name: '3-Bedroom', 
-        price: 250000,
-        roomsLeft: 3,
-        image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      }
-    ]
-  },
-  { 
-    id: 'lakeside', 
-    name: 'Lakeside Residences',
-    location: 'Ikoyi, Lagos',
-    roomTypes: [
-      { 
-        id: '2-bedroom', 
-        name: '2-Bedroom', 
-        price: 200000,
-        roomsLeft: 8,
-        image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      },
-      { 
-        id: '3-bedroom', 
-        name: '3-Bedroom', 
-        price: 280000,
-        roomsLeft: 5,
-        image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      },
-      { 
-        id: '4-bedroom', 
-        name: '4-Bedroom', 
-        price: 350000,
-        roomsLeft: 2,
-        image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080'
-      }
-    ]
-  },
-];
-
-export function AccommodationSelection({ accommodationType, onComplete, onBack, initialData, profile }: AccommodationSelectionProps) {
-  const [selection, setSelection] = useState<AccommodationData>(initialData || {
-    type: accommodationType,
-  });
-  const [newMember, setNewMember] = useState('');
+export function AccommodationSelection({ 
+  accommodationType, 
+  eventId,
+  registrationId,
+  onComplete, 
+  onBack, 
+  initialData, 
+  profile,
+  isSubmitting: externalSubmitting,
+  serverError: externalError
+}: AccommodationSelectionProps) {
+  // State
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(
+    initialData?.facilityId || null
+  );
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(
+    initialData?.roomId || null
+  );
+  const [selectedBedSpaceId, setSelectedBedSpaceId] = useState<string | null>(
+    initialData?.bedSpaceId || null
+  );
+  
   const [showPairingModal, setShowPairingModal] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
-  // Calculate price based on marital status
-  // Students: 10,000, Employed/Unemployed: 15,000
-  const getCampPrice = () => {
-    if (profile?.maritalStatus === 'student') {
-      return 10000;
+  // Derived state
+  const selectedFacility = facilities.find(f => f.facilityId === selectedFacilityId);
+  const selectedRoom = selectedFacility?.rooms.find(r => r.roomId === selectedRoomId);
+  const selectedBedSpace = selectedRoom?.bedSpaces.find(b => b.bedSpaceId === selectedBedSpaceId);
+  
+  const isHostel = accommodationType.toLowerCase() === 'hostel';
+  const isHotel = accommodationType.toLowerCase() === 'hotel';
+  
+  // For hostel, we need facility and bed space
+  // For hotel, we need facility and room (no individual bed selection)
+  const isSelectionComplete = isHostel 
+    ? !!(selectedFacilityId && selectedBedSpaceId)
+    : !!(selectedFacilityId && selectedRoomId);
+
+  // Fetch accommodations on mount
+  useEffect(() => {
+    async function loadAccommodations() {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await getAccommodations({
+          eventId,
+          type: accommodationType.toUpperCase() as 'HOSTEL' | 'HOTEL'
+        });
+        
+        setFacilities(response.facilities || []);
+        
+        if (!response.facilities || response.facilities.length === 0) {
+          setError('No accommodations available for this event at the moment.');
+        }
+      } catch (err) {
+        console.error('Failed to load accommodations:', err);
+        setError(
+          err instanceof ApiError 
+            ? err.message 
+            : 'Failed to load accommodations. Please try again.'
+        );
+      } finally {
+        setLoading(false);
+      }
     }
-    return 15000; // For employed, unemployed, single, married, divorced, widowed
+
+    if (eventId) {
+      loadAccommodations();
+    }
+  }, [eventId, accommodationType]);
+
+  // Handle facility selection
+  const handleSelectFacility = (facilityId: string) => {
+    setSelectedFacilityId(facilityId);
+    setSelectedRoomId(null);
+    setSelectedBedSpaceId(null);
+    setError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle room selection
+  const handleSelectRoom = (roomId: string) => {
+    setSelectedRoomId(roomId);
+    setSelectedBedSpaceId(null);
+    setError(null);
+  };
 
-    const res = validateAccommodationSelection(accommodationType, selection);
-    if (!res.ok) {
-      setFormError(res.message);
+  // Handle bed space selection
+  const handleSelectBedSpace = (bedSpaceId: string) => {
+    setSelectedBedSpaceId(bedSpaceId);
+    setError(null);
+  };
+
+  // Calculate price
+  const calculatePrice = (): number => {
+    if (isHostel && selectedBedSpace) {
+      return selectedBedSpace.price;
+    }
+    if (isHotel && selectedRoom) {
+      // Hotel price might be on the room or first bed space
+      return selectedRoom.bedSpaces[0]?.price || 0;
+    }
+    return 0;
+  };
+
+  // Handle booking submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!isSelectionComplete) {
+      setError('Please complete your accommodation selection.');
       return;
     }
-    setFormError(null);
 
-    // Check if user is married and selecting hotel accommodation
-    if (accommodationType === 'hotel' && profile?.maritalStatus === 'married') {
+    // Check for pairing modal (married users selecting hotel)
+    if (isHotel && profile?.maritalStatus === 'MARRIED') {
       setShowPairingModal(true);
-    } else {
-      onComplete(selection);
+      return;
+    }
+
+    await processBooking();
+  };
+
+  // Process the actual booking
+  const processBooking = async (isPaired: boolean = false) => {
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      // Prepare booking payload
+      const payload = {
+        eventId,
+        accommodationType: accommodationType.toUpperCase() as 'HOSTEL' | 'HOTEL',
+        facilityId: selectedFacilityId!,
+        roomId: selectedRoomId || undefined,
+        bedSpaceId: selectedBedSpaceId || undefined,
+        priceCategory: profile?.employmentStatus === 'STUDENT' 
+          ? 'UNEMPLOYED_STUDENT' as const
+          : 'EMPLOYED' as const,
+      };
+
+      // Call booking API
+      const booking = await bookAccommodation(payload);
+
+      // Prepare data for parent
+      const accommodationData: AccommodationData = {
+        type: accommodationType,
+        facilityId: selectedFacilityId!,
+        facilityName: selectedFacility?.name || booking.facilityName,
+        roomId: selectedRoomId || booking.roomId,
+        roomNumber: selectedRoom?.roomNumber || booking.roomNumber,
+        bedSpaceId: selectedBedSpaceId || booking.bedSpaceId,
+        bedNumber: selectedBedSpace?.bedNumber || booking.bedNumber,
+        price: booking.price,
+        bookingId: booking.bookingId,
+        isPaired,
+      };
+
+      // Call parent completion handler
+      await onComplete(accommodationData);
+      
+    } catch (err) {
+      console.error('Booking failed:', err);
+      setError(
+        err instanceof ApiError 
+          ? err.message 
+          : 'Failed to book accommodation. Please try again.'
+      );
+      setSubmitting(false);
     }
   };
 
+  // Pairing modal handlers
   const handleProceedToPayment = () => {
     setShowPairingModal(false);
-    onComplete(selection);
+    processBooking(false);
   };
 
   const handleCodeVerified = () => {
     setShowPairingModal(false);
-    // Mark as paired and skip payment - pass special flag
-    onComplete({ ...selection, isPaired: true });
+    processBooking(true);
   };
 
-  const addRoomMember = () => {
-    if (newMember.trim()) {
-      setSelection({
-        ...selection,
-        roomMembers: [...(selection.roomMembers || []), newMember.trim()],
-      });
-      setNewMember('');
-    }
-  };
+  // Render loading state
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">Loading accommodations...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const removeMember = (index: number) => {
-    const updatedMembers = [...(selection.roomMembers || [])];
-    updatedMembers.splice(index, 1);
-    setSelection({ ...selection, roomMembers: updatedMembers });
-  };
+  // Render error state with retry
+  if (error && facilities.length === 0) {
+    return (
+      <div className="flex-1 p-4 lg:p-8">
+        <div className="max-w-2xl mx-auto">
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <div className="flex gap-4">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <Button onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const isFormValid = () => {
-    if (accommodationType === 'hostel') {
-      return selection.facility && selection.price;
-    }
-    if (accommodationType === 'hotel') {
-      return selection.facility && selection.roomType;
-    }
-    if (accommodationType === 'shared') {
-      return selection.facility && selection.roomType;
-    }
-    return false;
-  };
+  const price = calculatePrice();
+  const isProcessing = submitting || externalSubmitting;
 
   return (
-    <div className="flex-1 overflow-auto p-4 lg:p-8">
-      <div className="max-w-2xl mx-auto">
+    <div className="flex-1 overflow-auto px-4 lg:px-8 py-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
         <div className="mb-6 lg:mb-8">
           <h1 className="text-2xl lg:text-3xl mb-2">
-            {accommodationType === 'hostel' && 'Camp Accommodation'}
-            {accommodationType === 'hotel' && 'Hotel Accommodation'}
-            {accommodationType === 'shared' && 'Shared Apartment'}
+            Select {isHostel ? 'Hostel' : 'Hotel'} Accommodation
           </h1>
           <p className="text-gray-600 text-sm">
-            Select your accommodation preferences
+            Choose your accommodation for the event
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {formError && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {formError}
+        {/* Error Messages */}
+        {(error || externalError) && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error || externalError}</AlertDescription>
+          </Alert>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Step 1: Select Facility */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-semibold text-sm">
+                1
+              </div>
+              <h2 className="text-xl font-semibold">Select Facility</h2>
             </div>
-          )}
-          {/* Hostel Flow */}
-          {accommodationType === 'hostel' && (
-            <>
-              <div className="space-y-3">
-                <label className="block text-sm text-gray-700 font-medium">Select Camp Facility *</label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {campFacilities.map((facility) => {
-                    const price = getCampPrice();
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {facilities.map((facility) => (
+                <button
+                  key={facility.facilityId}
+                  type="button"
+                  onClick={() => handleSelectFacility(facility.facilityId)}
+                  disabled={facility.availableSpaces === 0}
+                  className={`relative p-4 rounded-2xl border-2 transition-all duration-200 text-left ${
+                    selectedFacilityId === facility.facilityId
+                      ? 'border-gray-900 bg-gray-50 shadow-md'
+                      : facility.availableSpaces === 0
+                      ? 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
+                      : 'border-gray-200 bg-white hover:border-gray-400'
+                  }`}
+                >
+                  {selectedFacilityId === facility.facilityId && (
+                    <div className="absolute top-3 right-3 w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                  
+                  {/* Facility Image */}
+                  {facility.images && facility.images[0] && (
+                    <div className="aspect-video w-full rounded-xl overflow-hidden mb-3">
+                      <ImageWithFallback
+                        src={facility.images[0]}
+                        alt={facility.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+
+                  {/* Facility Info */}
+                  <h3 className="font-semibold text-gray-900 mb-1">
+                    {facility.name}
+                  </h3>
+                  
+                  {facility.location && (
+                    <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                      <MapPin className="w-3 h-3" />
+                      {facility.location}
+                    </div>
+                  )}
+
+                  {facility.description && (
+                    <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                      {facility.description}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <Badge variant={facility.availableSpaces > 0 ? "default" : "secondary"}>
+                      {facility.availableSpaces > 0 
+                        ? `${facility.availableSpaces} spaces left`
+                        : 'Fully booked'
+                      }
+                    </Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Step 2: Select Room (for hotels) or direct to bed (for hostels) */}
+          {selectedFacility && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-semibold text-sm">
+                  2
+                </div>
+                <h2 className="text-xl font-semibold">
+                  {isHostel ? 'Select Bed Space' : 'Select Room'}
+                </h2>
+              </div>
+
+              {isHotel ? (
+                // Hotel: Show rooms
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedFacility.rooms.map((room) => {
+                    const availableBeds = room.bedSpaces.filter(b => b.available).length;
+                    const roomPrice = room.bedSpaces[0]?.price || 0;
+                    
                     return (
                       <button
-                        key={facility.id}
+                        key={room.roomId}
                         type="button"
-                        onClick={() => { setFormError(null); setSelection({ ...selection, facility: facility.id, price }); }}
-                        className={`p-5 rounded-2xl border transition-all duration-200 text-left ${
-                          selection.facility === facility.id
-                            ? 'border-gray-900 bg-gray-50'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        onClick={() => handleSelectRoom(room.roomId)}
+                        disabled={availableBeds === 0}
+                        className={`relative p-5 rounded-2xl border-2 transition-all duration-200 text-left ${
+                          selectedRoomId === room.roomId
+                            ? 'border-gray-900 bg-gray-50 shadow-md'
+                            : availableBeds === 0
+                            ? 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
+                            : 'border-gray-200 bg-white hover:border-gray-400'
                         }`}
                       >
-                        <div className="aspect-4/3 w-full rounded-xl overflow-hidden mb-4">
-                          <ImageWithFallback
-                            src={facility.image}
-                            alt={facility.name}
-                            className="w-full h-full object-cover"
-                          />
+                        {selectedRoomId === room.roomId && (
+                          <div className="absolute top-3 right-3 w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+
+                        <div className="mb-3">
+                          <h3 className="font-semibold text-gray-900 mb-1">
+                            {room.roomType} - Room {room.roomNumber}
+                          </h3>
+                          <p className="text-sm text-gray-600 mb-2">
+                            Capacity: {room.capacity} {room.capacity === 1 ? 'person' : 'people'}
+                          </p>
                         </div>
-                        <h3 className="font-semibold text-gray-900 mb-1">
-                          {facility.name}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          {facility.spaces} Spaces Left
-                        </p>
+
+                        {room.amenities && room.amenities.length > 0 && (
+                          <div className="mb-3">
+                            <p className="text-xs text-gray-500 mb-1">Amenities:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {room.amenities.slice(0, 3).map((amenity, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {amenity}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-end justify-between">
+                          <div className="text-xl font-bold text-gray-900">
+                            ₦{roomPrice.toLocaleString('en-NG')}
+                          </div>
+                          <Badge variant={availableBeds > 0 ? "default" : "secondary"}>
+                            {availableBeds > 0 
+                              ? `${availableBeds} available`
+                              : 'Fully booked'
+                            }
+                          </Badge>
+                        </div>
                       </button>
                     );
                   })}
                 </div>
-              </div>
-            </>
-          )}
-
-          {/* Hotel Flow */}
-          {accommodationType === 'hotel' && (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="hotel" className="block text-sm text-gray-700">Select Hotel *</label>
-                <select
-                  id="hotel"
-                  value={selection.facility}
-                  onChange={(e) => { setFormError(null); setSelection({ ...selection, facility: e.target.value, roomType: '', price: undefined }); }}
-                  className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
-                >
-                  <option value="">Choose a hotel</option>
-                  {hotels.map((hotel) => (
-                    <option key={hotel.id} value={hotel.id}>
-                      {hotel.name} - {hotel.location}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {selection.facility && (
-                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <label className="block text-sm text-gray-700 font-medium">Select Room Type *</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {hotels
-                      .find((h) => h.id === selection.facility)
-                      ?.roomTypes.map((room) => (
-                        <button
-                          key={room.id}
-                          type="button"
-                          onClick={() => { setFormError(null); setSelection({ ...selection, roomType: room.id, price: room.price }); }}
-                          className={`relative p-5 rounded-2xl border transition-all duration-200 text-left ${
-                            selection.roomType === room.id
-                              ? 'border-gray-900 bg-gray-50 shadow-md'
-                              : 'border-gray-200 bg-white hover:border-gray-300'
-                          }`}
-                        >
-                          {selection.roomType === room.id && (
-                            <div className="absolute top-3 right-3 w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center">
-                              <Check className="w-4 h-4 text-white" />
-                            </div>
+              ) : (
+                // Hostel: Show all bed spaces from all rooms
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {selectedFacility.rooms.flatMap(room => 
+                    room.bedSpaces.map(bedSpace => (
+                      <button
+                        key={bedSpace.bedSpaceId}
+                        type="button"
+                        onClick={() => handleSelectBedSpace(bedSpace.bedSpaceId)}
+                        disabled={!bedSpace.available}
+                        className={`relative p-4 rounded-xl border-2 transition-all duration-200 ${
+                          selectedBedSpaceId === bedSpace.bedSpaceId
+                            ? 'border-gray-900 bg-gray-50 shadow-md'
+                            : !bedSpace.available
+                            ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
+                            : 'border-gray-200 bg-white hover:border-gray-400'
+                        }`}
+                      >
+                        {selectedBedSpaceId === bedSpace.bedSpaceId && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-gray-900 rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                        
+                        <div className="text-center">
+                          <Bed className={`w-8 h-8 mx-auto mb-2 ${
+                            bedSpace.available ? 'text-gray-700' : 'text-gray-400'
+                          }`} />
+                          <div className="font-semibold text-sm mb-1">
+                            Bed {bedSpace.bedNumber}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            ₦{bedSpace.price.toLocaleString('en-NG')}
+                          </div>
+                          {!bedSpace.available && (
+                            <Badge variant="secondary" className="mt-2 text-xs">
+                              Taken
+                            </Badge>
                           )}
-                          <div className="aspect-4/3 w-full rounded-xl overflow-hidden mb-4">
-                            <ImageWithFallback
-                              src={room.image}
-                              alt={room.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <h3 className="font-semibold text-gray-900 mb-1">
-                            {room.name}
-                          </h3>
-                          <p className="text-sm text-gray-500 mb-2">
-                            {hotels.find((h) => h.id === selection.facility)?.location}
-                          </p>
-                          <div className="flex items-end justify-between">
-                            <div className="text-xl font-bold text-gray-900">
-                              ₦{room.price.toLocaleString('en-NG')}
-                            </div>
-                            <p className="text-sm text-gray-500">
-                              {room.roomsLeft} Rooms Left
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                  </div>
+                        </div>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
-            </>
+            </div>
           )}
 
-          {/* Shared Apartment Flow */}
-          {accommodationType === 'shared' && (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="apartment" className="block text-sm text-gray-700">Select Apartment *</label>
-                <select
-                  id="apartment"
-                  value={selection.facility}
-                  onChange={(e) => { setFormError(null); setSelection({ ...selection, facility: e.target.value, roomType: '' }); }}
-                  className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
+          {/* Price Summary */}
+          {isSelectionComplete && (
+            <div className="p-6 bg-gray-50 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-gray-600">Selected Accommodation</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedFacilityId(null);
+                    setSelectedRoomId(null);
+                    setSelectedBedSpaceId(null);
+                  }}
                 >
-                  <option value="">Choose an apartment</option>
-                  {sharedApartments.map((apt) => (
-                    <option key={apt.id} value={apt.id}>
-                      {apt.name}
-                    </option>
-                  ))}
-                </select>
+                  Change
+                </Button>
+              </div>
+              
+              <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Facility:</span>
+                  <span className="font-medium">{selectedFacility?.name}</span>
+                </div>
+                {isHotel && selectedRoom && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Room:</span>
+                    <span className="font-medium">
+                      {selectedRoom.roomType} - Room {selectedRoom.roomNumber}
+                    </span>
+                  </div>
+                )}
+                {isHostel && selectedBedSpace && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Bed:</span>
+                    <span className="font-medium">Bed {selectedBedSpace.bedNumber}</span>
+                  </div>
+                )}
               </div>
 
-              {selection.facility && (
-                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <label className="block text-sm text-gray-700 font-medium">Select Room Type *</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {sharedApartments
-                      .find((a) => a.id === selection.facility)
-                      ?.roomTypes.map((room) => (
-                        <button
-                          key={room.id}
-                          type="button"
-                          onClick={() => { setFormError(null); setSelection({ ...selection, roomType: room.id, price: room.price }); }}
-                          className={`relative p-5 rounded-2xl border transition-all duration-200 text-left ${
-                            selection.roomType === room.id
-                              ? 'border-gray-900 bg-gray-50 shadow-md'
-                              : 'border-gray-200 bg-white hover:border-gray-300'
-                          }`}
-                        >
-                          {selection.roomType === room.id && (
-                            <div className="absolute top-3 right-3 w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center">
-                              <Check className="w-4 h-4 text-white" />
-                            </div>
-                          )}
-                          <div className="aspect-4/3 w-full rounded-xl overflow-hidden mb-4">
-                            <ImageWithFallback
-                              src={room.image}
-                              alt={room.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <h3 className="font-semibold text-gray-900 mb-1">
-                            {room.name}
-                          </h3>
-                          <p className="text-sm text-gray-500 mb-2">
-                            {sharedApartments.find((a) => a.id === selection.facility)?.location}
-                          </p>
-                          <div className="flex items-end justify-between">
-                            <div className="text-xl font-bold text-gray-900">
-                              ₦{room.price.toLocaleString('en-NG')}
-                            </div>
-                            <p className="text-sm text-gray-500">
-                              {room.roomsLeft} Rooms Left
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                  </div>
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold">Total Amount:</span>
+                  <span className="text-2xl font-bold text-gray-900">
+                    ₦{price.toLocaleString('en-NG')}
+                  </span>
                 </div>
-              )}
-            </>
+              </div>
+            </div>
           )}
 
-          <div className="flex gap-4">
-            <button
+          {/* Action Buttons */}
+          <div className="flex gap-4 sticky bottom-0 bg-white pt-4 pb-2 border-t">
+            <Button
               type="button"
+              variant="outline"
               onClick={onBack}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              disabled={isProcessing}
+              className="flex-shrink-0"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 mr-2" />
               Back
-            </button>
-            <button
+            </Button>
+            
+            <Button
               type="submit"
-              disabled={!isFormValid()}
-              className={`flex-1 py-3 rounded-lg transition-colors ${
-                isFormValid()
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
+              disabled={!isSelectionComplete || isProcessing}
+              className="flex-1"
             >
-              {accommodationType === 'hostel' && selection.price 
-                ? `Pay ₦${selection.price.toLocaleString('en-NG')}`
-                : 'Continue to Payment'
-              }
-            </button>
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Booking...
+                </>
+              ) : (
+                `Continue to Payment (₦${price.toLocaleString('en-NG')})`
+              )}
+            </Button>
           </div>
         </form>
+
+        {/* Pairing Modal */}
+        {showPairingModal && (
+          <PairingCodeModal
+            isOpen={showPairingModal}
+            onClose={() => setShowPairingModal(false)}
+            onProceedToPayment={handleProceedToPayment}
+            onCodeVerified={handleCodeVerified}
+          />
+        )}
       </div>
-      {showPairingModal && (
-        <PairingCodeModal
-          isOpen={showPairingModal}
-          onClose={() => setShowPairingModal(false)}
-          onProceedToPayment={handleProceedToPayment}
-          onCodeVerified={handleCodeVerified}
-        />
-      )}
     </div>
   );
 }

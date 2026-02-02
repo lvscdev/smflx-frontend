@@ -19,7 +19,28 @@ interface DependentsSectionProps {
 }
 
 export function DependentsSection({ dependents, onRegister, onPay }: DependentsSectionProps) {
-  if (dependents.length === 0) return null;
+  if (dependents.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
+        <div className="p-6 border-b border-gray-200 bg-linear-to-r from-blue-50 to-purple-50">
+          <h3 className="text-xl font-semibold text-gray-900">Your Dependents</h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Add dependents to register them and pay for feeding (₦7,000 per dependent).
+          </p>
+        </div>
+
+        <div className="p-6">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 text-center">
+            <div className="text-base font-medium text-gray-900 mb-1">No dependents yet</div>
+            <div className="text-sm text-gray-600">
+              Use the <span className="font-medium">Manage Dependents</span> button above to add your dependents.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   const allRegistered = dependents.every(d => d.isRegistered);
   const unpaidRegistered = dependents.filter(d => d.isRegistered && !d.isPaid);

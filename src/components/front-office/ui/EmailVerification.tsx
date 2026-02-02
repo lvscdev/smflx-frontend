@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { generateRegistrantOtp, validateOtp } from "@/lib/api";
 import { setTokenCookie } from "@/lib/auth/session";
 import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
-import { toUserMessage } from "@/lib/errors/userMessages";
+import { toUserMessage } from "@/lib/errors";
+import { InlineAlert } from "./InlineAlert";
 
 interface EmailVerificationProps {
   onVerified: (email: string) => void;
@@ -92,11 +93,6 @@ export function EmailVerification({
         otp: verificationCode,
         otpReference,
       });
-    
-    if (!token || typeof token !== "string") {
-        throw new Error("Invalid session token received. Please try again.");
-      }
-
 
       // Persist session for Stage 2/3 API calls
       setAuthToken(token);
@@ -147,9 +143,9 @@ export function EmailVerification({
           </div>
 
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <InlineAlert variant="error" title="Something went wrong" className="mb-4">
               {error}
-            </div>
+            </InlineAlert>
           )}
 
           {!verificationSent ? (

@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 import { generateLoginOtp, validateOtp } from "@/lib/api";
 import { setTokenCookie } from "@/lib/auth/session";
 import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
-import { toUserMessage } from "@/lib/errors/userMessages";
+import { toUserMessage } from "@/lib/errors";
+import { InlineAlert } from "./InlineAlert";
 
 interface ReturningUserLoginProps {
   onLoginSuccess: (email?: string) => void; 
@@ -126,9 +127,9 @@ export function ReturningUserLogin({
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                <InlineAlert variant="error" title="Couldn’t continue">
                   {error}
-                </div>
+                </InlineAlert>
               )}
 
               <button
@@ -180,9 +181,9 @@ export function ReturningUserLogin({
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                <InlineAlert variant="error" title="Couldn’t continue">
                   {error}
-                </div>
+                </InlineAlert>
               )}
 
               <div className="flex gap-3">

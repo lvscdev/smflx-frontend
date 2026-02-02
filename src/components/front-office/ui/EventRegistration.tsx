@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { validateEventRegistration } from "@/lib/validation/eventRegistration";
+import { toUserMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,9 +14,11 @@ interface RegistrationData {
 }
 
 interface EventRegistrationProps {
-  onComplete: (data: RegistrationData) => void;
+  onComplete: (data: RegistrationData) => void | Promise<void>;
   onBack: () => void;
   initialData?: RegistrationData | null;
+  isSubmitting?: boolean;
+  serverError?: string | null;
 }
 
 interface GridOptionProps {
@@ -68,22 +71,36 @@ const accommodationSpaces = {
   shared: 8,
 };
 
-export function EventRegistration({ onComplete, onBack, initialData }: EventRegistrationProps) {
+export function EventRegistration({ onComplete, onBack, initialData, isSubmitting, serverError }: EventRegistrationProps) {
   const [registration, setRegistration] = useState<RegistrationData>(initialData || {
     attendeeType: '',
     accommodationType: '',
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const [localSubmitting, setLocalSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const submitting = !!isSubmitting || localSubmitting;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+
     const res = validateEventRegistration(registration);
     if (!res.ok) {
       setFormError(res.message);
       return;
     }
+
     setFormError(null);
-    onComplete(registration);
+
+    try {
+      setLocalSubmitting(true);
+      await onComplete(registration);
+    } catch (err: any) {
+      setFormError(toUserMessage(err, { feature: "generic", action: "create" }));
+    } finally {
+      setLocalSubmitting(false);
+    }
   };
 
   const isFormValid = () => {
@@ -112,6 +129,11 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {serverError ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {serverError}
+            </div>
+          ) : null}
           {formError && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               {formError}
@@ -265,14 +287,14 @@ export function EventRegistration({ onComplete, onBack, initialData }: EventRegi
             </button>
             <button
               type="submit"
-              disabled={!isFormValid()}
+              disabled={!isFormValid() || submitting}
               className={`flex-1 py-3 rounded-lg transition-colors ${
                 isFormValid()
                   ? 'bg-red-600 text-white hover:bg-red-700'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {getButtonText()}
+              {submitting ? "Saving..." : getButtonText()}
             </button>
           </div>
         </form>

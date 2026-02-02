@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import {Home, Tent, User, LogOut, X, Building2, Hotel, Users, Facebook, Instagram, Twitter, Youtube, Radio, Loader2} from 'lucide-react';
+import {Home, Tent, User, LogOut, X, Building2, Hotel, Users, Facebook, Instagram, Twitter, Youtube, Radio, Loader2, RefreshCcw} from 'lucide-react';
+import { InlineAlert } from './InlineAlert';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import {
@@ -23,6 +24,7 @@ import { DependentsSection } from './DependentsSection';
 import { DependentRegistrationSuccess } from './DependentRegistrationSuccess';
 import { UserProfile } from './UserProfile';
 import { getUserDashboard, addDependent as apiAddDependent, removeDependent as apiRemoveDependent } from '@/lib/api';
+import { toUserMessage } from '@/lib/errors';
 
 const eventBgImage = '/assets/images/event-bg.png';
 const badgeImage = '/assets/images/badge.png';
@@ -58,6 +60,46 @@ export function Dashboard({
 
   const [dashboardLoadError, setDashboardLoadError] = useState<string | null>(null);
 
+  const [dashboardHydrating, setDashboardHydrating] = useState(false);
+
+  const reloadDashboard = async () => {
+    setDashboardHydrating(true);
+    setDashboardLoadError(null);
+    try {
+      const data: any = await getUserDashboard();
+
+      const deps =
+        data?.dependants ||
+        data?.dependents ||
+        data?.dependentRegistrations ||
+        [];
+      if (Array.isArray(deps)) {
+        setDependents(
+          deps.map((d: any) => ({
+            id: d?.id || d?.dependantId || crypto.randomUUID(),
+            name: d?.name,
+            age: d?.age,
+            gender: d?.gender?.toString()?.toLowerCase() || "male",
+            isRegistered: d?.isRegistered ?? true,
+            isPaid: d?.isPaid ?? (d?.paymentStatus === "PAID" ? true : false),
+          }))
+        );
+      } else {
+        setDependents([]);
+      }
+
+      // Optionally hydrate profile from API
+      if (data?.user && typeof data.user === "object") {
+        setLocalProfile((prev: any) => ({ ...prev, ...data.user }));
+      }
+    } catch (err: any) {
+      setDashboardLoadError(toUserMessage(err, { feature: 'generic' }));
+    } finally {
+      setDashboardHydrating(false);
+    }
+  };
+
+
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
@@ -83,41 +125,13 @@ export function Dashboard({
   useEffect(() => {
     let mounted = true;
     (async () => {
-      try {
-        const data: any = await getUserDashboard();
-        if (!mounted) return;
-
-        const deps =
-          data?.dependants ||
-          data?.dependents ||
-          data?.dependentRegistrations ||
-          [];
-        if (Array.isArray(deps) && deps.length > 0) {
-          setDependents(
-            deps.map((d: any) => ({
-              id: d?.id || d?.dependantId || crypto.randomUUID(),
-              name: d?.name,
-              age: d?.age,
-              gender: d?.gender?.toString()?.toLowerCase() || 'male',
-              isRegistered: d?.isRegistered ?? true,
-              isPaid: d?.isPaid ?? (d?.paymentStatus === 'PAID' ? true : false),
-            }))
-          );
-        }
-
-        // Optionally hydrate profile from API
-        if (data?.user && typeof data.user === 'object') {
-          setLocalProfile((prev: any) => ({ ...prev, ...data.user }));
-        }
-      } catch (err: any) {
-        if (!mounted) return;
-        setDashboardLoadError(err?.message || 'Failed to load dashboard data.');
-      }
+      await reloadDashboard();
     })();
     return () => {
       mounted = false;
     };
   }, []);
+
 
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
@@ -398,13 +412,6 @@ const confirmRemoveDependent = async () => {
         </div>
       </header>
 
-      {dashboardLoadError && (
-        <div className="mx-4 lg:mx-8 mt-4 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
-          {dashboardLoadError}
-        </div>
-      )}
-
-
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 lg:px-8 py-6 lg:py-10">
         {/* Welcome */}
@@ -412,6 +419,20 @@ const confirmRemoveDependent = async () => {
           <h1 className="text-2xl lg:text-3xl mb-1">Hello {firstName}</h1>
           <p className="text-gray-600 text-sm">Manage your WOTH Camp Meeting 2026 registration and view event details</p>
         </div>
+
+        {(dashboardLoadError || dashboardHydrating) && (
+          <InlineAlert
+            variant={dashboardLoadError ? "warning" : "info"}
+            title={dashboardLoadError ? "Dashboard couldn’t refresh" : "Refreshing"}
+            actionLabel="Retry"
+            onAction={() => {
+              if (!dashboardHydrating) void reloadDashboard();
+            }}
+            className="mb-6"
+          >
+            {dashboardLoadError ? dashboardLoadError : "Refreshing your dashboard…"}
+          </InlineAlert>
+        )}
 
         <DependentsBanner
           hasDependents={dependents.length > 0}
@@ -776,10 +797,13 @@ const confirmRemoveDependent = async () => {
               {modalStep === 2 && (
                 <AccommodationSelection
                   accommodationType={selectedAccommodationType}
+                  eventId={registration?.eventId || (registration as any)?.event?.eventId || ''}
+                  registrationId={registration?.registrationId}
                   onComplete={handleFacilitySelection}
                   onBack={handleModalBack}
                 />
               )}
+
 
               {modalStep === 3 && (
                 <Payment

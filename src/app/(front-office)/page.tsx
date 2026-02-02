@@ -13,6 +13,7 @@ import { Payment } from "@/components/front-office/ui/Payment";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
 
 import { getAuthToken, setAuthToken } from "@/lib/api/client";
+import { createUserRegistration } from "@/lib/api";
 
 type View =
   | "verify"
@@ -66,6 +67,8 @@ export default function HomePage() {
   } | null>(null);
 
   const [registration, setRegistration] = useState<any>(null);
+  const [registrationSubmitting, setRegistrationSubmitting] = useState(false);
+  const [registrationPersistError, setRegistrationPersistError] = useState<string | null>(null);
   const [accommodation, setAccommodation] = useState<any>(null);
 
   // ✅ Rehydrate session + resume flow if user already verified once (token exists)
@@ -243,37 +246,85 @@ export default function HomePage() {
           <EventRegistration
             initialData={registration}
             onBack={() => setView("event-selection")}
-            onComplete={(data) => {
-              const next = {
-                ...data,
-                eventId: selectedEvent?.eventId,
-                eventName: selectedEvent?.eventName,
-                email,
-              };
+            isSubmitting={registrationSubmitting}
+            serverError={registrationPersistError}
+            onComplete={async (data) => {
+              setRegistrationPersistError(null);
+              setRegistrationSubmitting(true);
 
-              setRegistration(next);
+              try {
+                if (!selectedEvent?.eventId) {
+                  throw new Error("No event selected. Please go back and select an event.");
+                }
 
-              // ✅ Camper: accommodation -> payment -> dashboard
-              if (next.attendeeType === "camper") {
-                setView("accommodation");
-                return;
+                const participationMode =
+                  data.attendeeType === "camper"
+                    ? "CAMPER"
+                    : data.attendeeType === "online"
+                    ? "ONLINE"
+                    : "ATTENDEE";
+
+                const accommodationType =
+                  participationMode === "CAMPER"
+                    ? data.accommodationType === "hostel"
+                      ? "HOSTEL"
+                      : data.accommodationType === "hotel" || data.accommodationType === "shared"
+                      ? "HOTEL"
+                      : "NONE"
+                    : "NONE";
+
+                const created = await createUserRegistration({
+                  eventId: selectedEvent.eventId,
+                  participationMode,
+                  accommodationType,
+                });
+
+                const next = {
+                  ...data,
+                  eventId: selectedEvent.eventId,
+                  eventName: selectedEvent.eventName,
+                  email,
+                  participationMode,
+                  accommodationType,
+                  registrationId: (created as any)?.registrationId,
+                };
+
+                setRegistration(next);
+
+                if (data.attendeeType === "camper") {
+                  setView("accommodation");
+                  return;
+                }
+
+                setView("dashboard");
+              } catch (e: any) {
+                setRegistrationPersistError(
+                  e?.message || "Unable to save registration. Please try again."
+                );
+              } finally {
+                setRegistrationSubmitting(false);
               }
-
-              // ✅ Physical/Online: straight to dashboard (NO payment)
-              setView("dashboard");
             }}
           />
         )}
 
+
         {view === "accommodation" && (
           <AccommodationSelection
             accommodationType={registration?.accommodationType || "hostel"}
+            eventId={selectedEvent?.eventId || ""}
+            registrationId={registration?.registrationId}
             initialData={accommodation}
+            profile={profile}
             onBack={() => setView("event-registration")}
-            onComplete={(data) => {
+            onComplete={async (data) => {
               setAccommodation(data);
-              setView("payment");
-            }}
+              if (data.isPaired) {
+                setView("dashboard");
+              } else {
+                setView("payment");
+              }
+          }}
           />
         )}
 

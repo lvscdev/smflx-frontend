@@ -104,7 +104,6 @@ export async function listActiveEvents() {
 // --- Event registrations ---
 
 export type CreateEventRegistrationPayload = {
-  userId: string;
   eventId: string;
   participationMode: 'CAMPER' | 'ATTENDEE' | 'ONLINE';
   accommodationType: 'HOSTEL' | 'HOTEL' | 'NONE';
@@ -157,17 +156,19 @@ export async function getUserDashboard() {
   return apiRequest<any>('/user-dashboard', { method: 'GET' });
 }
 
-export type BookAccommodationPayload = {
-  eventId: string;
-  accommodationType: string;
-  facilityId?: string;
-  roomId?: string;
-  bedSpaceId?: string;
-};
-
-export async function bookAccommodation(payload: BookAccommodationPayload) {
-  return apiRequest<any>('/user-dashboard/book-accommodation', { method: 'POST', body: payload });
-}
+// Re-export accommodation functions
+export {
+  getAccommodations,
+  bookAccommodation,
+  getMyAccommodations,
+  cancelAccommodationBooking,
+  type Facility,
+  type Room,
+  type BedSpace,
+  type GetAccommodationsResponse,
+  type BookAccommodationPayload,
+  type BookAccommodationResponse,
+} from './accommodations';
 
 // --- Payments (Stage 3) ---
 

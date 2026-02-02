@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { X, CreditCard } from 'lucide-react';
+import { InlineAlert } from './InlineAlert';
 import { initiateDependentsPayment } from '@/lib/api';
-import { toUserMessage } from '@/lib/errors/userMessages';
+import { toUserMessage } from '@/lib/errors';
 
 interface DependentsPaymentModalProps {
   isOpen: boolean;
@@ -38,8 +39,7 @@ export function DependentsPaymentModal({
 
   const totalAmount = dependents.length * 7000;
 
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const startPayment = async () => {
     setError(null);
     setPaymentProcessing(true);
 
@@ -76,13 +76,18 @@ export function DependentsPaymentModal({
       const checkoutUrl = resp?.checkoutUrl;
       if (!checkoutUrl) throw new Error('Dependents payment initiation succeeded but checkoutUrl was not returned.');
 
-      // ✅ SAME TAB redirect
       window.location.href = checkoutUrl;
     } catch (err: any) {
       setError(toUserMessage(err, { feature: 'payment', action: 'init' }));
     } finally {
       setPaymentProcessing(false);
     }
+  };
+
+  const handlePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (paymentProcessing) return;
+    await startPayment();
   };
 
   // Payment happens on the gateway page. We keep the card fields for UI parity,
@@ -144,9 +149,17 @@ export function DependentsPaymentModal({
           </div>
 
           {error && (
-            <div className="mb-6 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
+            <InlineAlert
+              variant="error"
+              title="Payment couldn’t start"
+              actionLabel="Try again"
+              onAction={() => {
+                if (!paymentProcessing) void startPayment();
+              }}
+              className="mb-6"
+            >
               {error}
-            </div>
+            </InlineAlert>
           )}
 
 

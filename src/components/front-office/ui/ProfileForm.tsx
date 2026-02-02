@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Check, User, Users, Briefcase, Home as HomeIcon, Heart, Search, ChevronDown, X } from 'lucide-react';
 import iso3166_2 from "iso-3166-2.json";
 import { updateMe } from '@/lib/api';
+import { toUserMessage } from '@/lib/errors';
 import { normalizeDialCode, sanitizeLocalPhone, validateProfileBasics } from '@/lib/validation/profile';
 
 const dialCodes = [
@@ -471,6 +472,29 @@ export function ProfileForm({ email, onComplete, onBack, initialData }: ProfileF
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
+  const snapshotRef = useRef<string>('');
+  const [isDirty, setIsDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string>('');
+
+  const serializeProfile = (p: ProfileData, yat: boolean) => {
+    // Keep serialization stable to avoid false positives in dirty tracking.
+    return JSON.stringify({ ...p, isYAT: yat });
+  };
+
+  useEffect(() => {
+    // Initialize baseline snapshot once (represents the last saved/loaded state).
+    if (!snapshotRef.current) {
+      snapshotRef.current = serializeProfile(profile, isYAT);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const current = serializeProfile(profile, isYAT);
+    setIsDirty(current !== snapshotRef.current);
+  }, [profile, isYAT]);
+
+
   const [countrySearch, setCountrySearch] = useState('');
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const countryDropdownRef = useRef<HTMLDivElement>(null);
@@ -555,9 +579,13 @@ export function ProfileForm({ email, onComplete, onBack, initialData }: ProfileF
     try {
       // Update profile server-side (token required)
       await updateMe(payload);
+      // Mark current state as saved for UX feedback
+      snapshotRef.current = serializeProfile(profile, isYAT);
+      setLastSavedAt(new Date().toISOString());
+      setIsDirty(false);
     } catch (err: any) {
       ok = false;
-      setSubmitError(err?.message || 'Failed to save profile. Please try again.');
+      setSubmitError(toUserMessage(err, { feature: 'profile', action: 'update' }));
     } finally {
       setSubmitLoading(false);
     }
@@ -596,7 +624,22 @@ export function ProfileForm({ email, onComplete, onBack, initialData }: ProfileF
     <div className="flex-1 overflow-auto px-4 lg:px-[32px] py-8 lg:py-[60.32px] lg:pt-[72px] lg:pr-[32px] lg:pb-[32px] lg:pl-[32px]">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6 lg:mb-8">
-          <h1 className="text-2xl lg:text-3xl mb-2">Complete Your Profile</h1>
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <h1 className="text-2xl lg:text-3xl">Complete Your Profile</h1>
+            {submitLoading ? (
+              <span className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+                Saving…
+              </span>
+            ) : isDirty ? (
+              <span className="shrink-0 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 border border-amber-200">
+                Unsaved changes
+              </span>
+            ) : lastSavedAt ? (
+              <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 border border-emerald-200">
+                Saved
+              </span>
+            ) : null}
+          </div>
           <p className="text-gray-600 text-sm">
             Please provide your personal details for registration
           </p>

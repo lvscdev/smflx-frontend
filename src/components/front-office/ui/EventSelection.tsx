@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Calendar, Clock, ArrowLeft, RefreshCcw } from "lucide-react";
+import { InlineAlert } from "./InlineAlert";
 import { listActiveEvents, type Event as ApiEvent } from "@/lib/api";
-import { toUserMessage } from "@/lib/errors/userMessages";
+import { toUserMessage } from "@/lib/errors";
 
 interface Event {
   id: string;
@@ -84,33 +85,82 @@ export function EventSelection({
         </div>
 
         {loading && (
-          <div className="text-center text-sm text-gray-500 mb-6">Loading events…</div>
+          <div className="mb-6 grid gap-4 md:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-6 rounded-2xl border border-gray-200 bg-white animate-pulse">
+                <div className="h-5 w-2/3 bg-gray-200 rounded mb-4" />
+                <div className="h-4 w-3/4 bg-gray-100 rounded mb-2" />
+                <div className="h-4 w-2/3 bg-gray-100 rounded mb-6" />
+                <div className="h-10 w-full bg-gray-200 rounded-lg" />
+              </div>
+            ))}
+          </div>
         )}
 
         {loadError && (
-          <div className="mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800 flex items-start justify-between gap-4">
-            <span>{loadError}</span>
-            <button
-              onClick={loadEvents}
-              className="inline-flex items-center gap-2 text-amber-900 hover:underline whitespace-nowrap"
-            >
-              <RefreshCcw className="w-4 h-4" />
-              Retry
-            </button>
-          </div>
+          <InlineAlert
+            variant="warning"
+            title="Couldn’t load events"
+            actionLabel="Retry"
+            onAction={() => void loadEvents()}
+            className="mb-6"
+          >
+            {loadError}
+          </InlineAlert>
         )}
 
         {!loading && !loadError && isEmpty && (
           <div className="mb-6 p-6 rounded-2xl border border-gray-200 bg-gray-50 text-center">
             <div className="text-base text-gray-900 mb-1">No events available</div>
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 mb-4">
               There are currently no events open for registration. Please check back later.
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                type="button"
+                onClick={loadEvents}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition-colors"
+              >
+                <RefreshCcw className="w-4 h-4" />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </button>
             </div>
           </div>
         )}
 
         {!loading && !loadError && !isEmpty && filteredEvents.length === 0 && (
-          <div className="text-center text-sm text-gray-600 mb-6">No events available for your profile.</div>
+          <div className="mb-6 p-6 rounded-2xl border border-gray-200 bg-white text-center">
+            <div className="text-base text-gray-900 mb-1">No matching events</div>
+            <div className="text-sm text-gray-600 mb-4">
+              Based on your profile, there are no events available right now. You can refresh to try again.
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                type="button"
+                onClick={loadEvents}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition-colors"
+              >
+                <RefreshCcw className="w-4 h-4" />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </button>
+            </div>
+          </div>
         )}
 
         <div className="grid gap-6 md:grid-cols-2">

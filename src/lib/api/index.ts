@@ -170,6 +170,14 @@ export {
   type BookAccommodationResponse,
 } from './accommodations';
 
+// Re-export accommodation allocation functions
+export {
+  initiateHostelAllocation,
+  initiateHotelAllocation,
+  type InitiateHostelAllocationPayload,
+  type InitiateHotelAllocationPayload,
+} from './accommodation-allocation';
+
 // --- Payments (Stage 3) ---
 
 export type InitiatePaymentResponse = {

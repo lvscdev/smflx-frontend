@@ -244,6 +244,7 @@ export default function HomePage() {
 
         {view === "event-registration" && (
           <EventRegistration
+            eventId={selectedEvent?.eventId}
             initialData={registration}
             onBack={() => setView("event-selection")}
             isSubmitting={registrationSubmitting}
@@ -268,7 +269,7 @@ export default function HomePage() {
                   participationMode === "CAMPER"
                     ? data.accommodationType === "hostel"
                       ? "HOSTEL"
-                      : data.accommodationType === "hotel" || data.accommodationType === "shared"
+                      : data.accommodationType === "hotel"
                       ? "HOTEL"
                       : "NONE"
                     : "NONE";

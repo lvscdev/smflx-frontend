@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminOtpInput, AdminEmailInput } from "./schemas";
+import { AdminSessionResponse } from "./types";
 
 const BASE_URL = "https://loveseal-events-backend.onrender.com/admin-x-auth";
 
@@ -49,43 +50,28 @@ export async function logoutAdmin() {
   redirect("/admin/login");
 }
 
-// export async function assertAdminSession() {
-//   const cookieStore = await cookies();
-//   const adminSession = cookieStore.get("admin_session")?.value;
-
-//   if (!adminSession) {
-//     return false;
-//   }
-
-//   const res = await fetch(`${BASE_URL}/login`, {
-//     method: "GET",
-//     headers: {
-//       accept: "application/json",
-//       Cookie: `admin_session=${adminSession}`,
-//     },
-//     cache: "no-store",
-//   });
-
-//   return res.ok;
-// }
-
-export async function assertAdminSession() {
+export async function assertAdminSession(): Promise<AdminSessionResponse | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get("admin_session")?.value;
-  console.log(token);
 
-  if (!token) return false;
+  if (!token) return null;
 
   const res = await fetch(`${BASE_URL}/login`, {
     method: "GET",
     headers: {
       accept: "application/json",
-      Authorization: `Bearer ${token}`, // ✅ THIS IS KEY
+      Authorization: `Bearer ${token}`,
     },
     cache: "no-store",
   });
 
-  return res.ok;
+  if (!res.ok) {
+    return null;
+  }
+
+  const response = (await res.json()).data.userDetails as AdminSessionResponse;
+
+  return response;
 }
 
 export async function resendAdminOtpAction(input: AdminEmailInput) {

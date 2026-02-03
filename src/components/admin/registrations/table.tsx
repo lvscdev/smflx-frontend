@@ -19,66 +19,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RegistrationActions } from "./registration-actions";
-import { Registration } from "@/types/registration";
+import { Registration } from "@/features/admin/registration/mapped-types";
 
-/* ------------------------------- columns -------------------------------- */
-
-// const columns: ColumnDef<Registration>[] = [
-//   {
-//     accessorKey: "name",
-//     header: "Name",
-//     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-//   },
-//   {
-//     accessorKey: "email",
-//     header: "Email",
-//     cell: ({ row }) => (
-//       <span className="text-muted-foreground">{row.original.email}</span>
-//     ),
-//   },
-//   {
-//     accessorKey: "type",
-//     header: "Type",
-//   },
-//   {
-//     accessorKey: "gender",
-//     header: "Gender",
-//   },
-//   {
-//     accessorKey: "payment",
-//     header: "Payment",
-//     cell: ({ row }) => {
-//       const value = row.original.payment;
-
-//       return (
-//         <Badge
-//           variant="secondary"
-//           className={
-//             value === "Completed"
-//               ? "bg-green-100 text-green-700"
-//               : "bg-amber-100 text-amber-700"
-//           }
-//         >
-//           {value}
-//         </Badge>
-//       );
-//     },
-//   },
-//   {
-//     accessorKey: "accommodation",
-//     header: "Accommodation",
-//     cell: ({ row }) => row.original.accommodation ?? "—",
-//   },
-//   {
-//     id: "actions",
-//     header: () => <div className="">Actions</div>,
-//     cell: ({ row }) => (
-//       <div className="flex justify-end">
-//         <RegistrationActions registration={row.original} isReadOnly={} />
-//       </div>
-//     ),
-//   },
-// ];
+import {
+  participationModeLabel,
+  genderLabel,
+  paymentStatusLabel,
+  paymentStatusBadgeClass,
+} from "@/features/admin/registration/registration-mapper";
 
 function getColumns(isReadOnly: boolean): ColumnDef<Registration>[] {
   return [
@@ -86,39 +34,39 @@ function getColumns(isReadOnly: boolean): ColumnDef<Registration>[] {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <span className="font-medium">{row.original.name}</span>
+        <span className="font-medium">{row.original.user?.fullName}</span>
       ),
     },
     {
       accessorKey: "email",
       header: "Email",
       cell: ({ row }) => (
-        <span className="text-muted-foreground">{row.original.email}</span>
+        <span className="text-muted-foreground">
+          {row.original.user?.email}
+        </span>
       ),
     },
     {
       accessorKey: "type",
       header: "Type",
+      cell: ({ row }) => participationModeLabel[row.original.participationMode],
     },
     {
       accessorKey: "gender",
       header: "Gender",
+      cell: ({ row }) => genderLabel[row.original.user?.gender],
     },
     {
       accessorKey: "payment",
       header: "Payment",
       cell: ({ row }) => {
-        const value = row.original.payment;
+        const value = paymentStatusLabel[row.original.paymentStatus];
         return (
           <Badge
             variant="secondary"
-            className={
-              value === "Completed"
-                ? "bg-green-100 text-green-700"
-                : "bg-amber-100 text-amber-700"
-            }
+            className={paymentStatusBadgeClass[row.original.paymentStatus]}
           >
-            {value}
+            {paymentStatusLabel[row.original.paymentStatus]}
           </Badge>
         );
       },
@@ -126,7 +74,7 @@ function getColumns(isReadOnly: boolean): ColumnDef<Registration>[] {
     {
       accessorKey: "accommodation",
       header: "Accommodation",
-      cell: ({ row }) => row.original.accommodation ?? "—",
+      cell: ({ row }) => row.original.accommodationType ?? "—",
     },
     {
       id: "actions",

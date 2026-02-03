@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { filterRegistrations } from "@/helpers/filter-registrations";
-import { Registration } from "@/types/registration";
+import { Registration } from "@/features/admin/registration/types";
 
 function toCsv(rows: Registration[]) {
   const headers = [

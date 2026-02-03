@@ -20,12 +20,13 @@ import {
 import { Eye, DocumentText } from "iconsax-reactjs";
 import { Profile2User } from "iconsax-reactjs";
 import { Badge } from "@/components/ui/badge";
-import { EventYear } from "@/app/api/event";
+// import { EventYear } from "@/app/api/event";
+import { Event } from "@/features/admin/events/types";
 import { EventDetailsModal } from "./event-details-modal";
 import { formatDate } from "@/helpers/format-date";
 
-function PastEventsTable({ events }: { events: EventYear[] }) {
-  const [selectedEvent, setSelectedEvent] = useState<EventYear | null>(null);
+function PastEventsTable({ events }: { events: Event[] }) {
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   if (!events.length) return null;
 
@@ -48,22 +49,22 @@ function PastEventsTable({ events }: { events: EventYear[] }) {
 
           <TableBody>
             {events.map(event => (
-              <TableRow key={event.year}>
-                <TableCell>{event.year}</TableCell>
+              <TableRow key={event.eventYear}>
+                <TableCell>{event.eventYear}</TableCell>
 
                 <TableCell className="text-slate-500">
                   {formatDate(event.startDate)} – {formatDate(event.endDate)}
                   {", "}
-                  {event.year}
+                  {event.eventYear}
                 </TableCell>
 
-                <TableCell>{event.totalRegistrations}</TableCell>
+                <TableCell>{event.eventYear}</TableCell>
 
-                <TableCell>{event.totalRevenue.toLocaleString()}</TableCell>
+                <TableCell>{event.eventYear.toLocaleString()}</TableCell>
 
                 <TableCell>
                   <Badge variant="default" className="bg-brand-red">
-                    {event.status}
+                    {event.eventStatus}
                   </Badge>
                 </TableCell>
 
@@ -93,7 +94,7 @@ function PastEventsTable({ events }: { events: EventYear[] }) {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Link
-                            href={`/event-management/reports/${event.year}`}
+                            href={`/event-management/reports/${event.eventYear}`}
                           >
                             <DocumentText
                               size={20}

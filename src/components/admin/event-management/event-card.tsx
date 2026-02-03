@@ -1,41 +1,47 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/admin/ui/stats-card";
-import { EventYear } from "@/app/api/event";
 import { Calendar } from "iconsax-reactjs";
-import { Edit } from "lucide-react";
+
 import { EventActions } from "./event-actions";
 import { formatDate } from "@/helpers/format-date";
+import { Event } from "@/features/admin/events/types";
+import { getEventStatusBadge } from "@/helpers/getEventStatus";
 
-function EventCard({ event }: { event: EventYear }) {
-  const role = "ADMIN"; // Placeholder for user role, replace with actual role fetching logic
+function EventCard({ event }: { event: Event }) {
+  const role = "ADMIN"; // TODO: replace with real role from session
+  const status = getEventStatusBadge(event.eventStatus);
+
   return (
     <Card className="rounded-2xl bg-slate-50 border-slate-300">
       <CardContent className="space-y-6 p-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-slate-950">{event.theme}</h2>
+            <h2 className="text-3xl font-bold text-slate-950">
+              {event.eventName}
+            </h2>
             <p className="text-muted-foreground">
-              {formatDate(event.startDate)} – {formatDate(event.endDate)}
-              {", "}
-              {event.year}
+              {formatDate(event.startDate)} – {formatDate(event.endDate)},{" "}
+              {event.eventYear}
             </p>
           </div>
+
           <Calendar size={48} variant="Bold" className="text-slate-600" />
         </div>
 
+        {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">
-          <StatsCard
-            label="Total Registrations"
-            value={event.totalRegistrations}
-          />
+          <StatsCard label="Total Registrations" value={event.eventYear ?? 0} />
+
           <StatsCard
             label="Total Revenue"
-            value={`₦${event.totalRevenue.toLocaleString()}`}
+            value={`₦${(event.eventYear ?? 0).toLocaleString()}`}
           />
-          <StatsCard label="Status" value={event.status} />
+
+          <StatsCard label="Status" value={status.label} />
         </div>
 
+        {/* Actions */}
         <div className="flex justify-end">
           <EventActions event={event} role={role} />
         </div>

@@ -1,5 +1,5 @@
 import { registrations } from "@/app/api/registration";
-import { Registration } from "@/types/registration";
+import { Registration } from "@/features/admin/registration/types";
 
 export type Filters = {
   type?: string;

@@ -22,19 +22,19 @@ import { StatsCard } from "./registration-stats";
 import { RegistrationsFilters } from "./filters";
 
 import { EventYear } from "@/app/api/event";
-import { Registration } from "@/types/registration"; // ✅ ADD THIS
+import { Registration } from "@/features/admin/registration/mapped-types"; // ✅ ADD THIS
 import { AddRegistrationModal } from "./add-registration/add-registration-modal";
 
 export default function RegistrationsClient({
-  event,
+  eventId,
   data,
   totalPages,
 }: {
-  event: EventYear;
+  eventId: string;
   data: Registration[];
   totalPages: number;
 }) {
-  const isReadOnly = event.status !== "Open";
+  const isReadOnly = false; // Assuming event is always open for now
   const router = useRouter();
   const params = useSearchParams();
   const page = Number(params.get("page") ?? 1);
@@ -161,7 +161,7 @@ export default function RegistrationsClient({
       <div className="bg-slate-50 border border-slate-300 rounded-2xl p-6">
         <div className="space-y-8">
           <RegistrationsFilters
-            eventId={event.id}
+            eventId={eventId}
             searchValue={filters.q}
             typeValue={filters.type}
             genderValue={filters.gender}
@@ -198,7 +198,11 @@ export default function RegistrationsClient({
         open={notifyOpen}
         onClose={() => setNotifyOpen(false)}
       />
-      <AddRegistrationModal open={addOpen} onClose={() => setAddOpen(false)} events={[event]} />
+      {/* <AddRegistrationModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        events={[{ id: eventId }]}
+      /> */}
     </div>
   );
 }

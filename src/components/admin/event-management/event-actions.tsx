@@ -1,38 +1,88 @@
+// "use client";
+
+// import { useState } from "react";
+// // import Link from "next/link";
+// import { Button } from "@/components/ui/button";
+// import { canEditEvent } from "@/lib/permissions";
+
+// import { EventDetailsModal } from "./event-details-modal";
+// import Link from "next/link";
+
+// export function EventActions({ event, role }: { event: EventYear; role: any }) {
+//   const [open, setOpen] = useState(false);
+
+//   return (
+//     <>
+//       <div className="flex gap-2">
+//         {/* <Button
+//           disabled={!canEditEvent(role, event.status)}
+//           onClick={() => setEditOpen(true)}
+//         >
+//           View / Edit Event
+//         </Button> */}
+
+//         <Button
+//           onClick={() => setOpen(true)}
+//           className="bg-brand-red hover:bg-brand-red/80"
+//         >
+//           View / Edit Event
+//         </Button>
+
+//         {/* <Link href={`event-management/reports/${event.year}`}>
+//         </Link> */}
+//         <Button variant="outline">View Reports</Button>
+
+//         <Link href={`/admin/events/${event.id}/registrations`}>
+//           <Button variant="outline">View Registrations</Button>
+//         </Link>
+//       </div>
+
+//       <EventDetailsModal
+//         event={event}
+//         open={open}
+//         onClose={() => setOpen(false)}
+//       />
+//       {/* <EventDetailsModal
+//         event={event}
+//         open={editOpen}
+//         onClose={() => setEditOpen(false)}
+//       /> */}
+//     </>
+//   );
+// }
+
 "use client";
 
 import { useState } from "react";
-// import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { canEditEvent } from "@/lib/permissions";
-import { EventYear } from "@/app/api/event";
-import { EventDetailsModal } from "./event-details-modal";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
-export function EventActions({ event, role }: { event: EventYear; role: any }) {
+import { EventDetailsModal } from "./event-details-modal";
+import { Event } from "@/features/admin/events/types";
+
+export function EventActions({ event, role }: { event: Event; role: any }) {
   const [open, setOpen] = useState(false);
+
+  const isReadOnly = event.eventStatus !== "DRAFT";
 
   return (
     <>
       <div className="flex gap-2">
-        {/* <Button
-          disabled={!canEditEvent(role, event.status)}
-          onClick={() => setEditOpen(true)}
-        >
-          View / Edit Event
-        </Button> */}
-
+        {/* View / Edit */}
         <Button
           onClick={() => setOpen(true)}
           className="bg-brand-red hover:bg-brand-red/80"
         >
-          View / Edit Event
+          View {isReadOnly ? "Event" : "/ Edit Event"}
         </Button>
 
-        {/* <Link href={`event-management/reports/${event.year}`}>
-        </Link> */}
-        <Button variant="outline">View Reports</Button>
+        {/* Reports (only meaningful when closed) */}
+        <Link href={`/admin/events/${event.eventId}/reports`}>
+          <Button variant="outline">View Reports</Button>
+        </Link>
 
-        <Link href={`/admin/events/${event.id}/registrations`}>
+        {/* Registrations */}
+        <Link href={`/admin/events/${event.eventId}/registrations`}>
           <Button variant="outline">View Registrations</Button>
         </Link>
       </div>
@@ -42,11 +92,6 @@ export function EventActions({ event, role }: { event: EventYear; role: any }) {
         open={open}
         onClose={() => setOpen(false)}
       />
-      {/* <EventDetailsModal
-        event={event}
-        open={editOpen}
-        onClose={() => setEditOpen(false)}
-      /> */}
     </>
   );
 }

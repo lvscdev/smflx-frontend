@@ -1,4 +1,4 @@
-import { getCurrentEvent, getPastEvents } from "@/app/api/event";
+import { getAllEvents } from "@/features/admin/events/server-actions";
 import { EventCard } from "@/components/admin/event-management/event-card";
 import { EmptyState } from "@/components/admin/event-management/empty-state";
 import { PastEventsTable } from "@/components/admin/event-management/past-events-table";
@@ -7,21 +7,31 @@ import { CreateEventModal } from "@/components/admin/event-management/create-eve
 import { Plus } from "lucide-react";
 import { Suspense } from "react";
 import EventLoading from "./loading";
+import { Event } from "@/features/admin/events/types";
 
 async function EventManagementPage() {
-  const currentEvent = await getCurrentEvent();
-  const pastEvents = await getPastEvents();
+  const events = await getAllEvents();
+
+  console.log("Events:", events);
+
+  const activeEvents = events.filter(
+    (e: Event) => e.eventStatus !== "CLOSED", // DRAFT + ACTIVE
+  );
+
+  // const pastEvents = events.filter(e => e.eventStatus === "CLOSED");
 
   return (
     <Suspense fallback={<EventLoading />}>
       <div className="space-y-8">
+        {/* Header */}
         <header className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Event Year Management</h1>
+            <h1 className="text-2xl font-semibold">Event Management</h1>
             <p className="text-muted-foreground">
-              Create and manage event years for SMFLX
+              Create and manage events for SMFLX
             </p>
           </div>
+
           <CreateEventModal>
             <Button className="bg-brand-red hover:bg-brand-red/90 text-white">
               <Plus className="h-4 w-4" />
@@ -30,11 +40,16 @@ async function EventManagementPage() {
           </CreateEventModal>
         </header>
 
-        {!currentEvent && <EmptyState />}
+        {/* Empty state */}
+        {!events.length && <EmptyState />}
 
-        {currentEvent && <EventCard event={currentEvent} />}
+        {/* Active / Draft events */}
+        {activeEvents.map((event: Event) => (
+          <EventCard key={event.eventId} event={event} />
+        ))}
 
-        {pastEvents && <PastEventsTable events={pastEvents} />}
+        {/* Past events */}
+        {/* {pastEvents.length > 0 && <PastEventsTable events={pastEvents} />} */}
       </div>
     </Suspense>
   );

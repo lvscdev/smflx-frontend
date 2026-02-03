@@ -10,28 +10,32 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { EventYear } from "@/app/api/event";
 import { EditEventForm } from "./edit-event-form";
 import { formatDate } from "@/helpers/format-date";
+import { Event } from "@/features/admin/events/types";
+import { get } from "http";
+import { getEventStatusBadge } from "@/helpers/getEventStatus";
 
 function EventDetailsModal({
   event,
   open,
   onClose,
 }: {
-  event: EventYear;
+  event: Event;
   open: boolean;
   onClose: () => void;
 }) {
-  const isReadOnly = event.status !== "Open";
+  const isReadOnly = event.eventStatus !== "DRAFT";
   const [mode, setMode] = useState<"view" | "edit">("view");
+
+  const badge = getEventStatusBadge(event.eventStatus);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="!max-w-3xl max-h-[90vh] p-6 space-y-5">
+      <DialogContent className="!max-w-3xl max-h-[90vh] p-6 space-y-5 overflow-auto">
         <DialogHeader className="text-left mt-5">
           <DialogTitle className="text-2xl font-semibold">
-            Event Details – {event.year}
+            Event Details – {event.eventYear}
           </DialogTitle>
           <p className="text-muted-foreground">
             View and manage all information related to this event.
@@ -44,22 +48,13 @@ function EventDetailsModal({
           <div className="rounded-xl border border-slate-300 bg-slate-50 p-6 grid grid-cols-2 gap-6 shadow-card">
             <div>
               <p className="text-sm text-muted-foreground">Event Theme</p>
-              <p className="font-semibold font-heading">{event.theme}</p>
+              <p className="font-semibold font-heading">{event.eventName}</p>
             </div>
 
             <div className="">
               <p className="text-sm text-muted-foreground">Status</p>
-              <Badge
-                variant="default"
-                className={`bg-${
-                  event.status === "Ended"
-                    ? "brand-red"
-                    : event.status === "Open"
-                      ? "brand-blue-500"
-                      : "green-500"
-                }`}
-              >
-                {event.status}
+              <Badge variant="default" className={badge.className}>
+                {badge.label}
               </Badge>
             </div>
 
@@ -68,7 +63,7 @@ function EventDetailsModal({
               <p className="font-semibold font-heading text-base">
                 {formatDate(event.startDate)} – {formatDate(event.endDate)}
                 {", "}
-                {event.year}
+                {event.eventYear}
               </p>
             </div>
 
@@ -77,14 +72,14 @@ function EventDetailsModal({
                 Total Registrations
               </p>
               <p className="font-semibold font-heading">
-                {event.totalRegistrations}
+                {/* {event.totalRegistrations} */}
               </p>
             </div>
 
             <div>
               <p className="text-sm text-muted-foreground">Total Revenue</p>
               <p className="font-semibold font-heading">
-                ₦{event.totalRevenue.toLocaleString()}
+                {/* ₦{event.totalRevenue.toLocaleString()} */}
               </p>
             </div>
           </div>
@@ -94,7 +89,9 @@ function EventDetailsModal({
             <div className="rounded-lg border border-brand-yellow-500 bg-yellow-50 p-4">
               <p className="font-medium">Read-only Mode</p>
               <p className="text-sm text-muted-foreground">
-                This is a past or locked event. No modifications can be made.
+                {event.eventStatus === "CLOSED"
+                  ? "This is a past event. No modifications can be made."
+                  : "This event is locked. No modifications can be made."}
                 You can only view reports and export data.
               </p>
             </div>
@@ -125,7 +122,7 @@ function EventDetailsModal({
           )}
         </div>
         {/* Footer */}
-        {event.status === "Ended" && (
+        {event.eventStatus === "CLOSED" && (
           <Button className="w-full bg-brand-red hover:bg-brand-red/80 mt-4">
             <Download />
             Download All Reports

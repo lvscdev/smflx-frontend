@@ -1,4 +1,4 @@
-import { Registration } from "@/types/registration";
+import { Registration } from "@/features/admin/registration/types";
 
 const names = [
   "Micheal",

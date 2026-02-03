@@ -40,11 +40,19 @@ export function Payment({ amount, onBack, profile, accommodation, registration }
         ? crypto.randomUUID()
         : `smflx_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
+      // Derive the absolute origin so Korapay can redirect back and
+      // so the backend can forward notification_url to Korapay.
+      const origin = window.location.origin; // e.g. https://smflx.vercel.app
+
       const resp = await initiateRegistrationPayment({
         amount,
         userId,
         eventId,
         reference,
+        // Korapay needs these forwarded by the backend when it calls
+        // the Korapay initialise charge API (Checkout Standard).
+        notification_url: `${origin}/api/billing/verify`,
+        redirect_url: `${origin}/payment/callback`,
       });
 
       const checkoutUrl = resp?.checkoutUrl;

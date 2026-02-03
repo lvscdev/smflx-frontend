@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { X, CreditCard } from 'lucide-react';
 import { InlineAlert } from './InlineAlert';
-import { initiateDependentsPayment } from '@/lib/api';
+import { initiateRegistrationPayment } from '@/lib/api';
 import { toUserMessage } from '@/lib/errors';
 
 interface DependentsPaymentModalProps {
@@ -29,11 +29,7 @@ export function DependentsPaymentModal({
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Kept only for UI parity (gateway collects payment on its own page)
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [cardName, setCardName] = useState('');
+
 
   if (!isOpen) return null;
 
@@ -53,28 +49,50 @@ export function DependentsPaymentModal({
         dependents?.[0]?.eventId ||
         dependents?.[0]?.event?.eventId;
 
-      const dependentIds = (dependents || [])
-        .map((d) => d?.dependentId || d?.id || d?.dependentRegistrationId)
-        .filter(Boolean);
-
-      if (!dependentIds.length) {
-        throw new Error('No dependents selected for payment.');
-      }
-
       if (!userId || !resolvedEventId) {
         throw new Error('Missing user/event context for payment checkout.');
       }
 
-      const resp = await initiateDependentsPayment({
+      // Generate a unique reference for this transaction
+      const reference = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+        ? crypto.randomUUID()
+        : `smflx_dep_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+      const origin = window.location.origin;
+
+      // Use /accommodation/initialize — the only payment-init endpoint in the
+      // backend.  reason + narration (optional in the schema) tell the backend
+      // this is a dependents payment so it can record it correctly.
+      const resp = await initiateRegistrationPayment({
+        amount: totalAmount,
         userId,
         eventId: resolvedEventId,
-        dependentIds,
-        amount: totalAmount,
-        currency: 'NGN',
+        reference,
+        reason: 'dependents_registration',
+        narration: `Registration payment for ${dependents.length} dependent(s)`,
+        notification_url: `${origin}/api/billing/verify`,
+        redirect_url: `${origin}/payment/callback`,
       });
 
       const checkoutUrl = resp?.checkoutUrl;
-      if (!checkoutUrl) throw new Error('Dependents payment initiation succeeded but checkoutUrl was not returned.');
+      if (!checkoutUrl) throw new Error('Payment initiation succeeded but checkoutUrl was not returned.');
+
+      // Persist context so the callback page knows this was a dependents payment
+      try {
+        localStorage.setItem(
+          'smflx_pending_payment_ctx',
+          JSON.stringify({
+            type: 'dependents',
+            dependentIds: (dependents || [])
+              .map((d: any) => d?.dependentId || d?.id || d?.dependentRegistrationId)
+              .filter(Boolean),
+            amount: totalAmount,
+            startedAt: new Date().toISOString(),
+          })
+        );
+      } catch {
+        // ignore storage failures
+      }
 
       window.location.href = checkoutUrl;
     } catch (err: any) {
@@ -90,23 +108,8 @@ export function DependentsPaymentModal({
     await startPayment();
   };
 
-  // Payment happens on the gateway page. We keep the card fields for UI parity,
-  // but we must not block the user from proceeding.
-  const isFormValid = () => true;
 
-  const formatCardNumber = (value: string) => {
-    const cleaned = value.replace(/\D/g, '');
-    const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
-    return formatted.slice(0, 19);
-  };
 
-  const formatExpiryDate = (value: string) => {
-    const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length >= 2) {
-      return `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`;
-    }
-    return cleaned;
-  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -164,78 +167,16 @@ export function DependentsPaymentModal({
 
 
           <form onSubmit={handlePayment} className="space-y-6">
-            <div className="space-y-2">
-              <label htmlFor="cardName" className="block text-sm text-gray-700 font-medium">
-                Cardholder Name *
-              </label>
-              <input
-                id="cardName"
-                value={cardName}
-                onChange={(e) => setCardName(e.target.value)}
-                placeholder="John Doe"
-                className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="cardNumber" className="block text-sm text-gray-700 font-medium">
-                Card Number *
-              </label>
-              <div className="relative">
-                <input
-                  id="cardNumber"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                  placeholder="1234 5678 9012 3456"
-                  className="w-full px-4 py-3 pr-12 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  maxLength={19}
-                  inputMode="numeric"
-                />
-                <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="expiryDate" className="block text-sm text-gray-700 font-medium">
-                  Expiry Date *
-                </label>
-                <input
-                  id="expiryDate"
-                  value={expiryDate}
-                  onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
-                  placeholder="MM/YY"
-                  className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  maxLength={5}
-                  inputMode="numeric"
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="cvv" className="block text-sm text-gray-700 font-medium">
-                  CVV *
-                </label>
-                <input
-                  id="cvv"
-                  type="password"
-                  value={cvv}
-                  onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 3))}
-                  placeholder="123"
-                  className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  maxLength={3}
-                  inputMode="numeric"
-                />
-              </div>
-            </div>
-
             <button
               type="submit"
-              disabled={!isFormValid() || paymentProcessing}
-              className={`w-full py-3 rounded-lg font-medium transition-colors ${
-                isFormValid() && !paymentProcessing
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              disabled={paymentProcessing}
+              className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                paymentProcessing
+                  ? 'bg-gray-300 text-gray-600 cursor-wait'
+                  : 'bg-red-600 text-white hover:bg-red-700'
               }`}
             >
+              <CreditCard className="w-5 h-5" />
               {paymentProcessing ? 'Redirecting to checkout…' : `Proceed to Checkout (₦${totalAmount.toLocaleString('en-NG')})`}
             </button>
           </form>

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bed, Users, ArrowLeft, Check, AlertCircle, Loader2, MapPin } from "lucide-react";
 import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
 import { PairingCodeModal } from "@/components/front-office/ui/PairingCodeModal";
-import { getAccommodations, bookAccommodation } from "@/lib/api";
+import { getAccommodations, bookAccommodation, initiateHostelAllocation, initiateHotelAllocation } from "@/lib/api";
 import type { Facility, Room, BedSpace } from "@/lib/api";
 import { ApiError } from "@/lib/api/client";
 
@@ -28,6 +28,7 @@ interface AccommodationSelectionProps {
   accommodationType: string;
   eventId: string;
   registrationId?: string;
+  userId?: string;
   onComplete: (data: AccommodationData) => Promise<void> | void;
   onBack: () => void;
   initialData?: AccommodationData | null;
@@ -40,6 +41,7 @@ export function AccommodationSelection({
   accommodationType, 
   eventId,
   registrationId,
+  userId,
   onComplete, 
   onBack, 
   initialData, 
@@ -65,6 +67,9 @@ export function AccommodationSelection({
   
   const [showPairingModal, setShowPairingModal] = useState(false);
 
+  // Ref placed on Step 2 (bed/room grid) so we can scroll into view after a conflict refresh
+  const selectionRef = useRef<HTMLDivElement | null>(null);
+
   // Derived state
   const selectedFacility = facilities.find(f => f.facilityId === selectedFacilityId);
   const selectedRoom = selectedFacility?.rooms.find(r => r.roomId === selectedRoomId);
@@ -79,39 +84,42 @@ export function AccommodationSelection({
     ? !!(selectedFacilityId && selectedBedSpaceId)
     : !!(selectedFacilityId && selectedRoomId);
 
-  // Fetch accommodations on mount
-  useEffect(() => {
-    async function loadAccommodations() {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await getAccommodations({
-          eventId,
-          type: accommodationType.toUpperCase() as 'HOSTEL' | 'HOTEL'
-        });
-        
-        setFacilities(response.facilities || []);
-        
-        if (!response.facilities || response.facilities.length === 0) {
-          setError('No accommodations available for this event at the moment.');
-        }
-      } catch (err) {
-        console.error('Failed to load accommodations:', err);
-        setError(
-          err instanceof ApiError 
-            ? err.message 
-            : 'Failed to load accommodations. Please try again.'
-        );
-      } finally {
-        setLoading(false);
+  // ---------------------------------------------------------------------------
+  // Fetch / refresh availability
+  // ---------------------------------------------------------------------------
+  const loadAccommodations = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await getAccommodations({
+        eventId,
+        type: accommodationType.toUpperCase() as 'HOSTEL' | 'HOTEL'
+      });
+      
+      setFacilities(response.facilities || []);
+      
+      if (!response.facilities || response.facilities.length === 0) {
+        setError('No accommodations available for this event at the moment.');
       }
+    } catch (err) {
+      console.error('Failed to load accommodations:', err);
+      setError(
+        err instanceof ApiError 
+          ? err.message 
+          : 'Failed to load accommodations. Please try again.'
+      );
+    } finally {
+      setLoading(false);
     }
+  }, [eventId, accommodationType]);
 
+  // Fetch accommodations on mount (or when eventId / type changes)
+  useEffect(() => {
     if (eventId) {
       loadAccommodations();
     }
-  }, [eventId, accommodationType]);
+  }, [eventId, loadAccommodations]);
 
   // Handle facility selection
   const handleSelectFacility = (facilityId: string) => {
@@ -164,13 +172,28 @@ export function AccommodationSelection({
     await processBooking();
   };
 
-  // Process the actual booking
+  // ---------------------------------------------------------------------------
+  // Conflict detection helper — returns true when the error looks like a
+  // "someone else grabbed that bed/room" conflict (409 or common message patterns)
+  // ---------------------------------------------------------------------------
+  const isConflictError = (err: unknown): boolean => {
+    if (err instanceof ApiError) {
+      if (err.status === 409) return true;
+      const msg = (err.message || '').toLowerCase();
+      if (msg.includes('already booked') || msg.includes('not available') || msg.includes('already taken')) return true;
+    }
+    return false;
+  };
+
+  // Process the actual booking  →  allocate  →  hand off to Payment
   const processBooking = async (isPaired: boolean = false) => {
     try {
       setSubmitting(true);
       setError(null);
 
-      // Prepare booking payload
+      // ---------------------------------------------------------------
+      // 1. Book the accommodation (reserves the bed / room server-side)
+      // ---------------------------------------------------------------
       const payload = {
         eventId,
         accommodationType: accommodationType.toUpperCase() as 'HOSTEL' | 'HOTEL',
@@ -182,10 +205,60 @@ export function AccommodationSelection({
           : 'EMPLOYED' as const,
       };
 
-      // Call booking API
-      const booking = await bookAccommodation(payload);
+      let booking: Awaited<ReturnType<typeof bookAccommodation>>;
+      try {
+        booking = await bookAccommodation(payload);
+      } catch (bookErr) {
+        // ---------------------------------------------------------------
+        // Conflict path: another user grabbed the same bed/room between
+        // when we fetched availability and when we tried to book.
+        // Re-fetch live state, clear stale selection, scroll to grid.
+        // ---------------------------------------------------------------
+        if (isConflictError(bookErr)) {
+          setError('That space was just taken. Here is the updated availability — please pick again.');
+          setSelectedBedSpaceId(null);
+          setSelectedRoomId(null);
+          // Re-fetch live availability (sets loading → false when done)
+          await loadAccommodations();
+          // Once state settles, scroll the selection grid into view
+          setTimeout(() => {
+            selectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 200);
+          return; // abort this booking attempt; user will retry
+        }
+        throw bookErr; // non-conflict errors fall through to the outer catch
+      }
 
-      // Prepare data for parent
+      // ---------------------------------------------------------------
+      // 2. Allocate — wire the correct endpoint based on type
+      //    Hostel: { registrationId, eventId, userId, facilityId }
+      //    Hotel:  { registrationId, roomTypeId, eventId, userId, facilityId }
+      // ---------------------------------------------------------------
+      const resolvedUserId = userId || profile?.userId || '';
+      const resolvedRegId  = registrationId || '';
+
+      if (isHostel) {
+        await initiateHostelAllocation({
+          registrationId: resolvedRegId,
+          eventId,
+          userId: resolvedUserId,
+          facilityId: selectedFacilityId!,
+        });
+      } else if (isHotel) {
+        // roomTypeId comes from the room object the user selected
+        const roomTypeId = selectedRoom?.roomType || selectedRoom?.roomId || '';
+        await initiateHotelAllocation({
+          registrationId: resolvedRegId,
+          roomTypeId,
+          eventId,
+          userId: resolvedUserId,
+          facilityId: selectedFacilityId!,
+        });
+      }
+
+      // ---------------------------------------------------------------
+      // 3. Hand off to parent (→ Payment or Dashboard if paired)
+      // ---------------------------------------------------------------
       const accommodationData: AccommodationData = {
         type: accommodationType,
         facilityId: selectedFacilityId!,
@@ -199,7 +272,6 @@ export function AccommodationSelection({
         isPaired,
       };
 
-      // Call parent completion handler
       await onComplete(accommodationData);
       
     } catch (err) {
@@ -358,7 +430,7 @@ export function AccommodationSelection({
 
           {/* Step 2: Select Room (for hotels) or direct to bed (for hostels) */}
           {selectedFacility && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div ref={selectionRef} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-semibold text-sm">
                   2
@@ -568,6 +640,11 @@ export function AccommodationSelection({
             onClose={() => setShowPairingModal(false)}
             onProceedToPayment={handleProceedToPayment}
             onCodeVerified={handleCodeVerified}
+            registrationId={registrationId}
+            eventId={eventId}
+            userId={userId}
+            facilityId={selectedFacilityId || ""}
+            roomId={selectedRoomId || ""}
           />
         )}
       </div>

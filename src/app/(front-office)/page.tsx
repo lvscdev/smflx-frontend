@@ -315,6 +315,7 @@ export default function HomePage() {
             accommodationType={registration?.accommodationType || "hostel"}
             eventId={selectedEvent?.eventId || ""}
             registrationId={registration?.registrationId}
+            userId={profile?.userId}
             initialData={accommodation}
             profile={profile}
             onBack={() => setView("event-registration")}

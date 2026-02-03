@@ -175,7 +175,7 @@ export function EventRegistration({ eventId: _eventId, onComplete, onBack, initi
                 <div className="flex-1">
                   <h4 className="font-semibold mb-2 text-blue-900">Event Location</h4>
                   <p className="text-sm text-blue-800 mb-3">
-                    123 Conference Center Drive, Downtown District, City 12345
+                    {process.env.NEXT_PUBLIC_EVENT_ADDRESS || 'Dansol High School, Agidingbi, Lagos State'}
                   </p>
                   <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center text-sm text-gray-600">
                     Map with directions would appear here

@@ -200,7 +200,9 @@ export function Dashboard({
   // Countdown timer
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const eventDate = new Date('2026-04-30T00:00:00').getTime();
+      const eventDate = new Date(
+        process.env.NEXT_PUBLIC_EVENT_START_DATE || '2026-04-30T00:00:00'
+      ).getTime();
       const now = new Date().getTime();
       const difference = eventDate - now;
 
@@ -508,7 +510,9 @@ const confirmRemoveDependent = async () => {
             <div className="relative z-10">
               <h2 className="text-lg lg:text-xl font-semibold mb-1">Join Believers to Experience the</h2>
               <h3 className="text-xl lg:text-2xl font-bold mb-2">Move of God at WOTH Meeting</h3>
-              <p className="text-sm mb-6 opacity-90">Apr 30th - May 3rd, 2026 · Dansol High School, Agidingbi, Lagos State</p>
+              <p className="text-sm mb-6 opacity-90">
+                {process.env.NEXT_PUBLIC_EVENT_DETAILS || 'Apr 30th - May 3rd, 2026 · Dansol High School, Agidingbi, Lagos State'}
+              </p>
 
               <div className="flex items-center gap-2 lg:gap-3">
                 <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 text-center min-w-15 lg:min-w-17.5">

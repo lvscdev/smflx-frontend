@@ -33,7 +33,8 @@ export function DependentsPaymentModal({
 
   if (!isOpen) return null;
 
-  const totalAmount = dependents.length * 7000;
+  const DEPENDENT_PRICE = Number(process.env.NEXT_PUBLIC_DEPENDENT_PRICE) || 7000;
+  const totalAmount = dependents.length * DEPENDENT_PRICE;
 
   const startPayment = async () => {
     setError(null);
@@ -137,7 +138,7 @@ export function DependentsPaymentModal({
               {dependents.map((dependent, index) => (
                 <div key={index} className="flex justify-between items-center text-sm">
                   <span className="text-gray-700">{dependent.name}</span>
-                  <span className="text-gray-600">₦7,000</span>
+                  <span className="text-gray-600">₦{DEPENDENT_PRICE.toLocaleString('en-NG')}</span>
                 </div>
               ))}
             </div>

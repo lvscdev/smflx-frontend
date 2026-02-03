@@ -40,10 +40,19 @@ async function proxy(req: NextRequest, context: { params: Promise<{ path?: strin
   // Read as raw bytes so we control headers
   const buf = await upstream.arrayBuffer();
 
-  // Copy headers but remove encoding/length
+  // Copy headers but remove encoding/length and caching headers
   const outHeaders = new Headers(upstream.headers);
   outHeaders.delete("content-encoding"); // critical
   outHeaders.delete("content-length");   // critical
+  
+  // Remove caching headers to ensure fresh data
+  outHeaders.delete("etag");
+  outHeaders.delete("cache-control");
+  outHeaders.delete("last-modified");
+  outHeaders.delete("expires");
+  
+  // Set no-cache headers for dynamic content
+  outHeaders.set("cache-control", "no-store, must-revalidate");
 
   return new NextResponse(buf, {
     status: upstream.status,

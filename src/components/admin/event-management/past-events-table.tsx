@@ -110,7 +110,7 @@ function PastEventsTable({ events }: { events: Event[] }) {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Link
-                            href={`/admin/events/${event.id}/registrations`}
+                            href={`/admin/events/${event.eventId}/registrations`}
                           >
                             {/* <Button size="sm" variant="outline">
                         View Registrations

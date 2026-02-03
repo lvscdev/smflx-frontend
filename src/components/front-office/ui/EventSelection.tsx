@@ -78,11 +78,20 @@ export function EventSelection({
     ? events.filter((event) => event.name.toLowerCase().includes("yat"))
     : events.filter((event) => !event.name.toLowerCase().includes("yat"));
 
+  console.log({
+    events,
+    filteredEvents,
+    isYATEligible,
+    userProfile,
+  });
+
   return (
     <div className="flex-1 overflow-auto pt-8 lg:pt-[150px] px-4 lg:pr-[32px] lg:pb-[32px] lg:pl-[32px]">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 lg:mb-8">
-          <h1 className="text-2xl lg:text-3xl mb-2 text-center">Select Even</h1>
+          <h1 className="text-2xl lg:text-3xl mb-2 text-center">
+            Select Event
+          </h1>
           <p className="text-gray-600 text-sm text-center">
             Choose the SMFLX event you would like to attend
           </p>

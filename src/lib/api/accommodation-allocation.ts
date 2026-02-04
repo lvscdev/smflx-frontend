@@ -37,8 +37,16 @@ export async function initiateHostelAllocation(
 export async function initiateHotelAllocation(
   payload: InitiateHotelAllocationPayload,
 ) {
+  const body = {
+    registrationId: payload?.registrationId,
+    roomTypeId: payload?.roomTypeId,
+    eventId: payload?.eventId,
+    userId: payload?.userId,
+    facilityId: payload?.facilityId,
+  };
+
   return apiRequest<any>("/allocation/hotel", {
     method: "POST",
-    body: payload,
+    body: body,
   });
 }

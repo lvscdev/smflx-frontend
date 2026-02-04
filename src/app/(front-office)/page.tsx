@@ -72,7 +72,9 @@ export default function HomePage() {
     string | null
   >(null);
   const [accommodation, setAccommodation] = useState<any>(null);
-  const [hostelSpacesLeft, setHostelSpacesLeft] = useState<number | undefined>(undefined);
+  const [hostelSpacesLeft, setHostelSpacesLeft] = useState<number | undefined>(
+    undefined,
+  );
 
   // ✅ Rehydrate session + resume flow if user already verified once (token exists)
   useEffect(() => {
@@ -109,17 +111,17 @@ export default function HomePage() {
 
         const data = await getAccommodations({
           eventId,
-          type: 'HOSTEL'
+          type: "HOSTEL",
         });
 
         // Use totalAvailable from metadata if available
         const available = data?.metadata?.totalAvailable;
-        if (typeof available === 'number') {
+        if (typeof available === "number") {
           setHostelSpacesLeft(available);
         }
       } catch (err) {
         // Silently fail - Sidebar will show "Limited" as fallback
-        console.error('Failed to fetch hostel availability:', err);
+        console.error("Failed to fetch hostel availability:", err);
       }
     }
 
@@ -283,6 +285,7 @@ export default function HomePage() {
             isSubmitting={registrationSubmitting}
             serverError={registrationPersistError}
             onComplete={async (data) => {
+              console.log("Event registration data:", data);
               setRegistrationPersistError(null);
               setRegistrationSubmitting(true);
 
@@ -315,6 +318,8 @@ export default function HomePage() {
                   accommodationType,
                 });
 
+                console.log("Created registration:", created);
+
                 const next = {
                   ...data,
                   eventId: selectedEvent.eventId,
@@ -322,7 +327,8 @@ export default function HomePage() {
                   email,
                   participationMode,
                   accommodationType,
-                  registrationId: (created as any)?.registrationId,
+                  registrationId: (created as any)?.regId,
+                  userId: (created as any)?.userId,
                 };
 
                 setRegistration(next);
@@ -351,7 +357,7 @@ export default function HomePage() {
             accommodationType={registration?.accommodationType || "hostel"}
             eventId={selectedEvent?.eventId || ""}
             registrationId={registration?.registrationId}
-            userId={profile?.userId}
+            userId={registration?.userId}
             initialData={accommodation}
             profile={profile}
             onBack={() => setView("event-registration")}

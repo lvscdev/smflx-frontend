@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Check, AlertCircle, Loader2, MapPin } from "lucide-react";
 import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
-import { initiateHostelAllocation } from "@/lib/api";
+import { initiateHostelAllocation, initiateHotelAllocation } from "@/lib/api";
 import { ApiError } from "@/lib/api/client";
 import {
   getAccommodationCategoryFacilities,
@@ -54,6 +54,11 @@ export function AccommodationSelection({
   isSubmitting: externalSubmitting,
   serverError: externalError,
 }: AccommodationSelectionProps) {
+  console.log("userId", userId);
+  console.log("registrationId", registrationId);
+  console.log("eventId", eventId);
+  console.log("profile", profile);
+
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [hotelRooms, setHotelRooms] = useState<HotelRoom[]>([]);
   const [loading, setLoading] = useState(false);
@@ -171,6 +176,14 @@ export function AccommodationSelection({
           userId: resolvedUserId,
           facilityid: selectedFacility?.facilityId || "",
         });
+      } else {
+        await initiateHotelAllocation({
+          registrationId: resolvedRegId,
+          eventId: eventId,
+          userId: resolvedUserId,
+          facilityId: selectedFacility?.facilityId || "",
+          roomTypeId: selectedRoom?.roomTypeId || "",
+        });
       }
 
       const accommodationData: AccommodationData = {
@@ -184,7 +197,7 @@ export function AccommodationSelection({
     } catch (err) {
       setError(
         err instanceof ApiError
-          ? err.message
+          ? `${err.message}: ${err?.details?.data}`
           : "Failed to book accommodation. Please try again.",
       );
       setSubmitting(false);

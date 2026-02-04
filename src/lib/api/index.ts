@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { apiRequest } from './client';
+import { apiRequest } from "./client";
 
 // --- Auth ---
 
@@ -8,8 +8,8 @@ export type GenerateOtpResponse = { reference: string };
 
 // Returning users (must have profile)
 export async function generateLoginOtp(email: string) {
-  return apiRequest<GenerateOtpResponse>('/user-auth/generate-otp', {
-    method: 'POST',
+  return apiRequest<GenerateOtpResponse>("/user-auth/generate-otp", {
+    method: "POST",
     auth: false,
     body: { email, emailAddress: email },
   });
@@ -17,8 +17,8 @@ export async function generateLoginOtp(email: string) {
 
 // New registrants (no profile yet)
 export async function generateRegistrantOtp(email: string) {
-  return apiRequest<GenerateOtpResponse>('/user-auth/otp-for-registrant', {
-    method: 'POST',
+  return apiRequest<GenerateOtpResponse>("/user-auth/otp-for-registrant", {
+    method: "POST",
     auth: false,
     body: { email, emailAddress: email },
   });
@@ -48,8 +48,8 @@ export async function validateOtp(payload: {
   otp: string;
   otpReference: string;
 }) {
-  return apiRequest<ValidateOtpResponse>('/user-auth/validate-otp', {
-    method: 'POST',
+  return apiRequest<ValidateOtpResponse>("/user-auth/validate-otp", {
+    method: "POST",
     auth: false,
     body: payload,
   });
@@ -74,11 +74,11 @@ export type UserProfile = {
 };
 
 export async function getMe() {
-  return apiRequest<UserProfile>('/user', { method: 'GET' });
+  return apiRequest<UserProfile>("/user", { method: "GET" });
 }
 
 export async function updateMe(payload: Partial<UserProfile>) {
-  return apiRequest<UserProfile>('/user', { method: 'PUT', body: payload });
+  return apiRequest<UserProfile>("/user", { method: "PUT", body: payload });
 }
 
 // --- Events ---
@@ -93,10 +93,9 @@ export type Event = {
 };
 
 export async function listActiveEvents() {
-  const res = await apiRequest<{ activeEvents: any[] }>(
-    "/events/user/active",
-    { method: "GET" }
-  );
+  const res = await apiRequest<{ activeEvents: any[] }>("/events/user/active", {
+    method: "GET",
+  });
 
   return res.activeEvents;
 }
@@ -105,8 +104,8 @@ export async function listActiveEvents() {
 
 export type CreateEventRegistrationPayload = {
   eventId: string;
-  participationMode: 'CAMPER' | 'ATTENDEE' | 'ONLINE';
-  accommodationType: 'HOSTEL' | 'HOTEL' | 'NONE';
+  participationMode: "CAMPER" | "ATTENDEE" | "ONLINE";
+  accommodationType: "HOSTEL" | "HOTEL" | "NONE";
 };
 
 export type EventRegistration = {
@@ -119,15 +118,19 @@ export type EventRegistration = {
   updatedAt?: string | null;
 };
 
-export async function createUserRegistration(payload: CreateEventRegistrationPayload) {
-  return apiRequest<EventRegistration>('/event-registrations/user', {
-    method: 'POST',
+export async function createUserRegistration(
+  payload: CreateEventRegistrationPayload,
+) {
+  return apiRequest<EventRegistration>("/registrations", {
+    method: "POST",
     body: payload,
   });
 }
 
 export async function listMyRegistrations() {
-  return apiRequest<EventRegistration[]>('/event-registrations/user', { method: 'GET' });
+  return apiRequest<EventRegistration[]>("/event-registrations/user", {
+    method: "GET",
+  });
 }
 
 // --- User dashboard ---
@@ -136,24 +139,34 @@ export type AddDependentPayload = {
   eventId: string;
   name: string;
   age: number;
-  gender: 'MALE' | 'FEMALE';
+  gender: "MALE" | "FEMALE";
 };
 
 export async function addDependent(payload: AddDependentPayload) {
-  return apiRequest<any>('/user-dashboard/add-dependent', { method: 'POST', body: payload });
+  return apiRequest<any>("/user-dashboard/add-dependent", {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export async function removeDependent(dependentId: string) {
-  return apiRequest<any>(`/user-dashboard/remove-dependent/${dependentId}`, { method: 'DELETE' });
+  return apiRequest<any>(`/user-dashboard/remove-dependent/${dependentId}`, {
+    method: "DELETE",
+  });
 }
 
-export async function payForDependant(payload: { dependantId: string; parentRegId: string }) {
-  return apiRequest<any>('/user-dashboard/pay-for-dependants', { method: 'POST', body: payload });
+export async function payForDependant(payload: {
+  dependantId: string;
+  parentRegId: string;
+}) {
+  return apiRequest<any>("/user-dashboard/pay-for-dependants", {
+    method: "POST",
+    body: payload,
+  });
 }
-
 
 export async function getUserDashboard() {
-  return apiRequest<any>('/user-dashboard', { method: 'GET' });
+  return apiRequest<any>("/user-dashboard", { method: "GET" });
 }
 
 // Re-export accommodation functions
@@ -168,7 +181,7 @@ export {
   type GetAccommodationsResponse,
   type BookAccommodationPayload,
   type BookAccommodationResponse,
-} from './accommodations';
+} from "./accommodations";
 
 // Re-export accommodation allocation functions
 export {
@@ -176,7 +189,7 @@ export {
   initiateHotelAllocation,
   type InitiateHostelAllocationPayload,
   type InitiateHotelAllocationPayload,
-} from './accommodation-allocation';
+} from "./accommodation-allocation";
 
 // --- Payments (Stage 3) ---
 
@@ -213,10 +226,12 @@ export async function initiateRegistrationPayment(payload: {
   [key: string]: any;
 }) {
   // Swagger: POST /accommodation/initialize
-  const path = process.env.NEXT_PUBLIC_ACCOMMODATION_PAYMENT_INIT_PATH || '/accommodation/initialize';
+  const path =
+    process.env.NEXT_PUBLIC_ACCOMMODATION_PAYMENT_INIT_PATH ||
+    "/accommodation/initialize";
 
   return apiRequest<InitiatePaymentResponse>(path, {
-    method: 'POST',
+    method: "POST",
     body: payload,
   });
 }
@@ -231,10 +246,10 @@ export async function initiateDependentsPayment(payload: {
 }) {
   const path =
     process.env.NEXT_PUBLIC_DEPENDENTS_PAYMENT_INIT_PATH ||
-    '/payments/dependents/initiate';
+    "/payments/dependents/initiate";
 
   return apiRequest<InitiatePaymentResponse>(path, {
-    method: 'POST',
+    method: "POST",
     body: payload,
   });
 }
@@ -263,5 +278,5 @@ export async function verifyPayment(params: {
   });
 
   const url = qs.toString() ? `${path}?${qs.toString()}` : path;
-  return apiRequest<VerifyPaymentResponse>(url, { method: 'GET' });
+  return apiRequest<VerifyPaymentResponse>(url, { method: "GET" });
 }

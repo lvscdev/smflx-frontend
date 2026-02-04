@@ -1,10 +1,26 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import {Home, Tent, User, LogOut, X, Building2, Hotel, Users, Facebook, Instagram, Twitter, Youtube, Radio, Loader2, RefreshCcw} from 'lucide-react';
-import { InlineAlert } from './InlineAlert';
-import Image from 'next/image';
-import { toast } from 'sonner';
+import { useState, useEffect, useRef } from "react";
+import {
+  Home,
+  Tent,
+  User,
+  LogOut,
+  X,
+  Building2,
+  Hotel,
+  Users,
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube,
+  Radio,
+  Loader2,
+  RefreshCcw,
+} from "lucide-react";
+import { InlineAlert } from "./InlineAlert";
+import Image from "next/image";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,26 +30,26 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { AccommodationSelection } from './AccommodationSelection';
-import { Payment } from './Payment';
-import { DependentsBanner } from './DependentsBanner';
-import { DependentsModal } from './DependentsModal';
-import { DependentsPaymentModal } from './DependentsPaymentModal';
-import { DependentsSection } from './DependentsSection';
-import { DependentRegistrationSuccess } from './DependentRegistrationSuccess';
-import { UserProfile } from './UserProfile';
+} from "@/components/ui/alert-dialog";
+import { AccommodationSelection } from "./AccommodationSelection";
+import { Payment } from "./Payment";
+import { DependentsBanner } from "./DependentsBanner";
+import { DependentsModal } from "./DependentsModal";
+import { DependentsPaymentModal } from "./DependentsPaymentModal";
+import { DependentsSection } from "./DependentsSection";
+import { DependentRegistrationSuccess } from "./DependentRegistrationSuccess";
+import { UserProfile } from "./UserProfile";
 import {
   getUserDashboard,
   addDependent as apiAddDependent,
   removeDependent as apiRemoveDependent,
   getAccommodations,
-} from '@/lib/api';
-import { toUserMessage } from '@/lib/errors';
+} from "@/lib/api";
+import { toUserMessage } from "@/lib/errors";
 
-const eventBgImage = '/assets/images/event-bg.png';
-const badgeImage = '/assets/images/badge.png';
-const logoImage = '/assets/images/logo.png';
+const eventBgImage = "/assets/images/event-bg.png";
+const badgeImage = "/assets/images/badge.png";
+const logoImage = "/assets/images/logo.png";
 
 interface DashboardProps {
   userEmail: string;
@@ -60,10 +76,14 @@ export function Dashboard({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const [activeDashboardPage, setActiveDashboardPage] = useState<'dashboard' | 'user-profile'>('dashboard');
+  const [activeDashboardPage, setActiveDashboardPage] = useState<
+    "dashboard" | "user-profile"
+  >("dashboard");
   const [localProfile, setLocalProfile] = useState<any>(profile);
 
-  const [dashboardLoadError, setDashboardLoadError] = useState<string | null>(null);
+  const [dashboardLoadError, setDashboardLoadError] = useState<string | null>(
+    null,
+  );
 
   const [dashboardHydrating, setDashboardHydrating] = useState(false);
 
@@ -87,7 +107,7 @@ export function Dashboard({
             gender: d?.gender?.toString()?.toLowerCase() || "male",
             isRegistered: d?.isRegistered ?? true,
             isPaid: d?.isPaid ?? (d?.paymentStatus === "PAID" ? true : false),
-          }))
+          })),
         );
       } else {
         setDependents([]);
@@ -98,21 +118,22 @@ export function Dashboard({
         setLocalProfile((prev: any) => ({ ...prev, ...data.user }));
       }
     } catch (err: any) {
-      setDashboardLoadError(toUserMessage(err, { feature: 'generic' }));
+      setDashboardLoadError(toUserMessage(err, { feature: "generic" }));
     } finally {
       setDashboardHydrating(false);
     }
   };
-
 
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
 
   // Accommodation modal state
-  const [isAccommodationModalOpen, setIsAccommodationModalOpen] = useState(false);
+  const [isAccommodationModalOpen, setIsAccommodationModalOpen] =
+    useState(false);
   const [modalStep, setModalStep] = useState(1); // 1: Type selection, 2: Facility selection, 3: Payment
-  const [selectedAccommodationType, setSelectedAccommodationType] = useState('');
+  const [selectedAccommodationType, setSelectedAccommodationType] =
+    useState("");
   const [accommodationData, setAccommodationData] = useState<any>(null);
 
   // Availability summary (best-effort) for the accommodation type picker.
@@ -131,20 +152,31 @@ export function Dashboard({
 
     let cancelled = false;
     (async () => {
-      setAvailabilitySummary((prev) => ({ ...prev, loading: true, error: null }));
+      setAvailabilitySummary((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+      }));
       try {
         const [hostel, hotel] = await Promise.all([
-          getAccommodations({ eventId, type: 'HOSTEL' }).catch(() => ({ facilities: [] })),
-          getAccommodations({ eventId, type: 'HOTEL' }).catch(() => ({ facilities: [] })),
+          getAccommodations({ eventId, type: "HOSTEL" }).catch(() => ({
+            facilities: [],
+          })),
+          getAccommodations({ eventId, type: "HOTEL" }).catch(() => ({
+            facilities: [],
+          })),
         ]);
 
         if (cancelled) return;
 
         const summarize = (items: any[]) => {
-          const availableFacilities = items.filter((i) => (Number(i?.availableSpaces ?? 0) || 0) > 0).length;
+          const availableFacilities = items.filter(
+            (i) => (Number(i?.availableSpaces ?? 0) || 0) > 0,
+          ).length;
           const totalCapacity = items.reduce(
-            (sum, i) => sum + (Number(i?.totalSpaces ?? i?.availableSpaces ?? 0) || 0),
-            0
+            (sum, i) =>
+              sum + (Number(i?.totalSpaces ?? i?.availableSpaces ?? 0) || 0),
+            0,
           );
           return { availableFacilities, totalCapacity };
         };
@@ -157,7 +189,10 @@ export function Dashboard({
         });
       } catch (err: any) {
         if (cancelled) return;
-        setAvailabilitySummary({ loading: false, error: toUserMessage(err, { feature: 'generic' }) });
+        setAvailabilitySummary({
+          loading: false,
+          error: toUserMessage(err, { feature: "generic" }),
+        });
       }
     })();
 
@@ -168,14 +203,19 @@ export function Dashboard({
 
   // Dependents state
   const [dependents, setDependents] = useState<any[]>([]);
-  const [removingDependentId, setRemovingDependentId] = useState<string | null>(null);
+  const [removingDependentId, setRemovingDependentId] = useState<string | null>(
+    null,
+  );
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [dependentToDelete, setDependentToDelete] = useState<any>(null);
   const [isDependentsModalOpen, setIsDependentsModalOpen] = useState(false);
-  const [isDependentsPaymentModalOpen, setIsDependentsPaymentModalOpen] = useState(false);
-  const [selectedDependentsForPayment, setSelectedDependentsForPayment] = useState<any[]>([]);
-  const [isRegistrationSuccessModalOpen, setIsRegistrationSuccessModalOpen] = useState(false);
-  const [registeredDependentName, setRegisteredDependentName] = useState('');
+  const [isDependentsPaymentModalOpen, setIsDependentsPaymentModalOpen] =
+    useState(false);
+  const [selectedDependentsForPayment, setSelectedDependentsForPayment] =
+    useState<any[]>([]);
+  const [isRegistrationSuccessModalOpen, setIsRegistrationSuccessModalOpen] =
+    useState(false);
+  const [registeredDependentName, setRegisteredDependentName] = useState("");
 
   // Stage 2: hydrate dashboard data from API when available
   useEffect(() => {
@@ -187,7 +227,6 @@ export function Dashboard({
       mounted = false;
     };
   }, []);
-
 
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
@@ -201,7 +240,7 @@ export function Dashboard({
   useEffect(() => {
     const calculateTimeLeft = () => {
       const eventDate = new Date(
-        process.env.NEXT_PUBLIC_EVENT_START_DATE || '2026-04-30T00:00:00'
+        process.env.NEXT_PUBLIC_EVENT_START_DATE || "2026-04-30T00:00:00",
       ).getTime();
       const now = new Date().getTime();
       const difference = eventDate - now;
@@ -209,7 +248,9 @@ export function Dashboard({
       if (difference > 0) {
         return {
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          hours: Math.floor(
+            (difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+          ),
           minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
           seconds: Math.floor((difference % (1000 * 60)) / 1000),
         };
@@ -230,24 +271,32 @@ export function Dashboard({
   // Close avatar dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
       }
     };
 
     if (isDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isDropdownOpen]);
 
-  const firstName = (profile?.firstName || (profile as any)?.fullName?.split(' ')?.[0] || 'User');
+  const firstName =
+    profile?.firstName || (profile as any)?.fullName?.split(" ")?.[0] || "User";
 
-  const attendeeType = registration?.attendeeType as 'camper' | 'physical' | 'online' | undefined;
-  const isNonCamper = attendeeType === 'physical' || attendeeType === 'online';
+  const attendeeType = registration?.attendeeType as
+    | "camper"
+    | "physical"
+    | "online"
+    | undefined;
+  const isNonCamper = attendeeType === "physical" || attendeeType === "online";
   const showAccommodationPromo = isNonCamper && !accommodation;
 
   const handleAccommodationType = (type: string) => {
@@ -263,14 +312,14 @@ export function Dashboard({
   const resetModal = () => {
     setIsAccommodationModalOpen(false);
     setModalStep(1);
-    setSelectedAccommodationType('');
+    setSelectedAccommodationType("");
     setAccommodationData(null);
   };
 
   const handlePaymentComplete = () => {
     onAccommodationUpdate?.(accommodationData);
 
-    onRegistrationUpdate?.({ ...registration, attendeeType: 'camper' });
+    onRegistrationUpdate?.({ ...registration, attendeeType: "camper" });
 
     resetModal();
   };
@@ -288,86 +337,89 @@ export function Dashboard({
   // Check if there are unregistered dependents
   const hasUnregisteredDependents = dependents.some((d) => !d.isRegistered);
 
-const handleSaveDependents = async (updatedDependents: any[]) => {
-  // optimistic UI
-  const prev = dependents;
-  setDependents(updatedDependents);
+  const handleSaveDependents = async (updatedDependents: any[]) => {
+    // optimistic UI
+    const prev = dependents;
+    setDependents(updatedDependents);
 
-  // Stage 2: persist newly added dependents (no demo fallbacks)
-  try {
-    const eventId = registration?.eventId || registration?.event?.eventId;
-    if (!eventId) {
-      throw new Error('Missing eventId: cannot save dependents.');
+    // Stage 2: persist newly added dependents (no demo fallbacks)
+    try {
+      const eventId = registration?.eventId || registration?.event?.eventId;
+      if (!eventId) {
+        throw new Error("Missing eventId: cannot save dependents.");
+      }
+
+      const prevIds = new Set(prev.map((d: any) => d.id));
+      const toCreate = updatedDependents.filter((d: any) => !prevIds.has(d.id));
+
+      for (const d of toCreate) {
+        const gender = (d?.gender || "male").toString().toUpperCase();
+        const normalizedGender = gender === "FEMALE" ? "FEMALE" : "MALE";
+        await apiAddDependent({
+          eventId,
+          name: d?.name,
+          age: Number(d?.age || 0),
+          gender: normalizedGender,
+        });
+      }
+    } catch (err: any) {
+      // revert optimistic update and surface error
+      setDependents(prev);
+      setDashboardLoadError(
+        err?.message || "Failed to save dependents. Please try again.",
+      );
     }
+  };
 
-    const prevIds = new Set(prev.map((d: any) => d.id));
-    const toCreate = updatedDependents.filter((d: any) => !prevIds.has(d.id));
+  const handleRemoveDependent = (dependentId: string) => {
+    const dependent = dependents.find((d) => d.id === dependentId);
+    if (!dependent) return;
 
-    for (const d of toCreate) {
-      const gender = (d?.gender || 'male').toString().toUpperCase();
-      const normalizedGender = gender === 'FEMALE' ? 'FEMALE' : 'MALE';
-      await apiAddDependent({
-        eventId,
-        name: d?.name,
-        age: Number(d?.age || 0),
-        gender: normalizedGender,
+    // Open confirmation dialog instead of window.confirm
+    setDependentToDelete(dependent);
+    setConfirmDeleteOpen(true);
+  };
+
+  const confirmRemoveDependent = async () => {
+    if (!dependentToDelete) return;
+
+    const dependentId = dependentToDelete.id;
+    const dependentName = dependentToDelete.name;
+
+    // Prevent double-click / parallel deletes
+    if (removingDependentId) return;
+    setRemovingDependentId(dependentId);
+
+    const prev = dependents;
+    setDependents((ds) => ds.filter((d) => d.id !== dependentId));
+
+    try {
+      await apiRemoveDependent(dependentId);
+
+      // ✅ SUCCESS TOAST
+      toast.success(`${dependentName} removed successfully`, {
+        description: "The dependent has been removed from your registration.",
       });
+    } catch (err: any) {
+      setDependents(prev);
+      const msg =
+        err?.message || `Failed to remove ${dependentName}. Please try again.`;
+      setDashboardLoadError(msg);
+
+      // Error toast
+      toast.error("Failed to remove dependent", {
+        description: msg,
+      });
+    } finally {
+      setRemovingDependentId(null);
+      setDependentToDelete(null);
     }
-  } catch (err: any) {
-    // revert optimistic update and surface error
-    setDependents(prev);
-    setDashboardLoadError(err?.message || 'Failed to save dependents. Please try again.');
-  }
-};
-
-const handleRemoveDependent = (dependentId: string) => {
-  const dependent = dependents.find((d) => d.id === dependentId);
-  if (!dependent) return;
-
-  // Open confirmation dialog instead of window.confirm
-  setDependentToDelete(dependent);
-  setConfirmDeleteOpen(true);
-};
-
-const confirmRemoveDependent = async () => {
-  if (!dependentToDelete) return;
-
-  const dependentId = dependentToDelete.id;
-  const dependentName = dependentToDelete.name;
-
-  // Prevent double-click / parallel deletes
-  if (removingDependentId) return;
-  setRemovingDependentId(dependentId);
-
-  const prev = dependents;
-  setDependents((ds) => ds.filter((d) => d.id !== dependentId));
-
-  try {
-    await apiRemoveDependent(dependentId);
-    
-    // ✅ SUCCESS TOAST
-    toast.success(`${dependentName} removed successfully`, {
-      description: "The dependent has been removed from your registration.",
-    });
-  } catch (err: any) {
-    setDependents(prev);
-    const msg =
-      err?.message ||
-      `Failed to remove ${dependentName}. Please try again.`;
-    setDashboardLoadError(msg);
-    
-    // Error toast
-    toast.error("Failed to remove dependent", {
-      description: msg,
-    });
-  } finally {
-    setRemovingDependentId(null);
-    setDependentToDelete(null);
-  }
-};
+  };
 
   const handleRegisterDependent = (id: string) => {
-    const updatedDependents = dependents.map((d) => (d.id === id ? { ...d, isRegistered: true } : d));
+    const updatedDependents = dependents.map((d) =>
+      d.id === id ? { ...d, isRegistered: true } : d,
+    );
     const registered = dependents.find((d) => d.id === id);
     if (registered?.name) {
       setRegisteredDependentName(registered.name);
@@ -386,7 +438,9 @@ const confirmRemoveDependent = async () => {
     setSelectedDependentsForPayment(selected);
     // mark them registered before payment
     const updatedDependents = dependents.map((d) =>
-      selected.find((sd: any) => sd.id === d.id) ? { ...d, isRegistered: true } : d
+      selected.find((sd: any) => sd.id === d.id)
+        ? { ...d, isRegistered: true }
+        : d,
     );
     setDependents(updatedDependents);
     setIsDependentsModalOpen(false);
@@ -395,21 +449,23 @@ const confirmRemoveDependent = async () => {
 
   const handleDependentsPaymentComplete = () => {
     const updatedDependents = dependents.map((d) =>
-      selectedDependentsForPayment.find((sd: any) => sd.id === d.id) ? { ...d, isPaid: true } : d
+      selectedDependentsForPayment.find((sd: any) => sd.id === d.id)
+        ? { ...d, isPaid: true }
+        : d,
     );
     setDependents(updatedDependents);
     setSelectedDependentsForPayment([]);
     setIsDependentsPaymentModalOpen(false);
   };
 
-  if (activeDashboardPage === 'user-profile') {
+  if (activeDashboardPage === "user-profile") {
     return (
       <UserProfile
         profile={localProfile}
         userEmail={userEmail}
-        userPhone={localProfile?.phone || localProfile?.phoneNumber || ''}
+        userPhone={localProfile?.phone || localProfile?.phoneNumber || ""}
         dependents={dependents}
-        onBack={() => setActiveDashboardPage('dashboard')}
+        onBack={() => setActiveDashboardPage("dashboard")}
         onUpdate={(updated) => {
           setLocalProfile(updated);
           onProfileUpdate?.(updated);
@@ -424,7 +480,13 @@ const confirmRemoveDependent = async () => {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Image src={logoImage} alt="SMFLX" width={120} height={40} className="h-8 lg:h-10 w-auto" />
+          <Image
+            src={logoImage}
+            alt="SMFLX"
+            width={120}
+            height={40}
+            className="h-8 lg:h-10 w-auto"
+          />
 
           {/* Avatar dropdown */}
           <div className="relative" ref={dropdownRef}>
@@ -451,7 +513,9 @@ const confirmRemoveDependent = async () => {
                   className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
                 >
                   <User className="w-5 h-5 text-gray-600" />
-                  <span className="font-medium text-gray-700">User Profile</span>
+                  <span className="font-medium text-gray-700">
+                    User Profile
+                  </span>
                 </button>
                 <div className="border-t border-gray-100 my-1" />
                 <button
@@ -475,20 +539,27 @@ const confirmRemoveDependent = async () => {
         {/* Welcome */}
         <div className="mb-6">
           <h1 className="text-2xl lg:text-3xl mb-1">Hello {firstName}</h1>
-          <p className="text-gray-600 text-sm">Manage your WOTH Camp Meeting 2026 registration and view event details</p>
+          <p className="text-gray-600 text-sm">
+            Manage your WOTH Camp Meeting 2026 registration and view event
+            details
+          </p>
         </div>
 
         {(dashboardLoadError || dashboardHydrating) && (
           <InlineAlert
             variant={dashboardLoadError ? "warning" : "info"}
-            title={dashboardLoadError ? "Dashboard couldn’t refresh" : "Refreshing"}
+            title={
+              dashboardLoadError ? "Dashboard couldn’t refresh" : "Refreshing"
+            }
             actionLabel="Retry"
             onAction={() => {
               if (!dashboardHydrating) void reloadDashboard();
             }}
             className="mb-6"
           >
-            {dashboardLoadError ? dashboardLoadError : "Refreshing your dashboard…"}
+            {dashboardLoadError
+              ? dashboardLoadError
+              : "Refreshing your dashboard…"}
           </InlineAlert>
         )}
 
@@ -497,10 +568,12 @@ const confirmRemoveDependent = async () => {
           onManageDependents={() => setIsDependentsModalOpen(true)}
         />
 
-
-        
-        <DependentsSection dependents={dependents} onRegister={handleRegisterDependent} onPay={handlePayForDependents} />
-{/* Top grid */}
+        <DependentsSection
+          dependents={dependents}
+          onRegister={handleRegisterDependent}
+          onPay={handlePayForDependents}
+        />
+        {/* Top grid */}
         <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
           {/* Event card */}
           <div
@@ -508,27 +581,40 @@ const confirmRemoveDependent = async () => {
             style={{ backgroundImage: `url(${eventBgImage})` }}
           >
             <div className="relative z-10">
-              <h2 className="text-lg lg:text-xl font-semibold mb-1">Join Believers to Experience the</h2>
-              <h3 className="text-xl lg:text-2xl font-bold mb-2">Move of God at WOTH Meeting</h3>
+              <h2 className="text-lg lg:text-xl font-semibold mb-1">
+                Join Believers to Experience the
+              </h2>
+              <h3 className="text-xl lg:text-2xl font-bold mb-2">
+                Move of God at WOTH Meeting
+              </h3>
               <p className="text-sm mb-6 opacity-90">
-                {process.env.NEXT_PUBLIC_EVENT_DETAILS || 'Apr 30th - May 3rd, 2026 · Dansol High School, Agidingbi, Lagos State'}
+                {process.env.NEXT_PUBLIC_EVENT_DETAILS ||
+                  "Apr 30th - May 3rd, 2026 · Dansol High School, Agidingbi, Lagos State"}
               </p>
 
               <div className="flex items-center gap-2 lg:gap-3">
                 <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 text-center min-w-15 lg:min-w-17.5">
-                  <div className="text-2xl lg:text-3xl font-bold">{timeLeft.days}</div>
+                  <div className="text-2xl lg:text-3xl font-bold">
+                    {timeLeft.days}
+                  </div>
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold">:</div>
                 <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 text-center min-w-15 lg:min-w-17.5">
-                  <div className="text-2xl lg:text-3xl font-bold">{String(timeLeft.hours).padStart(2, '0')}</div>
+                  <div className="text-2xl lg:text-3xl font-bold">
+                    {String(timeLeft.hours).padStart(2, "0")}
+                  </div>
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold">:</div>
                 <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 text-center min-w-15 lg:min-w-17.5">
-                  <div className="text-2xl lg:text-3xl font-bold">{String(timeLeft.minutes).padStart(2, '0')}</div>
+                  <div className="text-2xl lg:text-3xl font-bold">
+                    {String(timeLeft.minutes).padStart(2, "0")}
+                  </div>
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold">:</div>
                 <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 text-center min-w-15 lg:min-w-17.5">
-                  <div className="text-2xl lg:text-3xl font-bold">{String(timeLeft.seconds).padStart(2, '0')}</div>
+                  <div className="text-2xl lg:text-3xl font-bold">
+                    {String(timeLeft.seconds).padStart(2, "0")}
+                  </div>
                 </div>
               </div>
             </div>
@@ -539,22 +625,32 @@ const confirmRemoveDependent = async () => {
           <div className="bg-white rounded-3xl p-6 lg:p-8 flex flex-col justify-between">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg lg:text-xl font-semibold mb-1">You are registered for</h3>
-                <h4 className="text-xl lg:text-2xl font-bold mb-4">{registration?.eventName || 'WOTH Camp Meeting 2026'}</h4>
+                <h3 className="text-lg lg:text-xl font-semibold mb-1">
+                  You are registered for
+                </h3>
+                <h4 className="text-xl lg:text-2xl font-bold mb-4">
+                  {registration?.eventName || "WOTH Camp Meeting 2026"}
+                </h4>
 
                 <div className="flex items-center gap-2">
                   <span className="text-base font-medium">
-                    {attendeeType === 'camper' && 'Camper'}
-                    {attendeeType === 'physical' && 'Physical Attendance'}
-                    {attendeeType === 'online' && 'Online Participant'}
-                    {!attendeeType && 'Camper'}
+                    {attendeeType === "camper" && "Camper"}
+                    {attendeeType === "physical" && "Physical Attendance"}
+                    {attendeeType === "online" && "Online Participant"}
+                    {!attendeeType && "Camper"}
                   </span>
                   <Tent className="w-5 h-5 text-gray-700" />
                 </div>
               </div>
 
               <div className="w-20 h-20 lg:w-24 lg:h-24 shrink-0">
-                <Image src={badgeImage} alt="Badge" width={96} height={96} className="w-full h-full object-contain" />
+                <Image
+                  src={badgeImage}
+                  alt="Badge"
+                  width={96}
+                  height={96}
+                  className="w-full h-full object-contain"
+                />
               </div>
             </div>
 
@@ -570,29 +666,41 @@ const confirmRemoveDependent = async () => {
         </div>
 
         {/* Camper-only accommodation details */}
-        {accommodation && attendeeType === 'camper' && (
+        {accommodation && attendeeType === "camper" && (
           <div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-2">
                 <Home className="w-5 h-5 text-gray-700" />
-                <h3 className="text-lg lg:text-xl font-semibold">Accommodation Details</h3>
+                <h3 className="text-lg lg:text-xl font-semibold">
+                  Accommodation Details
+                </h3>
               </div>
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">Reserved</span>
+              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
+                Reserved
+              </span>
             </div>
 
             <div className="grid lg:grid-cols-2 gap-6 items-center">
               <div className="grid grid-cols-3 gap-6">
                 <div>
                   <span className="text-sm text-gray-500 block mb-2">Type</span>
-                  <span className="text-base font-semibold capitalize">{accommodation.type || 'Hostel'}</span>
+                  <span className="text-base font-semibold capitalize">
+                    {accommodation.type || "Hostel"}
+                  </span>
                 </div>
                 <div>
                   <span className="text-sm text-gray-500 block mb-2">Hall</span>
-                  <span className="text-base font-semibold capitalize">{accommodation.facility?.replace('-', ' ') || 'Grace Hall'}</span>
+                  <span className="text-base font-semibold capitalize">
+                    {accommodation.facility?.replace("-", " ") || "Grace Hall"}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-500 block mb-2">Bedspace</span>
-                  <span className="text-base font-semibold capitalize">{accommodation.bed?.replace('-', ' ') || 'Bedspace 101'}</span>
+                  <span className="text-sm text-gray-500 block mb-2">
+                    Bedspace
+                  </span>
+                  <span className="text-base font-semibold capitalize">
+                    {accommodation.bed?.replace("-", " ") || "Bedspace 101"}
+                  </span>
                 </div>
               </div>
 
@@ -619,11 +727,14 @@ const confirmRemoveDependent = async () => {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-3">
                   <Home className="w-5 h-5 text-purple-700" />
-                  <h3 className="text-lg lg:text-xl font-semibold text-gray-800">Need Accommodation?</h3>
+                  <h3 className="text-lg lg:text-xl font-semibold text-gray-800">
+                    Need Accommodation?
+                  </h3>
                 </div>
                 <p className="text-gray-700 mb-4 text-base">
-                  You can still book your accommodation space. You have just{' '}
-                  <span className="font-bold text-purple-800">100 spaces</span> available, book now.
+                  You can still book your accommodation space. You have just{" "}
+                  <span className="font-bold text-purple-800">100 spaces</span>{" "}
+                  available, book now.
                 </p>
                 <button
                   onClick={() => setIsAccommodationModalOpen(true)}
@@ -678,7 +789,9 @@ const confirmRemoveDependent = async () => {
           {/* Follow Us */}
           <div className="bg-white rounded-3xl p-6 lg:p-8">
             <h3 className="text-lg lg:text-xl font-semibold mb-4">Follow Us</h3>
-            <p className="text-gray-600 text-sm mb-5">Stay connected with us on social media</p>
+            <p className="text-gray-600 text-sm mb-5">
+              Stay connected with us on social media
+            </p>
 
             <div className="grid grid-cols-2 gap-3">
               <a
@@ -733,8 +846,12 @@ const confirmRemoveDependent = async () => {
 
           {/* Stream Our Meetings */}
           <div className="bg-white rounded-3xl p-6 lg:p-8">
-            <h3 className="text-lg lg:text-xl font-semibold mb-4">Stream Our Meetings</h3>
-            <p className="text-gray-600 text-sm mb-5">Join us live on your preferred platform</p>
+            <h3 className="text-lg lg:text-xl font-semibold mb-4">
+              Stream Our Meetings
+            </h3>
+            <p className="text-gray-600 text-sm mb-5">
+              Join us live on your preferred platform
+            </p>
 
             <div className="grid grid-cols-2 gap-3">
               <a
@@ -795,9 +912,9 @@ const confirmRemoveDependent = async () => {
           <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl lg:text-2xl font-semibold">
-                {modalStep === 1 && 'Select Accommodation Type'}
-                {modalStep === 2 && 'Camp Accommodation'}
-                {modalStep === 3 && 'Payment'}
+                {modalStep === 1 && "Select Accommodation Type"}
+                {modalStep === 2 && "Camp Accommodation"}
+                {modalStep === 3 && "Payment"}
               </h2>
               <button
                 onClick={handleModalClose}
@@ -810,29 +927,33 @@ const confirmRemoveDependent = async () => {
             <div className="flex-1 overflow-auto">
               {modalStep === 1 && (
                 <div className="p-6 lg:p-8">
-                  <p className="text-gray-600 mb-6">Choose your preferred accommodation type</p>
+                  <p className="text-gray-600 mb-6">
+                    Choose your preferred accommodation type
+                  </p>
                   <div className="grid md:grid-cols-2 gap-4 lg:gap-6">
                     <button
-                      onClick={() => handleAccommodationType('hostel')}
+                      onClick={() => handleAccommodationType("hostel")}
                       className="group bg-white border-2 border-gray-200 hover:border-purple-500 rounded-2xl p-6 transition-all hover:shadow-lg"
                     >
                       <div className="flex flex-col items-center text-center">
                         <div className="w-16 h-16 rounded-full bg-linear-to-br from-purple-100 to-pink-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                           <Building2 className="w-8 h-8 text-purple-600" />
                         </div>
-                        <h3 className="text-lg font-semibold mb-2">Hostel/Camp</h3>
+                        <h3 className="text-lg font-semibold mb-2">
+                          Hostel/Camp
+                        </h3>
                         <p className="text-sm text-gray-600">
                           {availabilitySummary.loading
-                            ? 'Loading availability…'
+                            ? "Loading availability…"
                             : availabilitySummary.hostel
                               ? `${availabilitySummary.hostel.availableFacilities} facilities available · capacity ${availabilitySummary.hostel.totalCapacity}`
-                              : 'View available facilities'}
+                              : "View available facilities"}
                         </p>
                       </div>
                     </button>
 
                     <button
-                      onClick={() => handleAccommodationType('hotel')}
+                      onClick={() => handleAccommodationType("hotel")}
                       className="group bg-white border-2 border-gray-200 hover:border-purple-500 rounded-2xl p-6 transition-all hover:shadow-lg"
                     >
                       <div className="flex flex-col items-center text-center">
@@ -842,10 +963,10 @@ const confirmRemoveDependent = async () => {
                         <h3 className="text-lg font-semibold mb-2">Hotel</h3>
                         <p className="text-sm text-gray-600">
                           {availabilitySummary.loading
-                            ? 'Loading availability…'
+                            ? "Loading availability…"
                             : availabilitySummary.hotel
                               ? `${availabilitySummary.hotel.availableFacilities} facilities available · capacity ${availabilitySummary.hotel.totalCapacity}`
-                              : 'View available facilities'}
+                              : "View available facilities"}
                         </p>
                       </div>
                     </button>
@@ -861,9 +982,12 @@ const confirmRemoveDependent = async () => {
 
               {modalStep === 2 && (
                 <AccommodationSelection
+                  categoryId=""
                   accommodationType={selectedAccommodationType}
                   eventId={registration?.eventId}
-                  registrationId={registration?.id || registration?.registrationId}
+                  registrationId={
+                    registration?.id || registration?.registrationId
+                  }
                   profile={localProfile}
                   onComplete={handleFacilitySelection}
                   onBack={handleModalBack}
@@ -887,7 +1011,7 @@ const confirmRemoveDependent = async () => {
 
       {/* Dependents Modal */}
       <DependentsModal
-                onRemoveDependent={handleRemoveDependent}
+        onRemoveDependent={handleRemoveDependent}
         isOpen={isDependentsModalOpen}
         onClose={() => setIsDependentsModalOpen(false)}
         existingDependents={dependents}
@@ -917,7 +1041,9 @@ const confirmRemoveDependent = async () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Dependent</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove {dependentToDelete?.name || 'this dependent'}? This action cannot be undone.
+              Are you sure you want to remove{" "}
+              {dependentToDelete?.name || "this dependent"}? This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -933,7 +1059,6 @@ const confirmRemoveDependent = async () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }

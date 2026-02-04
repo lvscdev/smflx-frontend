@@ -1,16 +1,38 @@
-'use client';
+"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { validateEventRegistration } from "@/lib/validation/eventRegistration";
 import { toUserMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Wifi, ArrowLeft, Tent, Users, Monitor, Building2, Home, Check, Radio, Youtube, Facebook } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  MapPin,
+  Wifi,
+  ArrowLeft,
+  Tent,
+  Users,
+  Monitor,
+  Building2,
+  Home,
+  Check,
+  Radio,
+  Youtube,
+  Facebook,
+} from "lucide-react";
+import { listAccomodationCategories } from "@/lib/api/accommodation";
+import { AccommodationCategories } from "@/lib/api/accommodation/types";
 
 interface RegistrationData {
   attendeeType: string;
   accommodationType: string;
+  categoryId: string;
 }
 
 interface EventRegistrationProps {
@@ -33,15 +55,24 @@ interface GridOptionProps {
   gradientTo?: string;
 }
 
-function GridOption({ value, selected, onClick, icon, label, description, gradientFrom = 'from-white', gradientTo = 'to-gray-50' }: GridOptionProps) {
+function GridOption({
+  value,
+  selected,
+  onClick,
+  icon,
+  label,
+  description,
+  gradientFrom = "from-white",
+  gradientTo = "to-gray-50",
+}: GridOptionProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={`relative p-4 rounded-xl border transition-all duration-300 text-left bg-gradient-to-br ${gradientFrom} ${gradientTo} ${
         selected
-          ? 'border-gray-700 shadow-sm'
-          : 'border-gray-200 hover:border-gray-400'
+          ? "border-gray-700 shadow-sm"
+          : "border-gray-200 hover:border-gray-400"
       }`}
     >
       {selected && (
@@ -50,15 +81,21 @@ function GridOption({ value, selected, onClick, icon, label, description, gradie
         </div>
       )}
       <div className="flex items-start gap-2.5">
-        {icon && <div className={`mt-0.5 ${selected ? 'text-gray-700' : 'text-gray-400'}`}>{icon}</div>}
+        {icon && (
+          <div
+            className={`mt-0.5 ${selected ? "text-gray-700" : "text-gray-400"}`}
+          >
+            {icon}
+          </div>
+        )}
         <div className="flex-1">
-          <div className={`text-sm font-medium mb-0.5 ${selected ? 'text-gray-900' : 'text-gray-700'}`}>
+          <div
+            className={`text-sm font-medium mb-0.5 ${selected ? "text-gray-900" : "text-gray-700"}`}
+          >
             {label}
           </div>
           {description && (
-            <div className="text-xs text-gray-500">
-              {description}
-            </div>
+            <div className="text-xs text-gray-500">{description}</div>
           )}
         </div>
       </div>
@@ -66,15 +103,43 @@ function GridOption({ value, selected, onClick, icon, label, description, gradie
   );
 }
 
-export function EventRegistration({ eventId: _eventId, onComplete, onBack, initialData, isSubmitting, serverError }: EventRegistrationProps) {
-  const [registration, setRegistration] = useState<RegistrationData>(initialData || {
-    attendeeType: '',
-    accommodationType: '',
-  });
+export function EventRegistration({
+  eventId: _eventId,
+  onComplete,
+  onBack,
+  initialData,
+  isSubmitting,
+  serverError,
+}: EventRegistrationProps) {
+  const [loadError, setLoadError] = useState<string>("");
+  const [loadingAccommodations, setLoadingAccommodations] = useState(false);
+  const [accommodationCategories, setAccommodationCategories] = useState<
+    AccommodationCategories[]
+  >([]);
+  const [registration, setRegistration] = useState<RegistrationData>(
+    initialData || {
+      attendeeType: "",
+      accommodationType: "",
+      categoryId: "",
+    },
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [localSubmitting, setLocalSubmitting] = useState(false);
 
   const submitting = !!isSubmitting || localSubmitting;
+
+  const loadAccommodations = async () => {
+    setLoadingAccommodations(true);
+    try {
+      const data = await listAccomodationCategories();
+
+      setAccommodationCategories(data);
+    } catch (error) {
+      setLoadError(toUserMessage(error, { feature: "events", action: "list" }));
+    } finally {
+      setLoadingAccommodations(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,8 +156,10 @@ export function EventRegistration({ eventId: _eventId, onComplete, onBack, initi
     try {
       setLocalSubmitting(true);
       await onComplete(registration);
-    } catch (err: any) {
-      setFormError(toUserMessage(err, { feature: "generic", action: "create" }));
+    } catch (err) {
+      setFormError(
+        toUserMessage(err, { feature: "generic", action: "create" }),
+      );
     } finally {
       setLocalSubmitting(false);
     }
@@ -100,17 +167,21 @@ export function EventRegistration({ eventId: _eventId, onComplete, onBack, initi
 
   const isFormValid = () => {
     if (!registration.attendeeType) return false;
-    if (registration.attendeeType === 'camper') {
+    if (registration.attendeeType === "camper") {
       return !!registration.accommodationType;
     }
     return true;
   };
 
+  useEffect(() => {
+    loadAccommodations();
+  }, []);
+
   const getButtonText = () => {
-    if (registration.attendeeType === 'camper') {
-      return 'Continue to Accommodation';
+    if (registration.attendeeType === "camper") {
+      return "Continue to Accommodation";
     }
-    return 'Go to Dashboard';
+    return "Go to Dashboard";
   };
 
   return (
@@ -136,20 +207,36 @@ export function EventRegistration({ eventId: _eventId, onComplete, onBack, initi
           )}
           {/* Attendee Type - Grid Selector */}
           <div className="space-y-3">
-            <label className="block text-sm text-gray-700 font-medium">Attendee Type *</label>
+            <label className="block text-sm text-gray-700 font-medium">
+              Attendee Type *
+            </label>
             <div className="grid grid-cols-2 gap-3">
               <GridOption
                 value="camper"
-                selected={registration.attendeeType === 'camper'}
-                onClick={() => { setFormError(null); setRegistration({ ...registration, attendeeType: 'camper', accommodationType: '' }); }}
+                selected={registration.attendeeType === "camper"}
+                onClick={() => {
+                  setFormError(null);
+                  setRegistration({
+                    ...registration,
+                    attendeeType: "camper",
+                    accommodationType: "",
+                  });
+                }}
                 icon={<Tent className="w-5 h-5" />}
                 label="Camper"
                 description="Stay on-site with full camping experience"
               />
               <GridOption
                 value="physical"
-                selected={registration.attendeeType === 'physical'}
-                onClick={() => { setFormError(null); setRegistration({ ...registration, attendeeType: 'physical', accommodationType: '' }); }}
+                selected={registration.attendeeType === "physical"}
+                onClick={() => {
+                  setFormError(null);
+                  setRegistration({
+                    ...registration,
+                    attendeeType: "physical",
+                    accommodationType: "",
+                  });
+                }}
                 icon={<MapPin className="w-5 h-5" />}
                 label="Physical Attendance"
                 description="Attend in person without camping"
@@ -157,8 +244,15 @@ export function EventRegistration({ eventId: _eventId, onComplete, onBack, initi
               <div className="col-span-2">
                 <GridOption
                   value="online"
-                  selected={registration.attendeeType === 'online'}
-                  onClick={() => { setFormError(null); setRegistration({ ...registration, attendeeType: 'online', accommodationType: '' }); }}
+                  selected={registration.attendeeType === "online"}
+                  onClick={() => {
+                    setFormError(null);
+                    setRegistration({
+                      ...registration,
+                      attendeeType: "online",
+                      accommodationType: "",
+                    });
+                  }}
                   icon={<Monitor className="w-5 h-5" />}
                   label="Online Participant"
                   description="Join us virtually via live stream"
@@ -168,12 +262,14 @@ export function EventRegistration({ eventId: _eventId, onComplete, onBack, initi
           </div>
 
           {/* Physical Attendance - Location Info */}
-          {registration.attendeeType === 'physical' && (
+          {registration.attendeeType === "physical" && (
             <div className="p-5 bg-blue-50 rounded-xl border border-blue-200 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-start gap-3">
                 <MapPin className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div className="flex-1">
-                  <h4 className="font-semibold mb-2 text-blue-900">Event Location</h4>
+                  <h4 className="font-semibold mb-2 text-blue-900">
+                    Event Location
+                  </h4>
                   <p className="text-sm text-blue-800 mb-3">
                     123 Conference Center Drive, Downtown District, City 12345
                   </p>
@@ -186,12 +282,14 @@ export function EventRegistration({ eventId: _eventId, onComplete, onBack, initi
           )}
 
           {/* Online Participant - Streaming Info */}
-          {registration.attendeeType === 'online' && (
+          {registration.attendeeType === "online" && (
             <div className="p-5 bg-purple-50 rounded-xl border border-purple-200 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-start gap-3">
                 <Wifi className="w-5 h-5 text-purple-600 mt-0.5" />
                 <div className="flex-1">
-                  <h4 className="font-semibold mb-2 text-purple-900">Join Us Online</h4>
+                  <h4 className="font-semibold mb-2 text-purple-900">
+                    Join Us Online
+                  </h4>
                   <p className="text-sm text-purple-800 mb-3">
                     Watch the event live on multiple platforms:
                   </p>
@@ -239,35 +337,89 @@ export function EventRegistration({ eventId: _eventId, onComplete, onBack, initi
           )}
 
           {/* Camper - Accommodation Type Grid Selector */}
-          {registration.attendeeType === 'camper' && (
+          {registration.attendeeType === "camper" && (
             <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <label className="block text-sm text-gray-700 font-medium">Accommodation Type *</label>
-              <div className="grid grid-cols-3 gap-3">
-                <GridOption
-                  value="hostel"
-                  selected={registration.accommodationType === 'hostel'}
-                  onClick={() => { setFormError(null); setRegistration({ ...registration, accommodationType: 'hostel' }); }}
-                  icon={<Tent className="w-5 h-5" />}
-                  label="Hostel (Camper)"
-                  description="Availability shown on next step"
-                />
-                <GridOption
+              <label className="block text-sm text-gray-700 font-medium">
+                Accommodation Type *
+              </label>
+
+              {loadingAccommodations ? (
+                <div className="grid grid-cols-3 gap-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="p-4 rounded-xl border border-gray-200 bg-white animate-pulse"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-5 h-5 bg-gray-200 rounded mt-0.5" />
+                        <div className="flex-1">
+                          <div className="h-4 w-20 bg-gray-200 rounded mb-1.5" />
+                          <div className="h-3 w-full bg-gray-100 rounded" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : loadError ? (
+                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800">
+                  {loadError}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  {accommodationCategories &&
+                    accommodationCategories.length > 0 &&
+                    accommodationCategories.map((category) => (
+                      <GridOption
+                        key={category.categoryId}
+                        value={category?.name?.toLowerCase()}
+                        selected={
+                          registration.accommodationType ===
+                          category?.name?.toLowerCase()
+                        }
+                        onClick={() => {
+                          setFormError(null);
+                          setRegistration({
+                            ...registration,
+                            accommodationType: category?.name?.toLowerCase(),
+                            categoryId: category?.categoryId,
+                          });
+                        }}
+                        icon={<Tent className="w-5 h-5" />}
+                        label={category?.name}
+                        description="Availability shown on next step"
+                      />
+                    ))}
+                </div>
+              )}
+
+              {/* <GridOption
                   value="hotel"
-                  selected={registration.accommodationType === 'hotel'}
-                  onClick={() => { setFormError(null); setRegistration({ ...registration, accommodationType: 'hotel' }); }}
+                  selected={registration.accommodationType === "hotel"}
+                  onClick={() => {
+                    setFormError(null);
+                    setRegistration({
+                      ...registration,
+                      accommodationType: "hotel",
+                    });
+                  }}
                   icon={<Building2 className="w-5 h-5" />}
                   label="Hotel"
                   description="Availability shown on next step"
                 />
                 <GridOption
                   value="shared"
-                  selected={registration.accommodationType === 'shared'}
-                  onClick={() => { setFormError(null); setRegistration({ ...registration, accommodationType: 'shared' }); }}
+                  selected={registration.accommodationType === "shared"}
+                  onClick={() => {
+                    setFormError(null);
+                    setRegistration({
+                      ...registration,
+                      accommodationType: "shared",
+                    });
+                  }}
                   icon={<Users className="w-5 h-5" />}
                   label="Shared Apartment"
                   description="Availability shown on next step"
-                />
-              </div>
+                /> */}
             </div>
           )}
 
@@ -285,8 +437,8 @@ export function EventRegistration({ eventId: _eventId, onComplete, onBack, initi
               disabled={!isFormValid() || submitting}
               className={`flex-1 py-3 rounded-lg transition-colors ${
                 isFormValid()
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  ? "bg-red-600 text-white hover:bg-red-700"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
               }`}
             >
               {submitting ? "Saving..." : getButtonText()}

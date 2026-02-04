@@ -68,7 +68,9 @@ export default function HomePage() {
 
   const [registration, setRegistration] = useState<any>(null);
   const [registrationSubmitting, setRegistrationSubmitting] = useState(false);
-  const [registrationPersistError, setRegistrationPersistError] = useState<string | null>(null);
+  const [registrationPersistError, setRegistrationPersistError] = useState<
+    string | null
+  >(null);
   const [accommodation, setAccommodation] = useState<any>(null);
 
   // ✅ Rehydrate session + resume flow if user already verified once (token exists)
@@ -145,7 +147,9 @@ export default function HomePage() {
         title: "Register",
         description: "Attendance & preferences",
         completed:
-          view === "accommodation" || view === "payment" || view === "dashboard",
+          view === "accommodation" ||
+          view === "payment" ||
+          view === "dashboard",
       },
       {
         id: 5,
@@ -255,23 +259,25 @@ export default function HomePage() {
 
               try {
                 if (!selectedEvent?.eventId) {
-                  throw new Error("No event selected. Please go back and select an event.");
+                  throw new Error(
+                    "No event selected. Please go back and select an event.",
+                  );
                 }
 
                 const participationMode =
                   data.attendeeType === "camper"
                     ? "CAMPER"
                     : data.attendeeType === "online"
-                    ? "ONLINE"
-                    : "ATTENDEE";
+                      ? "ONLINE"
+                      : "ATTENDEE";
 
                 const accommodationType =
                   participationMode === "CAMPER"
                     ? data.accommodationType === "hostel"
                       ? "HOSTEL"
                       : data.accommodationType === "hotel"
-                      ? "HOTEL"
-                      : "NONE"
+                        ? "HOTEL"
+                        : "NONE"
                     : "NONE";
 
                 const created = await createUserRegistration({
@@ -300,7 +306,8 @@ export default function HomePage() {
                 setView("dashboard");
               } catch (e: any) {
                 setRegistrationPersistError(
-                  e?.message || "Unable to save registration. Please try again."
+                  e?.message ||
+                    "Unable to save registration. Please try again.",
                 );
               } finally {
                 setRegistrationSubmitting(false);
@@ -309,9 +316,9 @@ export default function HomePage() {
           />
         )}
 
-
         {view === "accommodation" && (
           <AccommodationSelection
+            categoryId={registration?.categoryId}
             accommodationType={registration?.accommodationType || "hostel"}
             eventId={selectedEvent?.eventId || ""}
             registrationId={registration?.registrationId}
@@ -326,7 +333,7 @@ export default function HomePage() {
               } else {
                 setView("payment");
               }
-          }}
+            }}
           />
         )}
 

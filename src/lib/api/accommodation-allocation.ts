@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { apiRequest } from './client';
+import { apiRequest } from "./client";
 
 // These endpoints are defined in the current swagger under "Accommodation Allocation".
 // Note: the swagger schema has an inconsistent key casing for the hostel request
@@ -10,7 +10,7 @@ export type InitiateHostelAllocationPayload = {
   registrationId: string;
   eventId: string;
   userId: string;
-  facilityId: string;
+  facilityid: string;
 };
 
 export type InitiateHotelAllocationPayload = {
@@ -21,18 +21,24 @@ export type InitiateHotelAllocationPayload = {
   facilityId: string;
 };
 
-export async function initiateHostelAllocation(payload: InitiateHostelAllocationPayload) {
+export async function initiateHostelAllocation(
+  payload: InitiateHostelAllocationPayload,
+) {
   const body = {
     registrationId: payload.registrationId,
     eventId: payload.eventId,
     userId: payload.userId,
-    facilityId: payload.facilityId,
-    facilityid: payload.facilityId,
+    facilityid: payload.facilityid,
   };
 
-  return apiRequest<any>('/allocation/hostel', { method: 'POST', body });
+  return apiRequest<any>("/allocation/hostel", { method: "POST", body });
 }
 
-export async function initiateHotelAllocation(payload: InitiateHotelAllocationPayload) {
-  return apiRequest<any>('/allocation/hotel', { method: 'POST', body: payload });
+export async function initiateHotelAllocation(
+  payload: InitiateHotelAllocationPayload,
+) {
+  return apiRequest<any>("/allocation/hotel", {
+    method: "POST",
+    body: payload,
+  });
 }

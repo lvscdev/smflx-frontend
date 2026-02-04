@@ -146,7 +146,8 @@ export function DependentsModal({
   const unregisteredDependents = dependents.filter(d => !d.isRegistered);
   const registeredDependents = dependents.filter(d => d.isRegistered);
   const selectedCount = unregisteredDependents.length;
-  const totalAmount = selectedCount * 7000;
+  const DEPENDENT_PRICE = Number(process.env.NEXT_PUBLIC_DEPENDENT_PRICE) || 7000;
+  const totalAmount = selectedCount * DEPENDENT_PRICE;
 
   const isFormValid = validateDependentDraft(currentDependent).ok;
 

@@ -239,7 +239,9 @@ export function Dashboard({
   // Countdown timer
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const eventDate = new Date("2026-04-30T00:00:00").getTime();
+      const eventDate = new Date(
+        process.env.NEXT_PUBLIC_EVENT_START_DATE || "2026-04-30T00:00:00",
+      ).getTime();
       const now = new Date().getTime();
       const difference = eventDate - now;
 
@@ -586,8 +588,8 @@ export function Dashboard({
                 Move of God at WOTH Meeting
               </h3>
               <p className="text-sm mb-6 opacity-90">
-                Apr 30th - May 3rd, 2026 · Dansol High School, Agidingbi, Lagos
-                State
+                {process.env.NEXT_PUBLIC_EVENT_DETAILS ||
+                  "Apr 30th - May 3rd, 2026 · Dansol High School, Agidingbi, Lagos State"}
               </p>
 
               <div className="flex items-center gap-2 lg:gap-3">

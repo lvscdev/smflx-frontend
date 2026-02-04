@@ -13,7 +13,7 @@ import { Payment } from "@/components/front-office/ui/Payment";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
 
 import { getAuthToken, setAuthToken } from "@/lib/api/client";
-import { createUserRegistration } from "@/lib/api";
+import { createUserRegistration, getAccommodations } from "@/lib/api";
 
 type View =
   | "verify"
@@ -72,6 +72,7 @@ export default function HomePage() {
     string | null
   >(null);
   const [accommodation, setAccommodation] = useState<any>(null);
+  const [hostelSpacesLeft, setHostelSpacesLeft] = useState<number | undefined>(undefined);
 
   // ✅ Rehydrate session + resume flow if user already verified once (token exists)
   useEffect(() => {
@@ -97,6 +98,33 @@ export default function HomePage() {
     // token exists but no saved flow state => go to dashboard by default
     setView("dashboard");
   }, []);
+
+  // ✅ Fetch hostel availability count on mount
+  useEffect(() => {
+    async function fetchHostelAvailability() {
+      try {
+        // Fetch availability for currently active event if we have one
+        const eventId = selectedEvent?.eventId;
+        if (!eventId) return;
+
+        const data = await getAccommodations({
+          eventId,
+          type: 'HOSTEL'
+        });
+
+        // Use totalAvailable from metadata if available
+        const available = data?.metadata?.totalAvailable;
+        if (typeof available === 'number') {
+          setHostelSpacesLeft(available);
+        }
+      } catch (err) {
+        // Silently fail - Sidebar will show "Limited" as fallback
+        console.error('Failed to fetch hostel availability:', err);
+      }
+    }
+
+    fetchHostelAvailability();
+  }, [selectedEvent?.eventId]);
 
   // ✅ Save progress (only after auth screens)
   useEffect(() => {
@@ -197,6 +225,7 @@ export default function HomePage() {
           currentStep={currentStep}
           steps={steps}
           onAlreadyRegistered={() => setView("login")}
+          hostelSpacesLeft={hostelSpacesLeft}
         />
       )}
 

@@ -21,7 +21,7 @@ interface SidebarProps {
   hostelSpacesLeft?: number;
 }
 
-export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesLeft = 850 }: SidebarProps) {
+export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesLeft }: SidebarProps) {
   // Calculate progress percentage
   const completedSteps = steps.filter((step) => step.completed).length;
   const totalSteps = steps.length;
@@ -46,7 +46,9 @@ export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesL
 
   useEffect(() => {
     const calculateTimeToEvent = () => {
-      const eventDate = new Date('2026-04-30T00:00:00').getTime();
+      const eventDate = new Date(
+        process.env.NEXT_PUBLIC_EVENT_START_DATE || '2026-04-30T00:00:00'
+      ).getTime();
       const now = new Date().getTime();
       const difference = eventDate - now;
 
@@ -177,7 +179,7 @@ export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesL
         <div className="mt-auto hidden lg:block">
           <div className="bg-white/10 backdrop-blur-sm rounded-xl px-5 py-4 border border-white/20">
             <p className="text-white text-sm font-light">
-              <span className="font-semibold text-[64px]">{hostelSpacesLeft}</span> Hostel Spaces left.<br />
+              <span className="font-semibold text-[64px]">{hostelSpacesLeft ?? 'Limited'}</span> Hostel Spaces left.<br />
               Book your space now.
             </p>
           </div>

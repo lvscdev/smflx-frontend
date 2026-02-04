@@ -538,7 +538,9 @@ export function Dashboard({
       <div className="max-w-6xl mx-auto px-4 lg:px-8 py-6 lg:py-10">
         {/* Welcome */}
         <div className="mb-6">
-          <h1 className="text-2xl lg:text-3xl mb-1">Hello {firstName}</h1>
+          <h1 className="text-2xl lg:text-3xl text-gray-900 mb-1">
+            Hello {firstName}
+          </h1>
           <p className="text-gray-600 text-sm">
             Manage your WOTH Camp Meeting 2026 registration and view event
             details
@@ -625,10 +627,10 @@ export function Dashboard({
           <div className="bg-white rounded-3xl p-6 lg:p-8 flex flex-col justify-between">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg lg:text-xl font-semibold mb-1">
+                <h3 className="text-lg lg:text-xl font-semibold text-gray-900 mb-1">
                   You are registered for
                 </h3>
-                <h4 className="text-xl lg:text-2xl font-bold mb-4">
+                <h4 className="text-xl lg:text-2xl font-bold mb-4 text-gray-900">
                   {registration?.eventName || "WOTH Camp Meeting 2026"}
                 </h4>
 
@@ -788,7 +790,9 @@ export function Dashboard({
         <div className="grid lg:grid-cols-2 gap-6 mb-6">
           {/* Follow Us */}
           <div className="bg-white rounded-3xl p-6 lg:p-8">
-            <h3 className="text-lg lg:text-xl font-semibold mb-4">Follow Us</h3>
+            <h3 className="text-lg lg:text-xl font-semibold mb-4 text-gray-900">
+              Follow Us
+            </h3>
             <p className="text-gray-600 text-sm mb-5">
               Stay connected with us on social media
             </p>
@@ -846,7 +850,7 @@ export function Dashboard({
 
           {/* Stream Our Meetings */}
           <div className="bg-white rounded-3xl p-6 lg:p-8">
-            <h3 className="text-lg lg:text-xl font-semibold mb-4">
+            <h3 className="text-lg lg:text-xl font-semibold text-gray-900 mb-4">
               Stream Our Meetings
             </h3>
             <p className="text-gray-600 text-sm mb-5">

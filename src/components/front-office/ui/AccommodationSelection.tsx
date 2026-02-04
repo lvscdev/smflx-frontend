@@ -169,21 +169,28 @@ export function AccommodationSelection({
       const resolvedUserId = userId || profile?.userId || "";
       const resolvedRegId = registrationId || "";
 
+      let response;
+
       if (isHostel) {
-        await initiateHostelAllocation({
+        response = await initiateHostelAllocation({
           registrationId: resolvedRegId,
           eventId: eventId,
           userId: resolvedUserId,
           facilityid: selectedFacility?.facilityId || "",
         });
       } else {
-        await initiateHotelAllocation({
+        response = await initiateHotelAllocation({
           registrationId: resolvedRegId,
           eventId: eventId,
           userId: resolvedUserId,
           facilityId: selectedFacility?.facilityId || "",
           roomTypeId: selectedRoom?.roomTypeId || "",
         });
+      }
+
+      if (response?.checkoutUrl) {
+        window.location.href = response.checkoutUrl;
+        return;
       }
 
       const accommodationData: AccommodationData = {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { WhatsAppFloat } from "@/components/front-office/ui/WhatsAppFloat";
 import { Sidebar } from "@/components/front-office/ui/Sidebar";
 import { EmailVerification } from "@/components/front-office/ui/EmailVerification";
@@ -10,7 +11,6 @@ import { EventSelection } from "@/components/front-office/ui/EventSelection";
 import { EventRegistration } from "@/components/front-office/ui/EventRegistration";
 import { AccommodationSelection } from "@/components/front-office/ui/AccommodationSelection";
 import { Payment } from "@/components/front-office/ui/Payment";
-import { Dashboard } from "@/components/front-office/ui/Dashboard";
 
 import { getAuthToken, setAuthToken } from "@/lib/api/client";
 import { createUserRegistration, getAccommodations } from "@/lib/api";
@@ -22,8 +22,7 @@ type View =
   | "event-selection"
   | "event-registration"
   | "accommodation"
-  | "payment"
-  | "dashboard";
+  | "payment";
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 
@@ -56,6 +55,7 @@ function safeClearFlowState() {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const [view, setView] = useState<View>("verify");
 
   const [email, setEmail] = useState("");
@@ -76,30 +76,27 @@ export default function HomePage() {
     undefined,
   );
 
-  // ✅ Rehydrate session + resume flow if user already verified once (token exists)
   useEffect(() => {
     const token = getAuthToken();
     if (!token) return;
 
     const saved = safeLoadFlowState();
+    if (!saved) return;
 
-    if (saved) {
-      // restore data
-      setEmail(saved.email || "");
-      setProfile(saved.profile ?? null);
-      setSelectedEvent(saved.selectedEvent ?? null);
-      setRegistration(saved.registration ?? null);
-      setAccommodation(saved.accommodation ?? null);
-
-      // restore view (fallback to dashboard)
-      const nextView: View = saved.view || "dashboard";
-      setView(nextView);
+    if (saved.view === "dashboard") {
+      router.push("/dashboard");
       return;
     }
 
-    // token exists but no saved flow state => go to dashboard by default
-    setView("dashboard");
-  }, []);
+    setEmail(saved.email || "");
+    setProfile(saved.profile ?? null);
+    setSelectedEvent(saved.selectedEvent ?? null);
+    setRegistration(saved.registration ?? null);
+    setAccommodation(saved.accommodation ?? null);
+
+    const nextView: View = saved.view || "verify";
+    setView(nextView);
+  }, [router]);
 
   // ✅ Fetch hostel availability count on mount
   useEffect(() => {
@@ -128,7 +125,6 @@ export default function HomePage() {
     fetchHostelAvailability();
   }, [selectedEvent?.eventId]);
 
-  // ✅ Save progress (only after auth screens)
   useEffect(() => {
     if (view === "verify" || view === "login") return;
 
@@ -142,7 +138,6 @@ export default function HomePage() {
     });
   }, [view, email, profile, selectedEvent, registration, accommodation]);
 
-  // ✅ Only campers pay (from accommodation selection price)
   const paymentAmount = useMemo(() => {
     if (accommodation?.price) return accommodation.price;
     return 0;
@@ -169,29 +164,25 @@ export default function HomePage() {
         completed:
           view === "event-registration" ||
           view === "accommodation" ||
-          view === "payment" ||
-          view === "dashboard",
+          view === "payment",
       },
       {
         id: 4,
         title: "Register",
         description: "Attendance & preferences",
-        completed:
-          view === "accommodation" ||
-          view === "payment" ||
-          view === "dashboard",
+        completed: view === "accommodation" || view === "payment",
       },
       {
         id: 5,
         title: "Accommodation",
         description: "Pick where you'll stay",
-        completed: view === "payment" || view === "dashboard",
+        completed: view === "payment",
       },
       {
         id: 6,
         title: "Payment",
         description: "Complete registration",
-        completed: view === "dashboard",
+        completed: false,
       },
     ];
   }, [view]);
@@ -210,15 +201,13 @@ export default function HomePage() {
       case "accommodation":
         return 5;
       case "payment":
-      case "dashboard":
         return 6;
       default:
         return 1;
     }
   }, [view]);
 
-  // ✅ Sidebar visible until dashboard only
-  const showSidebar = view !== "dashboard";
+  const showSidebar = true;
 
   return (
     <div className="flex flex-col lg:flex-row h-screen w-full">
@@ -231,7 +220,6 @@ export default function HomePage() {
         />
       )}
 
-      {/* ✅ keep flex-col to preserve vertical centering of verification/login pages */}
       <div className="flex-1 min-h-0 flex flex-col overflow-y-auto bg-white">
         {view === "verify" && (
           <EmailVerification
@@ -247,7 +235,7 @@ export default function HomePage() {
           <ReturningUserLogin
             onLoginSuccess={(userEmail) => {
               if (userEmail) setEmail(userEmail);
-              setView("dashboard");
+              router.push("/dashboard");
             }}
             onCancel={() => setView("verify")}
           />
@@ -318,8 +306,6 @@ export default function HomePage() {
                   accommodationType,
                 });
 
-                console.log("Created registration:", created);
-
                 const next = {
                   ...data,
                   eventId: selectedEvent.eventId,
@@ -338,7 +324,15 @@ export default function HomePage() {
                   return;
                 }
 
-                setView("dashboard");
+                safeSaveFlowState({
+                  view: "dashboard",
+                  email,
+                  profile,
+                  selectedEvent,
+                  registration: next,
+                  accommodation,
+                });
+                router.push("/dashboard");
               } catch (e: any) {
                 setRegistrationPersistError(
                   e?.message ||
@@ -363,11 +357,6 @@ export default function HomePage() {
             onBack={() => setView("event-registration")}
             onComplete={async (data) => {
               setAccommodation(data);
-              if (data.isPaired) {
-                setView("dashboard");
-              } else {
-                setView("payment");
-              }
             }}
           />
         )}
@@ -376,30 +365,17 @@ export default function HomePage() {
           <Payment
             amount={paymentAmount}
             onBack={() => setView("accommodation")}
-            onComplete={() => setView("dashboard")}
-          />
-        )}
-
-        {view === "dashboard" && (
-          <Dashboard
-            userEmail={email}
-            profile={profile}
-            registration={registration}
-            accommodation={accommodation}
-            onLogout={() => {
-              setAuthToken(null);
-              safeClearFlowState();
-
-              setEmail("");
-              setProfile(null);
-              setSelectedEvent(null);
-              setRegistration(null);
-              setAccommodation(null);
-              setView("verify");
+            onComplete={() => {
+              safeSaveFlowState({
+                view: "dashboard",
+                email,
+                profile,
+                selectedEvent,
+                registration,
+                accommodation,
+              });
+              router.push("/dashboard");
             }}
-            onAccommodationUpdate={(data) => setAccommodation(data)}
-            onRegistrationUpdate={(data) => setRegistration(data)}
-            onProfileUpdate={(data) => setProfile(data)}
           />
         )}
       </div>

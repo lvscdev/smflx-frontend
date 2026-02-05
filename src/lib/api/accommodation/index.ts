@@ -1,9 +1,7 @@
 import { apiRequest } from "../client";
 import { AccommodationCategories, Facility, HotelRoom } from "./types";
 
-
 const ACCOMMODATION_BASE = "/accommodation";
-
 
 export async function listAccomodationCategories({
   eventId,
@@ -14,34 +12,28 @@ export async function listAccomodationCategories({
 
   return apiRequest<AccommodationCategories[]>(
     `${ACCOMMODATION_BASE}/categories/${id}`,
-    { method: "GET" }
+    { method: "GET" },
   );
 }
-
 
 export async function getAccommodationCategoryFacilities({
   categoryId,
 }: {
   categoryId: string;
 }) {
-  const qs = new URLSearchParams({ categoryId }).toString();
+  const id = encodeURIComponent(categoryId);
 
   return apiRequest<Facility[]>(
-    `${ACCOMMODATION_BASE}/facility/category?${qs}`,
-    { method: "GET" }
+    `${ACCOMMODATION_BASE}/facility/${id}`,
+
+    { method: "GET" },
   );
 }
 
-
-export async function getHotelRooms({
-  facilityId,
-}: {
-  facilityId: string;
-}) {
+export async function getHotelRooms({ facilityId }: { facilityId: string }) {
   const id = encodeURIComponent(facilityId);
 
-  return apiRequest<HotelRoom[]>(
-    `${ACCOMMODATION_BASE}/hotels/${id}`,
-    { method: "GET" }
-  );
+  return apiRequest<HotelRoom[]>(`${ACCOMMODATION_BASE}/hotels/${id}`, {
+    method: "GET",
+  });
 }

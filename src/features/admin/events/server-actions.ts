@@ -12,18 +12,6 @@ import { assertAdminSession } from "../auth/server-actions";
 
 const BASE_URL = "https://loveseal-events-backend.onrender.com/events";
 
-// export async function getEvents(): Promise<Event[]> {
-//   return fetchEvents();
-// }
-
-// export async function getEvent(eventId: string): Promise<Event> {
-//   return fetchEventById(eventId);
-// }
-
-// export async function getActiveEvent(): Promise<Event> {
-//   return fetchActiveEvent();
-// }
-
 export async function getAllEvents(): Promise<Event[]> {
   const token = (await cookies()).get("admin_session")?.value;
   console.log("Token:", token);
@@ -54,79 +42,6 @@ export async function getAllEvents(): Promise<Event[]> {
   // ✅ RETURN ARRAY ONLY
   return response.data.data ?? [];
 }
-
-// export async function getEventById(eventId: string): Promise<Event | null> {
-//   const token = (await cookies()).get("admin_session")?.value;
-//   if (!token) return null;
-
-//   const res = await fetch(`${BASE_URL}/${eventId}`, {
-//     headers: {
-//       accept: "application/json",
-//       Authorization: `Bearer ${token}`,
-//     },
-//     cache: "no-store",
-//   });
-
-//   if (!res.ok) {
-//     const text = await res.text();
-//     console.error("Fetch event by ID failed:", res.status, text);
-//     return null;
-//   }
-
-//   const response = await res.json();
-//   console.log("Event by ID Response:", response);
-
-//   return response.data ?? null;
-// }
-//   const res = await fetch(BASE_URL, {
-//     headers: {
-//       accept: "application/json",
-//       Authorization: `Bearer ${token}`,
-//     },
-//     cache: "no-store",
-//   });
-
-//   if (!res.ok) {
-//     throw new Error("Failed to fetch events");
-//   }
-
-//   const json = await res.json();
-
-//   // assuming backend returns { data: Event[] }
-//   return json.data;
-// }
-
-// export async function createEvent(input: {
-//   eventYear: string;
-//   eventName: string;
-//   startDate: string;
-//   endDate: string;
-//   registrationOpenAt: string;
-//   registrationCloseAt: string;
-//   accommodationNeeded: boolean;
-// }) {
-//   const res = await fetch(`${BASE_URL}`, {
-//     method: "POST",
-//     headers: {
-//       ...(await authHeaders()),
-//       "Content-Type": "application/json",
-//     },
-//     body: JSON.stringify({
-//       ...input,
-//       eventStatus: "DRAFT",
-//     }),
-//   });
-
-//   if (!res.ok) {
-//     throw new Error("Failed to create event");
-//   }
-
-//   revalidatePath("/admin/events");
-// }
-
-// import { revalidatePath } from "next/cache";
-
-// const BASE_URL = "https://loveseal-events-backend.onrender.com/events";
 
 export async function createEventAction(formValues: unknown) {
   // 🔐 validate again on the server (important)
@@ -167,26 +82,7 @@ export async function createEventAction(formValues: unknown) {
   revalidatePath("/admin/events");
 }
 
-// export async function updateEvent(id: string, data: Partial<Event>) {
-//   const res = await fetch(`${BASE_URL}/${id}`, {
-//     method: "PUT",
-//     headers: {
-//       ...(await authHeaders()),
-//       "Content-Type": "application/json",
-//     },
-//     body: JSON.stringify(data),
-//   });
-
-//   if (!res.ok) throw new Error("Failed to update event");
-
-//   revalidatePath("/admin/events");
-// }
-
-import { z } from "zod";
-
-/**
- * Utility: combine date + time → ISO string
- */
+// Utility: combine date + time → ISO string
 function toIso(date: string, time?: string) {
   const value = time ? `${date}T${time}` : date;
   return new Date(value).toISOString();

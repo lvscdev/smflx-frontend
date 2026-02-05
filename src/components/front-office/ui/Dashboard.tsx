@@ -32,7 +32,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AccommodationSelection } from "./AccommodationSelection";
-import { Payment } from "./Payment";
 import { DependentsBanner } from "./DependentsBanner";
 import { DependentsModal } from "./DependentsModal";
 import { DependentsPaymentModal } from "./DependentsPaymentModal";
@@ -97,10 +96,17 @@ export function Dashboard({
         data?.dependants ||
         data?.dependents ||
         data?.dependentRegistrations ||
+        data?.dependantsData ||
         [];
-      if (Array.isArray(deps)) {
+      const depsData = Array.isArray(deps)
+        ? deps
+        : Array.isArray(data?.dependants?.dependantsData)
+          ? data.dependants.dependantsData
+          : [];
+
+      if (Array.isArray(depsData)) {
         setDependents(
-          deps.map((d: any) => ({
+          depsData.map((d: any) => ({
             id: d?.id || d?.dependantId || crypto.randomUUID(),
             name: d?.name,
             age: d?.age,
@@ -113,12 +119,46 @@ export function Dashboard({
         setDependents([]);
       }
 
-      // Optionally hydrate profile from API
-      if (data?.user && typeof data.user === "object") {
-        setLocalProfile((prev: any) => ({ ...prev, ...data.user }));
+      // Hydrate profile from API (dashboard response uses top-level fields)
+      if (data && typeof data === "object") {
+        setLocalProfile((prev: any) => ({
+          ...prev,
+          firstName: data?.firstName ?? prev?.firstName,
+          lastName: data?.lastName ?? prev?.lastName,
+          email: data?.email ?? prev?.email,
+          phoneNumber: data?.phoneNumber ?? prev?.phoneNumber,
+          gender: data?.gender ?? prev?.gender,
+          ageRange: data?.ageRange ?? prev?.ageRange,
+          userId: data?.userId ?? prev?.userId,
+        }));
       }
+
+      // Registration + accommodation are the source of truth for camper payment status
+      const nextRegistration: any = {
+        ...(registration || {}),
+        userId: data?.userId ?? registration?.userId,
+        regId: data?.regId ?? registration?.regId,
+        attendanceType: data?.attendanceType ?? registration?.attendanceType,
+        attendeeType:
+          (data?.attendanceType || registration?.attendeeType || "")
+            .toString()
+            .toLowerCase() || registration?.attendeeType,
+        eventId: data?.eventData?.eventId ?? registration?.eventId,
+        eventTitle: data?.eventData?.eventTitle ?? registration?.eventTitle,
+        eventDate: data?.eventData?.date ?? registration?.eventDate,
+        mealTicket: data?.mealTicket ?? registration?.mealTicket,
+      };
+
+      onRegistrationUpdate?.(nextRegistration);
+
+      if (data?.accommodation && typeof data.accommodation === "object") {
+        onAccommodationUpdate?.(data.accommodation);
+      }
+
+      return data;
     } catch (err: any) {
       setDashboardLoadError(toUserMessage(err, { feature: "generic" }));
+      return null;
     } finally {
       setDashboardHydrating(false);
     }
@@ -127,6 +167,67 @@ export function Dashboard({
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
+  // If user just returned from Korapay checkout, auto-refresh/poll the dashboard until payment status updates.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const attendee =
+      (registration?.attendanceType || registration?.attendeeType || "")
+        .toString()
+        .toUpperCase();
+    const isCamper =
+      attendee === "CAMPER" || attendee === "CAMPERS" || attendee === "CAMPER ";
+
+    if (!isCamper) return;
+
+    let flag = "0";
+    try {
+      flag = localStorage.getItem("smflx_pending_accommodation_payment") || "0";
+    } catch {
+      // ignore
+    }
+
+    const requiresAccommodation = accommodation?.requiresAccommodation === true;
+    const paidForAccommodation = accommodation?.paidForAccommodation === true;
+
+    if (!(flag === "1" || (requiresAccommodation && !paidForAccommodation))) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 25; // ~75s
+
+    const tick = async () => {
+      if (cancelled) return;
+      attempts += 1;
+
+      const latest = await reloadDashboard();
+      const latestPaid = latest?.accommodation?.paidForAccommodation === true;
+
+      if (latestPaid) {
+        try {
+          localStorage.removeItem("smflx_pending_accommodation_payment");
+        } catch {
+          // ignore
+        }
+        return;
+      }
+
+      if (attempts >= maxAttempts) return;
+      setTimeout(tick, 3000);
+    };
+
+    tick();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    registration?.attendanceType,
+    registration?.attendeeType,
+    accommodation?.requiresAccommodation,
+    accommodation?.paidForAccommodation,
+  ]);
+
 
   // Accommodation modal state
   const [isAccommodationModalOpen, setIsAccommodationModalOpen] =
@@ -134,7 +235,6 @@ export function Dashboard({
   const [modalStep, setModalStep] = useState(1); // 1: Type selection, 2: Facility selection, 3: Payment
   const [selectedAccommodationType, setSelectedAccommodationType] =
     useState("");
-  const [accommodationData, setAccommodationData] = useState<any>(null);
 
   // Availability summary (best-effort) for the accommodation type picker.
   // Note: the current API docs expose facility `totalCapacity` + `available` but do not expose
@@ -299,29 +399,25 @@ export function Dashboard({
   const isNonCamper = attendeeType === "physical" || attendeeType === "online";
   const showAccommodationPromo = isNonCamper && !accommodation;
 
+  // Camper accommodation payment state (from dashboard API)
+  const paidForAccommodation = accommodation?.paidForAccommodation === true;
+
   const handleAccommodationType = (type: string) => {
     setSelectedAccommodationType(type);
     setModalStep(2);
   };
 
   const handleFacilitySelection = (data: any) => {
-    setAccommodationData(data);
-    setModalStep(3);
+    // AccommodationSelection triggers Korapay checkout directly.
+    // Save selection snapshot for UI, then close modal.
+    onAccommodationUpdate?.(data);
+    resetModal();
   };
 
   const resetModal = () => {
     setIsAccommodationModalOpen(false);
     setModalStep(1);
     setSelectedAccommodationType("");
-    setAccommodationData(null);
-  };
-
-  const handlePaymentComplete = () => {
-    onAccommodationUpdate?.(accommodationData);
-
-    onRegistrationUpdate?.({ ...registration, attendeeType: "camper" });
-
-    resetModal();
   };
 
   const handleModalClose = () => resetModal();
@@ -677,9 +773,18 @@ export function Dashboard({
                   Accommodation Details
                 </h3>
               </div>
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
-                Reserved
-              </span>
+              <span
+                className={
+                   "px-3 py-1 text-sm rounded-full " +
+                (paidForAccommodation
+                  ? "bg-gray-100 text-gray-700"
+                  : "bg-amber-50 text-amber-800 border border-amber-200")
+                }
+                >
+                {paidForAccommodation ? "Reserved" : "Pending Payment"}
+                </span>
+
+
             </div>
 
             <div className="grid lg:grid-cols-2 gap-6 items-center">
@@ -687,7 +792,7 @@ export function Dashboard({
                 <div>
                   <span className="text-sm text-gray-500 block mb-2">Type</span>
                   <span className="text-base font-semibold capitalize">
-                    {accommodation.type || "Hostel"}
+                    {(accommodation.accommodationType || accommodation.type || "Hostel")}
                   </span>
                 </div>
                 <div>
@@ -716,6 +821,44 @@ export function Dashboard({
                 />
               </div>
             </div>
+
+            {attendeeType === "camper" && accommodation && (
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                <div className="text-sm text-gray-600">
+                  {paidForAccommodation
+                    ? "Payment confirmed. Your accommodation is reserved."
+                    : "Payment not confirmed yet. If you just completed checkout, this may take a moment."}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={reloadDashboard}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                  >
+                    <RefreshCcw
+                      className={
+                        dashboardHydrating
+                          ? "w-4 h-4 animate-spin"
+                          : "w-4 h-4"
+                      }
+                    />
+                    Refresh
+                  </button>
+
+                  {!paidForAccommodation && (
+                    <button
+                      onClick={() => {
+                        setIsAccommodationModalOpen(true);
+                        setModalStep(1);
+                      }}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Continue to Payment
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -917,9 +1060,7 @@ export function Dashboard({
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl lg:text-2xl font-semibold">
                 {modalStep === 1 && "Select Accommodation Type"}
-                {modalStep === 2 && "Camp Accommodation"}
-                {modalStep === 3 && "Payment"}
-              </h2>
+                {modalStep === 2 && "Camp Accommodation"}              </h2>
               <button
                 onClick={handleModalClose}
                 className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
@@ -995,17 +1136,6 @@ export function Dashboard({
                   profile={localProfile}
                   onComplete={handleFacilitySelection}
                   onBack={handleModalBack}
-                />
-              )}
-
-              {modalStep === 3 && (
-                <Payment
-                  amount={accommodationData?.price || 250}
-                  onComplete={handlePaymentComplete}
-                  onBack={handleModalBack}
-                  profile={localProfile}
-                  accommodation={accommodationData}
-                  registration={registration}
                 />
               )}
             </div>

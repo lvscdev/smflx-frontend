@@ -14,6 +14,27 @@ import {
 } from "@/lib/api/accommodation";
 import { Facility, HotelRoom } from "@/lib/api/accommodation/types";
 
+
+const FLOW_STATE_KEY = "smflx_flow_state_v1";
+
+function safeLoadFlowState() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(FLOW_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeSaveFlowState(state: any) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(FLOW_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore
+  }
+}
 interface AccommodationData {
   type: string;
   facilityId?: string;
@@ -189,6 +210,30 @@ export function AccommodationSelection({
       }
 
       if (response?.checkoutUrl) {
+        // Mark pending accommodation payment so dashboard can auto-refresh/poll after return.
+        try {
+          localStorage.setItem("smflx_pending_accommodation_payment", "1");
+        } catch {
+          // ignore
+        }
+
+        // Persist a minimal accommodation snapshot in flow state so UI shows type immediately.
+        try {
+          const saved = safeLoadFlowState() || {};
+          const snapshot = {
+            ...(saved.accommodation || {}),
+            requiresAccommodation: true,
+            paidForAccommodation: false,
+            accommodationType: accommodationType,
+            facility: selectedFacility?.facilityName || selectedFacility?.facilityId || "",
+            // Hotel rooms use `roomType` (not `roomTypeName`). Hostels don't select rooms/bedspaces in this UI.
+            room: selectedRoom?.roomType || selectedRoom?.roomTypeId || "",
+          };
+          safeSaveFlowState({ ...saved, accommodation: snapshot });
+        } catch {
+          // ignore
+        }
+
         window.location.href = response.checkoutUrl;
         return;
       }

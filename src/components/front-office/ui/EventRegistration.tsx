@@ -104,7 +104,7 @@ function GridOption({
 }
 
 export function EventRegistration({
-  eventId: _eventId,
+  eventId,
   onComplete,
   onBack,
   initialData,
@@ -131,7 +131,10 @@ export function EventRegistration({
   const loadAccommodations = async () => {
     setLoadingAccommodations(true);
     try {
-      const data = await listAccomodationCategories();
+      if (!eventId) {
+          throw new Error("Missing eventId for accommodation categories");
+        }
+        const data = await listAccomodationCategories({ eventId });
 
       setAccommodationCategories(data);
     } catch (error) {

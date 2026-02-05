@@ -21,10 +21,8 @@ export async function getAccommodationCategoryFacilities({
 }: {
   categoryId: string;
 }) {
-  const id = encodeURIComponent(categoryId);
-
   return apiRequest<Facility[]>(
-    `${ACCOMMODATION_BASE}/facility/${id}`,
+    `${ACCOMMODATION_BASE}/facility/${categoryId}`,
 
     { method: "GET" },
   );

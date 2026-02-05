@@ -1,22 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-/**
- * Minimal API client for SMFLX Stage 1/2 integrations.
- *
- * - Uses NEXT_PUBLIC_API_BASE_URL when provided
- * - Falls back to Render backend base URL
- * - Attaches token from localStorage/cookie (smflx_token) when available
- *
- * NOTE:
- * In browser we default to Next.js proxy `/api` to avoid CORS against Render.
- */
-
 export const DEFAULT_API_BASE_URL = (() => {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  const env = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+
+  // Guard against accidental proxy values like "/api" or ".../api"
+  if (!env || env === "/api" || env.endsWith("/api")) {
+    return "https://loveseal-events-backend.onrender.com";
   }
 
-  return "https://loveseal-events-backend.onrender.com";
+  return env.replace(/\/$/, "");
 })();
 
 export type ApiEnvelope<T> = {
@@ -72,8 +62,29 @@ export function setAuthToken(token: string | null) {
   }
 }
 
+export function getStoredUser<T = any>(): T | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = localStorage.getItem(AUTH_USER_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredUser(user: any | null) {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (!user) localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+    else localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    // ignore
+  }
+}
+
 function normalizeToken(raw: string): string {
-  // Ensure we store/send the raw JWT only (no "Bearer " prefix).
   return raw.trim().replace(/^bearer\s+/i, "");
 }
 
@@ -92,12 +103,10 @@ export async function apiRequest<T>(
 
   const method = (opts?.method || "GET").toUpperCase();
 
-  // Build headers
   const headers: Record<string, string> = {
     ...(opts?.headers || {}),
   };
 
-  // Only set Content-Type when there is a JSON body
   const hasBody = opts?.body != null && method !== "GET" && method !== "HEAD";
   if (hasBody) {
     headers["Content-Type"] = "application/json";
@@ -121,16 +130,9 @@ export async function apiRequest<T>(
 
   let res = await doFetch(headers);
 
-  /**
-   * If backend auth middleware is incorrectly verifying the entire Authorization header string
-   * instead of stripping "Bearer ", it will reject the bearer format.
-   *
-   * Retry once with raw token ONLY (no "Bearer " prefix).
-   */
   if (res.status === 401 && auth && rawToken) {
     const retryHeaders: Record<string, string> = { ...(opts?.headers || {}) };
 
-    // Keep Content-Type behavior consistent
     if (hasBody) retryHeaders["Content-Type"] = "application/json";
 
     retryHeaders["Authorization"] = rawToken;
@@ -150,7 +152,6 @@ export async function apiRequest<T>(
     throw new ApiError(msg, { status: res.status, code: json?.code, details: json });
   }
 
-  // Most endpoints wrap in { code, message, data }
   if (json && typeof json === "object" && "data" in json) {
     return (json as ApiEnvelope<T>).data as T;
   }

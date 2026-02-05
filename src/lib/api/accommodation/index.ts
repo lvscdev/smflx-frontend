@@ -1,15 +1,21 @@
 import { apiRequest } from "../client";
 import { AccommodationCategories, Facility, HotelRoom } from "./types";
 
-export async function listAccomodationCategories({ eventId }: { eventId: string }) {
-  const res = await apiRequest<AccommodationCategories[]>(
-    `/accommodation/categories?eventId=${encodeURIComponent(eventId)}`,
-    {
-      method: "GET",
-    },
-  );
 
-  return res;
+const ACCOMMODATION_BASE = "/accommodation";
+
+
+export async function listAccomodationCategories({
+  eventId,
+}: {
+  eventId: string;
+}) {
+  const id = encodeURIComponent(eventId);
+
+  return apiRequest<AccommodationCategories[]>(
+    `${ACCOMMODATION_BASE}/categories/${id}`,
+    { method: "GET" }
+  );
 }
 
 
@@ -18,23 +24,24 @@ export async function getAccommodationCategoryFacilities({
 }: {
   categoryId: string;
 }) {
-  const res = await apiRequest<Facility[]>(
-    `/accommodation/facility/${categoryId}`,
-    {
-      method: "GET",
-    },
-  );
+  const qs = new URLSearchParams({ categoryId }).toString();
 
-  return res;
+  return apiRequest<Facility[]>(
+    `${ACCOMMODATION_BASE}/facility/category?${qs}`,
+    { method: "GET" }
+  );
 }
 
-export async function getHotelRooms({ facilityId }: { facilityId: string }) {
-  const res = await apiRequest<HotelRoom[]>(
-    `/accommodation/hotels/${facilityId}`,
-    {
-      method: "GET",
-    },
-  );
 
-  return res;
+export async function getHotelRooms({
+  facilityId,
+}: {
+  facilityId: string;
+}) {
+  const id = encodeURIComponent(facilityId);
+
+  return apiRequest<HotelRoom[]>(
+    `${ACCOMMODATION_BASE}/hotels/${id}`,
+    { method: "GET" }
+  );
 }

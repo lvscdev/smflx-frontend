@@ -1,7 +1,6 @@
 export const DEFAULT_API_BASE_URL = (() => {
   const env = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
-  // Guard against accidental proxy values like "/api" or ".../api"
   if (!env || env === "/api" || env.endsWith("/api")) {
     return "https://loveseal-events-backend.onrender.com";
   }

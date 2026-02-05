@@ -156,7 +156,7 @@ export async function getAccommodations(params: {
     });
 
     return apiRequest<GetAccommodationsResponse>(
-      `/accommodations?${queryParams.toString()}`,
+      `/accommodation?${queryParams.toString()}`,
       { method: 'GET' }
     );
   }

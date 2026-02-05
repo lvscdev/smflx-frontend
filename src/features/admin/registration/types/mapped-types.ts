@@ -8,7 +8,7 @@ import {
 } from "./api-types";
 
 export interface Registration {
-  id: string;
+  userId: string;
   eventId: string;
 
   user: {

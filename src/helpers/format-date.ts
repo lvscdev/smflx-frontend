@@ -1,7 +1,7 @@
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr);
   const options: Intl.DateTimeFormatOptions = {
-    month: "long",
+    month: "short",
     day: "numeric",
   };
   return date.toLocaleDateString("en-US", options);

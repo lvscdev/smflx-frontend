@@ -21,16 +21,17 @@ import SendNotificationModal from "./send-notifications-modal";
 import { StatsCard } from "./registration-stats";
 import { RegistrationsFilters } from "./filters";
 
-import { EventYear } from "@/app/api/event";
-import { Registration } from "@/features/admin/registration/mapped-types"; // ✅ ADD THIS
+import { Registration } from "@/features/admin/registration/types/mapped-types"; // ✅ ADD THIS
 import { AddRegistrationModal } from "./add-registration/add-registration-modal";
 
 export default function RegistrationsClient({
   eventId,
+  // event,
   data,
   totalPages,
 }: {
   eventId: string;
+  // event: any;
   data: Registration[];
   totalPages: number;
 }) {
@@ -85,7 +86,7 @@ export default function RegistrationsClient({
         </div>
         <div className="flex justify-between">
           <div>
-            <h6 className="font-bold text-xl">Registration Management</h6>
+            <h6 className="font-bold text-xl">Registration</h6>
             <p className="text-slate-500">
               View and manage all event registrations
             </p>

@@ -44,6 +44,7 @@ export function CreateEventModal({ children }: { children: ReactNode }) {
     defaultValues: {
       eventName: "",
       year: new Date().getFullYear(),
+      venue: "",
       startDate: "",
       endDate: "",
       registrationOpens: "",
@@ -139,6 +140,23 @@ export function CreateEventModal({ children }: { children: ReactNode }) {
                     />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="venue"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-slate-950">Venue</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter event venue"
+                      {...field}
+                      className="border-slate-300 shadow-xs"
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

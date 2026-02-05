@@ -83,7 +83,9 @@
 // }
 
 import { cookies } from "next/headers";
-import { Registration } from "./mapped-types";
+
+import { Registration } from "./types/mapped-types";
+import { RegistrationTableUi } from "./types/registration-ui";
 
 const BASE_URL = "https://loveseal-events-backend.onrender.com";
 
@@ -92,16 +94,123 @@ type GetRegistrationsArgs = {
   page: number;
 };
 
+async function getUserProfile(userId: string, token: string) {
+  const res = await fetch(`${BASE_URL}/user/${userId}`, {
+    headers: {
+      accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    console.error("Failed to fetch user", userId);
+    return null;
+  }
+
+  const json = await res.json();
+  return json.data?.profileInfo ?? null;
+}
+
+// export async function getRegistrationsPaginated({
+//   eventId,
+//   page,
+// }: GetRegistrationsArgs): Promise<{
+//   data: Registration[];
+//   totalPages: number;
+// }> {
+//   const token = (await cookies()).get("admin_session")?.value;
+//   if (!token) return { data: [], totalPages: 1 };
+
+//   const res = await fetch(
+//     `${BASE_URL}/registrations/event/${eventId}?page=${page}`,
+//     {
+//       headers: {
+//         accept: "application/json",
+//         Authorization: `Bearer ${token}`,
+//       },
+//       cache: "no-store",
+//     },
+//   );
+
+//   if (!res.ok) {
+//     const text = await res.text();
+//     console.error("Fetch registrations failed:", res.status, text);
+//     throw new Error("Failed to fetch registrations");
+//   }
+
+//   const response = await res.json();
+//   console.log("RESPONSE:", response.data.data);
+
+//   return {
+//     data: response.data.data ?? [],
+//     totalPages: response.data.meta?.totalPages ?? 1,
+//   };
+// }
+
+// export async function getRegistrationsPaginated({
+//   eventId,
+//   page,
+// }: {
+//   eventId: string;
+//   page: number;
+// }): Promise<{
+//   data: RegistrationTableUi[];
+//   totalPages: number;
+// }> {
+//   const token = (await cookies()).get("admin_session")?.value;
+//   if (!token) return { data: [], totalPages: 1 };
+
+//   const res = await fetch(
+//     `${BASE_URL}/registrations/event/${eventId}?page=${page}`,
+//     {
+//       headers: {
+//         accept: "application/json",
+//         Authorization: `Bearer ${token}`,
+//       },
+//       cache: "no-store",
+//     },
+//   );
+
+//   if (!res.ok) throw new Error("Failed to fetch registrations");
+
+//   const response = await res.json();
+//   const registrations: Registration[] = response.data.data ?? [];
+
+//   // ✅ Enrich users in parallel (NO N+1 waterfalls)
+//   const enriched = await Promise.all(
+//     registrations.map(async r => {
+//       const user = await getUserInfo(r.user.userId, token);
+
+//       return {
+//         ...r,
+//         user: {
+//           userId: user.id,
+//           name: user.name,
+//           email: user.email,
+//           gender: user.gender,
+//         },
+//       };
+//     }),
+//   );
+
+//   return {
+//     data: enriched,
+//     totalPages: response.data.meta?.totalPages ?? 1,
+//   };
+// }
+
 export async function getRegistrationsPaginated({
   eventId,
   page,
 }: GetRegistrationsArgs): Promise<{
-  data: Registration[];
+  data: RegistrationTableUi[];
   totalPages: number;
 }> {
   const token = (await cookies()).get("admin_session")?.value;
   if (!token) return { data: [], totalPages: 1 };
 
+  // Fetching registrations
   const res = await fetch(
     `${BASE_URL}/registrations/event/${eventId}?page=${page}`,
     {
@@ -113,16 +222,30 @@ export async function getRegistrationsPaginated({
     },
   );
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Fetch registrations failed:", res.status, text);
-    throw new Error("Failed to fetch registrations");
-  }
+  if (!res.ok) throw new Error("Failed to fetch registrations");
 
   const response = await res.json();
+  const registrations: Registration[] = response.data.data ?? [];
+
+  // Enrich registration table with user profile info
+  const enriched = await Promise.all(
+    registrations.map(async r => {
+      const profile = await getUserProfile(r.userId, token);
+
+      return {
+        ...r,
+        user: {
+          id: profile.userId,
+          fullName: `${profile.firstName} ${profile.lastName}`,
+          email: profile.email,
+          gender: profile.gender,
+        },
+      };
+    }),
+  );
 
   return {
-    data: response.data.data ?? [],
+    data: enriched,
     totalPages: response.data.meta?.totalPages ?? 1,
   };
 }

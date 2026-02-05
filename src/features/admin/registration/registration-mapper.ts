@@ -1,6 +1,11 @@
 // src/lib/registration-mappers.ts
 
-import { ParticipationMode, PaymentStatus, Gender } from "./api-types";
+import {
+  ParticipationMode,
+  PaymentStatus,
+  Gender,
+  AccommodationType,
+} from "./types/api-types";
 
 export const participationModeLabel: Record<ParticipationMode, string> = {
   CAMPER: "Camper",
@@ -17,6 +22,12 @@ export const paymentStatusLabel: Record<PaymentStatus, string> = {
 export const genderLabel: Record<Gender, string> = {
   MALE: "Male",
   FEMALE: "Female",
+};
+
+export const accommodationTypeLabel: Record<AccommodationType, string> = {
+  HOSTEL: "Hostel",
+  HOTEL: "Hotel",
+  SHARED_APARTMENT: "Shared Apartment",
 };
 
 export const paymentStatusBadgeClass: Record<PaymentStatus, string> = {

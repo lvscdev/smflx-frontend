@@ -72,6 +72,7 @@ export const createEventSchema = z
       .min(1, "Event name is required")
       .min(3, "Event name must be at least 3 characters"),
     year: z.number().min(2000, "Enter a valid year").int(),
+    venue: z.string().min(1, "Venue is required"),
     startDate: z.string().min(1, "Start date is required"),
     endDate: z.string().min(1, "End date is required"),
     registrationOpens: z.string().min(1, "Registration date is required"),

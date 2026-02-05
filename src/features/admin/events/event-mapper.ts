@@ -16,6 +16,7 @@ export function mapCreateEventFormToApi(
   return {
     eventName: values.eventName,
     eventYear: String(values.year),
+    venue: String(values.venue),
 
     startDate: toDateTime(values.startDate),
     endDate: toDateTime(values.endDate),

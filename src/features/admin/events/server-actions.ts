@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 // import { fetchEvents, fetchEventById, fetchActiveEvent } from "./api";
 import { Event } from "./types";
 import { authHeaders } from "./auth";
-import { cookies } from "next/headers";
 import { mapCreateEventFormToApi } from "./event-mapper";
 import { createEventSchema, editEventSchema } from "./event-form-schema";
 
@@ -55,10 +55,29 @@ export async function getAllEvents(): Promise<Event[]> {
   return response.data.data ?? [];
 }
 
-// export async function getAllEvents(): Promise<Event[]> {
+// export async function getEventById(eventId: string): Promise<Event | null> {
 //   const token = (await cookies()).get("admin_session")?.value;
-//   if (!token) throw new Error("Unauthorized");
+//   if (!token) return null;
 
+//   const res = await fetch(`${BASE_URL}/${eventId}`, {
+//     headers: {
+//       accept: "application/json",
+//       Authorization: `Bearer ${token}`,
+//     },
+//     cache: "no-store",
+//   });
+
+//   if (!res.ok) {
+//     const text = await res.text();
+//     console.error("Fetch event by ID failed:", res.status, text);
+//     return null;
+//   }
+
+//   const response = await res.json();
+//   console.log("Event by ID Response:", response);
+
+//   return response.data ?? null;
+// }
 //   const res = await fetch(BASE_URL, {
 //     headers: {
 //       accept: "application/json",

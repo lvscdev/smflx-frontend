@@ -19,13 +19,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RegistrationActions } from "./registration-actions";
-import { Registration } from "@/features/admin/registration/mapped-types";
+import { Registration } from "@/features/admin/registration/types/mapped-types";
 
 import {
   participationModeLabel,
   genderLabel,
   paymentStatusLabel,
   paymentStatusBadgeClass,
+  accommodationTypeLabel,
 } from "@/features/admin/registration/registration-mapper";
 
 function getColumns(isReadOnly: boolean): ColumnDef<Registration>[] {
@@ -74,7 +75,8 @@ function getColumns(isReadOnly: boolean): ColumnDef<Registration>[] {
     {
       accessorKey: "accommodation",
       header: "Accommodation",
-      cell: ({ row }) => row.original.accommodationType ?? "—",
+      cell: ({ row }) =>
+        accommodationTypeLabel[row.original.accommodationType ?? "—"],
     },
     {
       id: "actions",

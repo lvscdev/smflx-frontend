@@ -59,6 +59,7 @@ import { getRegistrationsPaginated } from "@/features/admin/registration/server-
 import RegistrationsClient from "@/components/admin/registrations/registration-client";
 import RegistrationsLoading from "./loading";
 import page from "../../page";
+// import { getEventById } from "@/features/admin/events/server-actions";
 
 type PageProps = {
   params: Promise<{ eventId: string }>;
@@ -80,10 +81,13 @@ export default async function RegistrationsPage({
     page,
   });
 
+  // const event = await getEventById(eventId);
+
   return (
     <Suspense fallback={<RegistrationsLoading />}>
       <RegistrationsClient
         eventId={eventId}
+        // event={event}
         data={data}
         totalPages={totalPages}
       />

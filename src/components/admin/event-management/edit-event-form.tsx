@@ -11,6 +11,15 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,6 +83,13 @@ export function EditEventForm({
       );
     }
   };
+
+  const canEditStatus = event.eventStatus === "DRAFT";
+  const EVENT_STATUS_OPTIONS = [
+    { value: "DRAFT", label: "Open" },
+    { value: "ACTIVE", label: "Ongoing" },
+    { value: "CLOSED", label: "Ended" },
+  ] as const;
 
   return (
     <Form {...form}>
@@ -192,6 +208,65 @@ export function EditEventForm({
                 <FormLabel>Time</FormLabel>
                 <FormControl>
                   <Input type="time" {...field} disabled={disabled} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="accommodationNeeded"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Accommodation</FormLabel>
+                <FormControl>
+                  <Select
+                    disabled={disabled || !canEditStatus}
+                    value={field.value ? "yes" : "no"}
+                    onValueChange={value => field.onChange(value === "yes")}
+                  >
+                    <SelectTrigger className="border-slate-300 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      <SelectItem value="yes">Yes</SelectItem>
+                      <SelectItem value="no">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Event Status</FormLabel>
+                <FormControl>
+                  <Select
+                    disabled={disabled || !canEditStatus}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger className="border-slate-300 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {EVENT_STATUS_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </FormControl>
                 <FormMessage />
               </FormItem>

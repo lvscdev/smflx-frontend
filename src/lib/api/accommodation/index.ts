@@ -2,9 +2,8 @@ import { apiRequest } from "../client";
 import { AccommodationCategories, Facility, HotelRoom } from "./types";
 
 export async function listAccomodationCategories({ eventId }: { eventId: string }) {
-  const qs = new URLSearchParams({ eventId }).toString();
   const res = await apiRequest<AccommodationCategories[]>(
-    `/accommodation/categories?${qs}`,
+    `/accommodation/categories?eventId=${encodeURIComponent(eventId)}`,
     {
       method: "GET",
     },
@@ -12,6 +11,7 @@ export async function listAccomodationCategories({ eventId }: { eventId: string 
 
   return res;
 }
+
 
 export async function getAccommodationCategoryFacilities({
   categoryId,

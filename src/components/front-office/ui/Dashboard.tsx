@@ -167,69 +167,7 @@ export function Dashboard({
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
-  // If user just returned from Korapay checkout, auto-refresh/poll the dashboard until payment status updates.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const attendee =
-      (registration?.attendanceType || registration?.attendeeType || "")
-        .toString()
-        .toUpperCase();
-    const isCamper =
-      attendee === "CAMPER" || attendee === "CAMPERS" || attendee === "CAMPER ";
-
-    if (!isCamper) return;
-
-    let flag = "0";
-    try {
-      flag = localStorage.getItem("smflx_pending_accommodation_payment") || "0";
-    } catch {
-      // ignore
-    }
-
-    const requiresAccommodation = accommodation?.requiresAccommodation === true;
-    const paidForAccommodation = accommodation?.paidForAccommodation === true;
-
-    if (!(flag === "1" || (requiresAccommodation && !paidForAccommodation))) return;
-
-    let cancelled = false;
-    let attempts = 0;
-    const maxAttempts = 25; // ~75s
-
-    const tick = async () => {
-      if (cancelled) return;
-      attempts += 1;
-
-      const latest = await reloadDashboard();
-      const latestPaid = latest?.accommodation?.paidForAccommodation === true;
-
-      if (latestPaid) {
-        try {
-          localStorage.removeItem("smflx_pending_accommodation_payment");
-        } catch {
-          // ignore
-        }
-        return;
-      }
-
-      if (attempts >= maxAttempts) return;
-      setTimeout(tick, 3000);
-    };
-
-    tick();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    registration?.attendanceType,
-    registration?.attendeeType,
-    accommodation?.requiresAccommodation,
-    accommodation?.paidForAccommodation,
-  ]);
-
-
-  // Accommodation modal state
+// Accommodation modal state
   const [isAccommodationModalOpen, setIsAccommodationModalOpen] =
     useState(false);
   const [modalStep, setModalStep] = useState(1); // 1: Type selection, 2: Facility selection, 3: Payment

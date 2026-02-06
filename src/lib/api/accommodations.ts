@@ -205,3 +205,24 @@ export async function cancelAccommodationBooking(bookingId: string) {
     { method: 'DELETE' }
   );
 }
+
+/**
+ * Get remaining hostel capacity (unoccupied bed spaces).
+ * This endpoint is public (no auth required).
+ *
+ * @returns capacityLeft (number) or null when unavailable
+ */
+export async function getHostelUnoccupiedCapacity(): Promise<number | null> {
+  const url =
+    'https://loveseal-events-backend.onrender.com/accommodation/hostel/unoccupied';
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { accept: '*/*' },
+  });
+
+  const json = (await res.json().catch(() => null)) as any;
+  const raw = json?.data?.capacityLeft;
+  const left = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(left) ? left : null;
+}

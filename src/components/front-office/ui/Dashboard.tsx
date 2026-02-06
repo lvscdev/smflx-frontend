@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import type { Dependent as ModalDependent } from "./DependentsModal";
+import { useState, useEffect, useRef, type ComponentProps } from "react";
 import {
   Home,
   Tent,
@@ -37,7 +38,7 @@ import { DependentsModal } from "./DependentsModal";
 import { DependentsPaymentModal } from "./DependentsPaymentModal";
 import { DependentsSection } from "./DependentsSection";
 import { DependentRegistrationSuccess } from "./DependentRegistrationSuccess";
-import { UserProfile } from "./UserProfile";
+import { UserProfile as UserProfileView } from "./UserProfile";
 import {
   getUserDashboard,
   addDependent as apiAddDependent,
@@ -45,20 +46,76 @@ import {
   getAccommodations,
 } from "@/lib/api";
 import { toUserMessage } from "@/lib/errors";
+import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation, DashboardDependent } from "@/lib/api/dashboardTypes";
 
 const eventBgImage = "/assets/images/event-bg.png";
 const badgeImage = "/assets/images/badge.png";
 const logoImage = "/assets/images/logo.png";
 
+const getEventId = (registration: unknown): string | undefined => {
+  if (typeof registration !== "object" || registration === null) return undefined;
+
+  const reg = registration as Record<string, unknown>;
+
+  if ("eventId" in reg && reg.eventId != null) return String(reg.eventId);
+
+  const evt = reg.event;
+  if (typeof evt === "object" && evt !== null) {
+    const e = evt as Record<string, unknown>;
+    if ("eventId" in e && e.eventId != null) return String(e.eventId);
+  }
+
+  return undefined;
+};
+
+type Dependent = DashboardDependent;
+
+const toDependent = (d: DashboardDependent): Dependent => {
+  const rec = d as unknown as Record<string, unknown>;
+
+  const id =
+    typeof rec.id === "string" && rec.id
+      ? rec.id
+      : typeof rec.dependantId === "string" && rec.dependantId
+        ? rec.dependantId
+        : typeof rec.dependentId === "string" && rec.dependentId
+          ? rec.dependentId
+          : crypto.randomUUID();
+
+  const rawName =
+    typeof rec.name === "string" && rec.name ? rec.name :
+    typeof rec.fullName === "string" ? rec.fullName :
+    typeof rec.dependentName === "string" ? rec.dependentName :
+    typeof rec.dependantName === "string" ? rec.dependantName :
+    "Dependent";
+
+  const name = rawName.trim() ? rawName.trim() : "Dependent";
+
+  const ageVal = rec.age;
+  const age =
+    typeof ageVal === "number" ? String(ageVal) :
+    typeof ageVal === "string" ? ageVal.trim() :
+    "";
+
+  const gender = typeof rec.gender === "string" ? rec.gender : "";
+  const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : false;
+
+  const isPaid =
+    typeof rec.isPaid === "boolean" ? rec.isPaid :
+    rec.paymentStatus === "PAID";
+
+  return { id, name, age, gender, isRegistered, isPaid };
+};
+
 interface DashboardProps {
   userEmail: string;
-  profile: any;
-  registration: any;
-  accommodation: any;
+  profile: UserProfile | null;
+  registration: DashboardRegistration | null;
+  accommodation: DashboardAccommodation | null;
   onLogout: () => void;
-  onAccommodationUpdate?: (data: any) => void;
-  onRegistrationUpdate?: (data: any) => void;
-  onProfileUpdate?: (data: any) => void;
+  onAccommodationUpdate?: (data: DashboardAccommodation | null) => void;
+  onRegistrationUpdate?: (data: DashboardRegistration | null) => void;
+  onProfileUpdate?: (data: UserProfile | null) => void;
 }
 
 export function Dashboard({
@@ -71,14 +128,51 @@ export function Dashboard({
   onRegistrationUpdate,
   onProfileUpdate,
 }: DashboardProps) {
-  // Avatar dropdown state
+  // Resolve eventId from the current registration (source of truth)
+  const resolvedEventId = (() => {
+    // 1. Primary source: registration
+    if (registration?.eventId) return registration.eventId;
+
+    // 2. Flow state fallback
+    try {
+      const flowRaw =
+        localStorage.getItem("smflx_flow_state") ||
+        localStorage.getItem("flowState");
+
+      if (flowRaw) {
+        const flow = JSON.parse(flowRaw);
+        const fromFlow =
+          flow?.selectedEvent?.eventId ||
+          flow?.event?.eventId ||
+          flow?.eventId;
+
+        if (fromFlow) return fromFlow;
+      }
+    } catch {
+      // ignore corrupted storage
+    }
+
+    // 3. Legacy fallback
+    try {
+      const legacy = localStorage.getItem("smflx_selected_event");
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (parsed?.eventId) return parsed.eventId;
+      }
+    } catch {
+      // ignore
+    }
+
+    return undefined;
+  })();
+// Avatar dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [activeDashboardPage, setActiveDashboardPage] = useState<
     "dashboard" | "user-profile"
   >("dashboard");
-  const [localProfile, setLocalProfile] = useState<any>(profile);
+  const [localProfile, setLocalProfile] = useState<UserProfile | null>(profile);
 
   const [dashboardLoadError, setDashboardLoadError] = useState<string | null>(
     null,
@@ -86,77 +180,110 @@ export function Dashboard({
 
   const [dashboardHydrating, setDashboardHydrating] = useState(false);
 
-  const reloadDashboard = async () => {
+  const reloadDashboard = async (): Promise<NormalizedDashboardResponse | null> => {
     setDashboardHydrating(true);
     setDashboardLoadError(null);
+
+    // Resolve eventId (registration → flow state → legacy)
+    const resolvedEventId: string | undefined = (() => {
+      if (registration?.eventId) return registration.eventId;
+      if (typeof window === "undefined") return undefined;
+
+      try {
+        const flowRaw =
+          localStorage.getItem("smflx_flow_state_v1") ||
+          localStorage.getItem("smflx_flow_state") ||
+          localStorage.getItem("flowState");
+        if (flowRaw) {
+          const flow = JSON.parse(flowRaw) as unknown;
+          if (flow && typeof flow === "object") {
+            const f = flow as Record<string, unknown>;
+            const selectedEvent = f["selectedEvent"] as unknown;
+            if (selectedEvent && typeof selectedEvent === "object") {
+              const se = selectedEvent as Record<string, unknown>;
+              const id = se["eventId"];
+              if (typeof id === "string" && id) return id;
+            }
+            const rid = f["eventId"];
+            if (typeof rid === "string" && rid) return rid;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const legacy = localStorage.getItem("smflx_selected_event");
+        if (legacy) {
+          const parsed = JSON.parse(legacy) as unknown;
+          if (parsed && typeof parsed === "object") {
+            const p = parsed as Record<string, unknown>;
+            const id = p["eventId"];
+            if (typeof id === "string" && id) return id;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      return undefined;
+    })();
+
+    if (!resolvedEventId) {
+      setDashboardLoadError(
+        "We couldn’t determine the active event. Please refresh or reselect your event."
+      );
+      setDashboardHydrating(false);
+      return null;
+    }
+
     try {
-      const data: any = await getUserDashboard();
+      const data = await getUserDashboard(resolvedEventId);
 
-      const deps =
-        data?.dependants ||
-        data?.dependents ||
-        data?.dependentRegistrations ||
-        data?.dependantsData ||
-        [];
-      const depsData = Array.isArray(deps)
-        ? deps
-        : Array.isArray(data?.dependants?.dependantsData)
-          ? data.dependants.dependantsData
-          : [];
+      // Dependents (already normalized by API)
+      const nextDependents: ModalDependent[] = data.dependents.map((d: DashboardDependent) => {
+        const id = (typeof d.id === "string" && d.id) ? d.id :
+                   (typeof d.dependantId === "string" && d.dependantId) ? d.dependantId :
+                   crypto.randomUUID();
+        const ageNum =
+          typeof d.age === "number" ? d.age :
+          typeof d.age === "string" ? Number(d.age) :
+          undefined;
 
-      if (Array.isArray(depsData)) {
-        setDependents(
-          depsData.map((d: any) => ({
-            id: d?.id || d?.dependantId || crypto.randomUUID(),
-            name: d?.name,
-            age: d?.age,
-            gender: d?.gender?.toString()?.toLowerCase() || "male",
-            isRegistered: d?.isRegistered ?? true,
-            isPaid: d?.isPaid ?? (d?.paymentStatus === "PAID" ? true : false),
-          })),
-        );
-      } else {
-        setDependents([]);
-      }
+        const gender =
+          typeof d.gender === "string" ? d.gender : "";
 
-      // Hydrate profile from API (dashboard response uses top-level fields)
-      if (data && typeof data === "object") {
-        setLocalProfile((prev: any) => ({
-          ...prev,
-          firstName: data?.firstName ?? prev?.firstName,
-          lastName: data?.lastName ?? prev?.lastName,
-          email: data?.email ?? prev?.email,
-          phoneNumber: data?.phoneNumber ?? prev?.phoneNumber,
-          gender: data?.gender ?? prev?.gender,
-          ageRange: data?.ageRange ?? prev?.ageRange,
-          userId: data?.userId ?? prev?.userId,
-        }));
-      }
+        return {
+          id,
+          name: typeof d.name === "string" && d.name.trim() ? d.name.trim() : "Dependent",
+          age: Number.isFinite(ageNum as number) ? String(ageNum as number) : "",
+          gender,
+          isRegistered: typeof d.isRegistered === "boolean" ? d.isRegistered : false,
+          isPaid: typeof d.isPaid === "boolean" ? d.isPaid : (d.paymentStatus === "PAID"),
+        };
+      });
+      setDependents(nextDependents);
 
-      // Registration + accommodation are the source of truth for camper payment status
-      const nextRegistration: any = {
-        ...(registration || {}),
-        userId: data?.userId ?? registration?.userId,
-        regId: data?.regId ?? registration?.regId,
-        attendanceType: data?.attendanceType ?? registration?.attendanceType,
-        attendeeType:
-          (data?.attendanceType || registration?.attendeeType || "")
-            .toString()
-            .toLowerCase() || registration?.attendeeType,
-        eventId: data?.eventData?.eventId ?? registration?.eventId,
-        eventTitle: data?.eventData?.eventTitle ?? registration?.eventTitle,
-        eventDate: data?.eventData?.date ?? registration?.eventDate,
-        mealTicket: data?.mealTicket ?? registration?.mealTicket,
-      };
+      // Profile (normalized)
+      setLocalProfile(data.profile);
+      onProfileUpdate?.(data.profile);
 
-      onRegistrationUpdate?.(nextRegistration);
+      // Select event-specific registration/accommodation if arrays include multiple events
+      const regForEvent =
+        data.registrations.find((r) => r.eventId === resolvedEventId) ??
+        data.registrations[0] ??
+        null;
 
-      if (data?.accommodation && typeof data.accommodation === "object") {
-        onAccommodationUpdate?.(data.accommodation);
-      }
+      const accForEvent =
+        data.accommodations.find((a) => a.eventId === resolvedEventId) ??
+        data.accommodations[0] ??
+        null;
+
+      onRegistrationUpdate?.(regForEvent);
+      onAccommodationUpdate?.(accForEvent);
 
       return data;
-    } catch (err: any) {
+    } catch (err: unknown) {
       setDashboardLoadError(toUserMessage(err, { feature: "generic" }));
       return null;
     } finally {
@@ -207,25 +334,36 @@ export function Dashboard({
 
         if (cancelled) return;
 
-        const summarize = (items: any[]) => {
-          const availableFacilities = items.filter(
-            (i) => (Number(i?.availableSpaces ?? 0) || 0) > 0,
-          ).length;
-          const totalCapacity = items.reduce(
-            (sum, i) =>
-              sum + (Number(i?.totalSpaces ?? i?.availableSpaces ?? 0) || 0),
-            0,
-          );
-          return { availableFacilities, totalCapacity };
-        };
+      type FacilityLike = {
+        availableSpaces?: number | string | null;
+        totalSpaces?: number | string | null;
+        totalCapacity?: number | string | null;
+      };
+
+      const summarize = (items: FacilityLike[]) => {
+        const availableFacilities = items.filter((i) => {
+          const avail = Number(i?.availableSpaces ?? 0) || 0;
+          return avail > 0;
+        }).length;
+
+        const totalCapacity = items.reduce((sum, i) => {
+          // prefer totalSpaces, else totalCapacity, else availableSpaces
+          const cap =
+            Number(i?.totalSpaces ?? i?.totalCapacity ?? i?.availableSpaces ?? 0) ||
+            0;
+          return sum + cap;
+        }, 0);
+
+        return { availableFacilities, totalCapacity };
+      };
 
         setAvailabilitySummary({
           loading: false,
-          hostel: summarize((hostel as any)?.facilities || []),
-          hotel: summarize((hotel as any)?.facilities || []),
+          hostel: summarize((hostel)?.facilities || []),
+          hotel: summarize((hotel)?.facilities || []),
           error: null,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (cancelled) return;
         setAvailabilitySummary({
           loading: false,
@@ -240,33 +378,41 @@ export function Dashboard({
   }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
 
   // Dependents state
-  const [dependents, setDependents] = useState<any[]>([]);
+  type Dependent = {
+  id: string;
+  name: string;
+  age: string;
+  gender: string;
+  isRegistered: boolean;
+  isPaid: boolean;
+};
+
+const getErrorMessage = (err: unknown, fallback: string) =>
+  err instanceof Error ? err.message : typeof err === "string" ? err : fallback;
+
+const asString = (v: unknown) => (typeof v === "string" ? v : "");
+
+
+type AccommodationData = Parameters<
+  NonNullable<ComponentProps<typeof AccommodationSelection>["onComplete"]>
+>[0];
+
+
+  const [dependents, setDependents] = useState<ModalDependent[]>(() => []);
   const [removingDependentId, setRemovingDependentId] = useState<string | null>(
     null,
   );
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [dependentToDelete, setDependentToDelete] = useState<any>(null);
+  const [dependentToDelete, setDependentToDelete] = useState<ModalDependent | null>(null);
   const [isDependentsModalOpen, setIsDependentsModalOpen] = useState(false);
   const [isDependentsPaymentModalOpen, setIsDependentsPaymentModalOpen] =
     useState(false);
   const [selectedDependentsForPayment, setSelectedDependentsForPayment] =
-    useState<any[]>([]);
+    useState<ModalDependent[]>([]);
   const [isRegistrationSuccessModalOpen, setIsRegistrationSuccessModalOpen] =
     useState(false);
   const [registeredDependentName, setRegisteredDependentName] = useState("");
-
-  // Stage 2: hydrate dashboard data from API when available
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      await reloadDashboard();
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Countdown timer state
+// Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
@@ -327,7 +473,7 @@ export function Dashboard({
   }, [isDropdownOpen]);
 
   const firstName =
-    profile?.firstName || (profile as any)?.fullName?.split(" ")?.[0] || "User";
+    (localProfile?.firstName ?? "User");
 
   const attendeeType = registration?.attendeeType as
     | "camper"
@@ -345,12 +491,25 @@ export function Dashboard({
     setModalStep(2);
   };
 
-  const handleFacilitySelection = (data: any) => {
-    // AccommodationSelection triggers Korapay checkout directly.
+  const handleAccommodationComplete = (data: AccommodationData) => {
     // Save selection snapshot for UI, then close modal.
-    onAccommodationUpdate?.(data);
+    const snapshot: DashboardAccommodation = {
+      accommodationType: data.type,
+
+      // AccommodationData uses IDs in this zip
+      facility: data.facilityId ?? "",
+      room: data.roomId ?? "",
+      bedspace: data.bedSpaceId ?? "",
+
+      // keep stable UI flags (actual "paid" flips after verification/poll)
+      requiresAccommodation: true,
+      paidForAccommodation: false,
+    };
+
+    onAccommodationUpdate?.(snapshot);
     resetModal();
   };
+
 
   const resetModal = () => {
     setIsAccommodationModalOpen(false);
@@ -371,20 +530,20 @@ export function Dashboard({
   // Check if there are unregistered dependents
   const hasUnregisteredDependents = dependents.some((d) => !d.isRegistered);
 
-  const handleSaveDependents = async (updatedDependents: any[]) => {
+  const handleSaveDependents = async (updatedDependents: ModalDependent[]) => {
     // optimistic UI
     const prev = dependents;
-    setDependents(updatedDependents);
+    setDependents(updatedDependents as ModalDependent[]);
 
     // Stage 2: persist newly added dependents (no demo fallbacks)
     try {
-      const eventId = registration?.eventId || registration?.event?.eventId;
+      const eventId = getEventId(registration);
       if (!eventId) {
         throw new Error("Missing eventId: cannot save dependents.");
       }
 
-      const prevIds = new Set(prev.map((d: any) => d.id));
-      const toCreate = updatedDependents.filter((d: any) => !prevIds.has(d.id));
+      const prevIds = new Set(prev.map((d) => d.id));
+      const toCreate = updatedDependents.filter((d) => !prevIds.has(d.id));
 
       for (const d of toCreate) {
         const gender = (d?.gender || "male").toString().toUpperCase();
@@ -396,11 +555,11 @@ export function Dashboard({
           gender: normalizedGender,
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // revert optimistic update and surface error
       setDependents(prev);
       setDashboardLoadError(
-        err?.message || "Failed to save dependents. Please try again.",
+        getErrorMessage(err, "Failed to save dependents. Please try again."),
       );
     }
   };
@@ -434,10 +593,10 @@ export function Dashboard({
       toast.success(`${dependentName} removed successfully`, {
         description: "The dependent has been removed from your registration.",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setDependents(prev);
       const msg =
-        err?.message || `Failed to remove ${dependentName}. Please try again.`;
+        getErrorMessage(err, `Failed to remove ${dependentName}. Please try again.`);
       setDashboardLoadError(msg);
 
       // Error toast
@@ -468,11 +627,11 @@ export function Dashboard({
     setIsDependentsPaymentModalOpen(true);
   };
 
-  const handleRegisterAndPayDependents = (selected: any[]) => {
+  const handleRegisterAndPayDependents = (selected: ModalDependent[]) => {
     setSelectedDependentsForPayment(selected);
     // mark them registered before payment
     const updatedDependents = dependents.map((d) =>
-      selected.find((sd: any) => sd.id === d.id)
+      selected.find((sd) => sd.id === d.id)
         ? { ...d, isRegistered: true }
         : d,
     );
@@ -483,7 +642,7 @@ export function Dashboard({
 
   const handleDependentsPaymentComplete = () => {
     const updatedDependents = dependents.map((d) =>
-      selectedDependentsForPayment.find((sd: any) => sd.id === d.id)
+      selectedDependentsForPayment.find((sd) => sd.id === d.id)
         ? { ...d, isPaid: true }
         : d,
     );
@@ -494,10 +653,10 @@ export function Dashboard({
 
   if (activeDashboardPage === "user-profile") {
     return (
-      <UserProfile
+      <UserProfileView
         profile={localProfile}
         userEmail={userEmail}
-        userPhone={localProfile?.phone || localProfile?.phoneNumber || ""}
+        userPhone={asString((localProfile as Record<string, unknown> | null | undefined)?.["phone"]) || asString(localProfile?.phoneNumber)}
         dependents={dependents}
         onBack={() => setActiveDashboardPage("dashboard")}
         onUpdate={(updated) => {
@@ -729,9 +888,14 @@ export function Dashboard({
               <div className="grid grid-cols-3 gap-6">
                 <div>
                   <span className="text-sm text-gray-500 block mb-2">Type</span>
-                  <span className="text-base font-semibold capitalize">
-                    {(accommodation.accommodationType || accommodation.type || "Hostel")}
-                  </span>
+                      <span className="text-base font-semibold capitalize">
+                        {(() => {
+                          const a = accommodation as Record<string, unknown>;
+                          if (typeof a.accommodationType === "string") return a.accommodationType;
+                          if (typeof a.type === "string") return a.type;
+                          return "Hostel";
+                        })()}
+                      </span>
                 </div>
                 <div>
                   <span className="text-sm text-gray-500 block mb-2">Hall</span>
@@ -744,7 +908,9 @@ export function Dashboard({
                     Bedspace
                   </span>
                   <span className="text-base font-semibold capitalize">
-                    {accommodation.bed?.replace("-", " ") || "Bedspace 101"}
+                    {typeof (accommodation as Record<string, unknown>).bed === "string"
+                      ? String((accommodation as Record<string, unknown>).bed).replace(/-/g, " ")
+                      : "Bedspace 101"}
                   </span>
                 </div>
               </div>
@@ -1063,19 +1229,47 @@ export function Dashboard({
                 </div>
               )}
 
-              {modalStep === 2 && (
-                <AccommodationSelection
-                  categoryId=""
-                  accommodationType={selectedAccommodationType}
-                  eventId={registration?.eventId}
-                  registrationId={
-                    registration?.id || registration?.registrationId
-                  }
-                  profile={localProfile}
-                  onComplete={handleFacilitySelection}
-                  onBack={handleModalBack}
-                />
-              )}
+              {modalStep === 2 && (() => {
+                const eventId =
+                  registration?.eventId ??
+                  (registration?.event &&
+                  typeof registration.event === "object" &&
+                  "eventId" in registration.event
+                    ? String(
+                        (registration.event as { eventId?: unknown }).eventId || ""
+                      )
+                    : "");
+
+                if (!eventId) {
+                  return (
+                    <div className="p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-900">
+                      Missing eventId. Please go back and reselect the event.
+                    </div>
+                  );
+                }
+
+                return (
+                  <AccommodationSelection
+                    categoryId=""
+                    accommodationType={selectedAccommodationType}
+                    eventId={eventId}
+                    registrationId={
+                      typeof registration?.id === "string"
+                        ? registration.id
+                        : typeof registration?.registrationId === "string"
+                          ? registration.registrationId
+                          : typeof registration?.id === "number"
+                            ? String(registration.id)
+                            : typeof registration?.registrationId === "number"
+                              ? String(registration.registrationId)
+                              : undefined
+                    }
+                    profile={localProfile}
+                    onComplete={handleAccommodationComplete}
+                    onBack={handleModalBack}
+                  />
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1096,7 +1290,7 @@ export function Dashboard({
         isOpen={isDependentsPaymentModalOpen}
         onClose={() => setIsDependentsPaymentModalOpen(false)}
         dependents={selectedDependentsForPayment}
-        eventId={registration?.eventId || registration?.event?.eventId}
+        eventId={getEventId(registration)}
         onPaymentComplete={handleDependentsPaymentComplete}
       />
 

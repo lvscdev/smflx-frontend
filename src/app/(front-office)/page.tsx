@@ -12,7 +12,7 @@ import { EventRegistration } from "@/components/front-office/ui/EventRegistratio
 import { AccommodationSelection } from "@/components/front-office/ui/AccommodationSelection";
 import { Payment } from "@/components/front-office/ui/Payment";
 
-import { getAuthToken, setAuthToken } from "@/lib/api/client";
+import { getAuthToken } from "@/lib/api/client";
 import { createUserRegistration, getAccommodations } from "@/lib/api";
 
 type View =
@@ -98,11 +98,9 @@ export default function HomePage() {
     setView(nextView);
   }, [router]);
 
-  // ✅ Fetch hostel availability count on mount
   useEffect(() => {
     async function fetchHostelAvailability() {
       try {
-        // Fetch availability for currently active event if we have one
         const eventId = selectedEvent?.eventId;
         if (!eventId) return;
 
@@ -111,13 +109,11 @@ export default function HomePage() {
           type: "HOSTEL",
         });
 
-        // Use totalAvailable from metadata if available
         const available = data?.metadata?.totalAvailable;
         if (typeof available === "number") {
           setHostelSpacesLeft(available);
         }
       } catch (err) {
-        // Silently fail - Sidebar will show "Limited" as fallback
         console.error("Failed to fetch hostel availability:", err);
       }
     }
@@ -234,7 +230,31 @@ export default function HomePage() {
         {view === "login" && (
           <ReturningUserLogin
             onLoginSuccess={(userEmail) => {
-              if (userEmail) setEmail(userEmail);
+              const nextEmail = (userEmail || email).trim();
+              if (nextEmail) setEmail(nextEmail);
+
+              // Best-effort: hydrate profile from stored user details (set during OTP verification)
+              let nextProfile = profile;
+              if (!nextProfile) {
+                try {
+                  const raw = localStorage.getItem("smflx_user");
+                  const stored = raw ? JSON.parse(raw) : null;
+                  nextProfile = stored?.userDetails || stored || null;
+                } catch {
+                  nextProfile = profile;
+                }
+              }
+              if (nextProfile !== profile) setProfile(nextProfile);
+
+              safeSaveFlowState({
+                view: "dashboard",
+                email: nextEmail || email,
+                profile: nextProfile ?? profile,
+                selectedEvent,
+                registration,
+                accommodation,
+              });
+
               router.push("/dashboard");
             }}
             onCancel={() => setView("verify")}
@@ -273,7 +293,9 @@ export default function HomePage() {
             isSubmitting={registrationSubmitting}
             serverError={registrationPersistError}
             onComplete={async (data) => {
-              console.log("Event registration data:", data);
+              if (process.env.NODE_ENV !== "production") {
+                console.log("Event registration data:", data);
+              }
               setRegistrationPersistError(null);
               setRegistrationSubmitting(true);
 
@@ -335,8 +357,7 @@ export default function HomePage() {
                 router.push("/dashboard");
               } catch (e: any) {
                 setRegistrationPersistError(
-                  e?.message ||
-                    "Unable to save registration. Please try again.",
+                  e?.message || "Unable to save registration. Please try again.",
                 );
               } finally {
                 setRegistrationSubmitting(false);

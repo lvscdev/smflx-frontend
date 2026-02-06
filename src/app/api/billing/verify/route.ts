@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Proxy to backend webhook endpoint
-    const backendUrl = `${BACKEND_BASE_URL}/billing/webhook`;
+    const backendUrl = `${BACKEND_BASE_URL}/billing/verify`;
     
     const response = await fetch(backendUrl, {
       method: 'POST',

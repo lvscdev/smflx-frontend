@@ -1,1 +1,1 @@
-export { default } from "./(front-office)/page";
+export { default } from "./(front-office)/dashboard/page";

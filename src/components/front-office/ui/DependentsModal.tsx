@@ -7,12 +7,13 @@ import { toast } from 'sonner';
 import { validateDependentDraft, sanitizeDependentAge } from '@/lib/validation/dependents';
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from '@/components/ui/alert-dialog';
 
-interface Dependent {
+export interface Dependent {
   id: string;
   name: string;
   age: string;
   gender: string;
   isRegistered: boolean;
+  isPaid: boolean;
 }
 
 interface DependentsModalProps {
@@ -73,7 +74,8 @@ export function DependentsModal({
       name: currentDependent.name.trim(),
       age: currentDependent.age,
       gender: currentDependent.gender,
-      isRegistered: false
+      isRegistered: false,
+      isPaid: false,
     };
 
     setDependents([...dependents, newDependent]);
@@ -109,10 +111,10 @@ export function DependentsModal({
       toast.success(`${name} removed successfully`, {
         description: "The dependent has been removed.",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // rollback local state if parent/API fails
       setDependents(prev);
-      const msg = err?.message || 'Failed to remove dependent. Please try again.';
+      const msg = err instanceof Error ? err.message : "Failed to remove dependent. Please try again.";
       setRemoveError(msg);
       
       // Error toast

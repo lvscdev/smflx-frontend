@@ -1,27 +1,40 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { apiRequest } from "./client";
+import type {
+  NormalizedDashboardResponse,
+  UserProfile as DashboardUserProfile,
+  DashboardRegistration as DashboardReg,
+  DashboardAccommodation as DashboardAcc,
+  DashboardDependent as DashboardDep,
+  PaymentSummary as DashboardPaymentSummary
+} from "./dashboardTypes";
 
 // --- Auth ---
 
 export type GenerateOtpResponse = { reference: string };
 
-// Returning users (must have profile)
 export async function generateLoginOtp(email: string) {
-  return apiRequest<GenerateOtpResponse>("/user-auth/generate-otp", {
+  const response = await apiRequest<any>("/user-auth/generate-otp", {
     method: "POST",
     auth: false,
     body: { email, emailAddress: email },
   });
+  return response?.data || response;
 }
 
-// New registrants (no profile yet)
 export async function generateRegistrantOtp(email: string) {
-  return apiRequest<GenerateOtpResponse>("/user-auth/otp-for-registrant", {
+  const response = await apiRequest<any>("/user-auth/otp-for-registrant", {
     method: "POST",
     auth: false,
     body: { email, emailAddress: email },
   });
+  return response?.data || response;
+}
+
+export async function verifyToken() {
+  const response = await apiRequest<any>("/user-auth/login", { method: "GET" });
+  return response?.data || response;
 }
 
 export type ValidateOtpResponse = {
@@ -48,11 +61,12 @@ export async function validateOtp(payload: {
   otp: string;
   otpReference: string;
 }) {
-  return apiRequest<ValidateOtpResponse>("/user-auth/validate-otp", {
+  const response = await apiRequest<any>("/user-auth/validate-otp", {
     method: "POST",
     auth: false,
     body: payload,
   });
+  return response?.data || response;
 }
 
 // --- User/Profile ---
@@ -74,11 +88,13 @@ export type UserProfile = {
 };
 
 export async function getMe() {
-  return apiRequest<UserProfile>("/user", { method: "GET" });
+  const response = await apiRequest<any>("/user", { method: "GET" });
+  return response?.data || response;
 }
 
-export async function updateMe(payload: Partial<UserProfile>) {
-  return apiRequest<UserProfile>("/user", { method: "PUT", body: payload });
+export async function updateMe(payload: Partial<DashboardUserProfile>) {
+  const response = await apiRequest<any>("/user", { method: "PUT", body: payload });
+  return response?.data || response;
 }
 
 // --- Events ---
@@ -93,11 +109,13 @@ export type Event = {
 };
 
 export async function listActiveEvents() {
-  const res = await apiRequest<{ activeEvents: any[] }>("/events/user/active", {
+  const response = await apiRequest<any>("/events/user/active", {
     method: "GET",
   });
-
-  return res.activeEvents;
+  
+  // Backend returns { data: { activeEvents: [...] } }
+  const data = response?.data || response;
+  return data?.activeEvents || [];
 }
 
 // --- Event registrations ---
@@ -112,6 +130,7 @@ export type EventRegistration = {
   registrationId?: string;
   userId: string;
   eventId: string;
+  eventName?: string;
   participationMode: string;
   accommodationType: string;
   createdAt?: string;
@@ -121,16 +140,19 @@ export type EventRegistration = {
 export async function createUserRegistration(
   payload: CreateEventRegistrationPayload,
 ) {
-  return apiRequest<EventRegistration>("/registrations", {
+  const response = await apiRequest<any>("/registrations", {
     method: "POST",
     body: payload,
   });
+  return response?.data || response;
 }
 
-export async function listMyRegistrations() {
-  return apiRequest<EventRegistration[]>("/event-registrations/user", {
+export async function listMyRegistrations(): Promise<EventRegistration[]> {
+  const response = await apiRequest<any>("/registrations/my-registrations", {
     method: "GET",
   });
+  // Backend wraps in { code, message, data }
+  return response?.data || response || [];
 }
 
 // --- User dashboard ---
@@ -143,30 +165,158 @@ export type AddDependentPayload = {
 };
 
 export async function addDependent(payload: AddDependentPayload) {
-  return apiRequest<any>("/user-dashboard/add-dependent", {
+  const response = await apiRequest<any>("/user-dashboard/add-dependent", {
     method: "POST",
     body: payload,
   });
+  return response?.data || response;
 }
 
 export async function removeDependent(dependentId: string) {
-  return apiRequest<any>(`/user-dashboard/remove-dependent/${dependentId}`, {
+  const response = await apiRequest<any>(`/user-dashboard/remove-dependent/${dependentId}`, {
     method: "DELETE",
   });
+  return response?.data || response;
 }
 
 export async function payForDependant(payload: {
   dependantId: string;
   parentRegId: string;
 }) {
-  return apiRequest<any>("/user-dashboard/pay-for-dependants", {
+  const response = await apiRequest<any>("/user-dashboard/pay-for-dependants", {
     method: "POST",
     body: payload,
   });
+  return response?.data || response;
 }
 
-export async function getUserDashboard() {
-  return apiRequest<any>("/user-dashboard", { method: "GET" });
+// Dashboard types
+export type DashboardRegistration = {
+  registrationId: string;
+  eventId: string;
+  eventName?: string;
+  participationMode: string;
+  accommodationType: string;
+  registrationStatus: string;
+  paymentStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type DashboardAccommodation = {
+  facilityId?: string;
+  facilityName?: string;
+  roomNumber?: string;
+  bedNumber?: string;
+  checkInDate?: string;
+  checkOutDate?: string;
+  price?: number;
+};
+
+export type DashboardDependent = {
+  dependentId: string;
+  name: string;
+  age: number;
+  gender: string;
+  registrationStatus?: string;
+  paymentStatus?: string;
+};
+
+export type PaymentSummary = {
+  totalPaid?: number;
+  totalPending?: number;
+  lastPaymentDate?: string;
+};
+
+export type UserDashboardData = {
+  user?: UserProfile;
+  registrations?: DashboardRegistration[];
+  accommodations?: DashboardAccommodation[];
+  dependents?: DashboardDependent[];
+  paymentSummary?: PaymentSummary;
+};
+
+export async function getUserDashboard(eventId: string): Promise<NormalizedDashboardResponse> {
+  const response = await apiRequest<unknown>(`/user-dashboard/${eventId}`, { method: "GET" });
+
+  // Backend often wraps responses in { code, message, data }.
+  // We normalize once here so UI code stays typed and stable.
+  const root: unknown =
+    (response && typeof response === "object" && "data" in (response as Record<string, unknown>))
+      ? (response as Record<string, unknown>)["data"]
+      : response;
+
+  const obj = (root && typeof root === "object") ? (root as Record<string, unknown>) : {};
+
+  const profileCandidate =
+    (obj["profile"] && typeof obj["profile"] === "object") ? (obj["profile"] as Record<string, unknown>) :
+    (obj["user"] && typeof obj["user"] === "object") ? (obj["user"] as Record<string, unknown>) :
+    null;
+
+  const profileFromFlat = obj;
+
+  const profile: UserProfile = {
+    userId: (profileCandidate?.["userId"] as string | undefined) ?? (profileFromFlat["userId"] as string | undefined),
+    firstName: (profileCandidate?.["firstName"] as string | undefined) ?? (profileFromFlat["firstName"] as string | undefined),
+    lastName: (profileCandidate?.["lastName"] as string | undefined) ?? (profileFromFlat["lastName"] as string | undefined),
+    email: (profileCandidate?.["email"] as string | undefined) ?? (profileFromFlat["email"] as string | undefined),
+    phoneNumber: (profileCandidate?.["phoneNumber"] as string | undefined) ?? (profileFromFlat["phoneNumber"] as string | undefined),
+    gender: (profileCandidate?.["gender"] as string | undefined) ?? (profileFromFlat["gender"] as string | undefined),
+    ageRange: (profileCandidate?.["ageRange"] as string | undefined) ?? (profileFromFlat["ageRange"] as string | undefined),
+    localAssembly: (profileCandidate?.["localAssembly"] as string | undefined) ?? (profileFromFlat["localAssembly"] as string | undefined),
+    maritalStatus: (profileCandidate?.["maritalStatus"] as string | undefined) ?? (profileFromFlat["maritalStatus"] as string | undefined),
+    employmentStatus: (profileCandidate?.["employmentStatus"] as string | undefined) ?? (profileFromFlat["employmentStatus"] as string | undefined),
+    stateOfResidence: (profileCandidate?.["stateOfResidence"] as string | undefined) ?? (profileFromFlat["stateOfResidence"] as string | undefined),
+  };
+
+  const regsUnknown =
+    (obj["registrations"] as unknown) ??
+    (obj["registration"] as unknown) ??
+    (obj["data"] as unknown);
+
+  const registrations: DashboardReg[] = Array.isArray(regsUnknown)
+    ? (regsUnknown as unknown[]).filter((r): r is Record<string, unknown> => !!r && typeof r === "object").map((r) => r as DashboardReg)
+    : regsUnknown && typeof regsUnknown === "object"
+      ? [regsUnknown as DashboardReg]
+      : [];
+
+  const accUnknown =
+    (obj["accommodations"] as unknown) ??
+    (obj["accommodation"] as unknown);
+
+  const accommodations: DashboardAcc[] = Array.isArray(accUnknown)
+    ? (accUnknown as unknown[]).filter((a): a is Record<string, unknown> => !!a && typeof a === "object").map((a) => a as DashboardAcc)
+    : accUnknown && typeof accUnknown === "object"
+      ? [accUnknown as DashboardAcc]
+      : [];
+
+  const depsUnknown =
+    (obj["dependents"] as unknown) ??
+    (obj["dependants"] as unknown) ??
+    (obj["dependentRegistrations"] as unknown) ??
+    (obj["dependantsData"] as unknown) ??
+    (obj["dependants"] && typeof obj["dependants"] === "object"
+      ? (obj["dependants"] as Record<string, unknown>)["dependantsData"]
+      : undefined);
+
+  const dependents: DashboardDep[] = Array.isArray(depsUnknown)
+    ? (depsUnknown as unknown[]).filter((d): d is Record<string, unknown> => !!d && typeof d === "object").map((d) => d as DashboardDep)
+    : [];
+
+  const paymentSummaryUnknown = obj["paymentSummary"] as unknown;
+  const paymentSummary: DashboardPaymentSummary | null =
+    paymentSummaryUnknown && typeof paymentSummaryUnknown === "object"
+      ? (paymentSummaryUnknown as DashboardPaymentSummary)
+      : null;
+
+  return {
+    eventId,
+    profile,
+    registrations,
+    accommodations,
+    dependents,
+    paymentSummary,
+  };
 }
 
 // Re-export accommodation functions
@@ -197,12 +347,6 @@ export type InitiatePaymentResponse = {
   checkoutUrl: string;
 };
 
-/**
- * Optional payment verification response.
- *
- * NOTE: This is intentionally loose because different payment providers / backends
- * return different shapes. The UI only relies on `status`/`paid` when present.
- */
 export type VerifyPaymentResponse = {
   status?: string;
   paid?: boolean;
@@ -211,29 +355,22 @@ export type VerifyPaymentResponse = {
   data?: any;
 };
 
-/**
- * Initiate the primary (camper) registration payment.
- *
- * Backend path differs across environments; this is made configurable to avoid
- * flow changes while Stage 3 contracts stabilize.
- */
 export async function initiateRegistrationPayment(payload: {
   amount: number;
   userId: string;
   eventId: string;
   reference: string;
-  // keep optional fields for forward-compat
   [key: string]: any;
 }) {
-  // Swagger: POST /accommodation/initialize
   const path =
     process.env.NEXT_PUBLIC_ACCOMMODATION_PAYMENT_INIT_PATH ||
     "/accommodation/initialize";
 
-  return apiRequest<InitiatePaymentResponse>(path, {
+  const response = await apiRequest<any>(path, {
     method: "POST",
     body: payload,
   });
+  return response?.data || response;
 }
 
 export async function initiateDependentsPayment(payload: {
@@ -248,18 +385,13 @@ export async function initiateDependentsPayment(payload: {
     process.env.NEXT_PUBLIC_DEPENDENTS_PAYMENT_INIT_PATH ||
     "/payments/dependents/initiate";
 
-  return apiRequest<InitiatePaymentResponse>(path, {
+  const response = await apiRequest<any>(path, {
     method: "POST",
     body: payload,
   });
+  return response?.data || response;
 }
 
-/**
- * (Optional) Verify a payment after return from checkout.
- *
- * If your backend exposes a verify endpoint, set NEXT_PUBLIC_PAYMENT_VERIFY_PATH.
- * Example: /payments/verify
- */
 export async function verifyPayment(params: {
   reference?: string;
   transactionId?: string;
@@ -267,7 +399,6 @@ export async function verifyPayment(params: {
 }) {
   const path = process.env.NEXT_PUBLIC_PAYMENT_VERIFY_PATH;
   if (!path) {
-    // If not configured, callers should treat this as a no-op.
     return null;
   }
 
@@ -278,5 +409,7 @@ export async function verifyPayment(params: {
   });
 
   const url = qs.toString() ? `${path}?${qs.toString()}` : path;
-  return apiRequest<VerifyPaymentResponse>(url, { method: "GET" });
+  const response = await apiRequest<any>(url, { method: "GET" });
+  return response?.data || response;
 }
+

@@ -29,7 +29,15 @@ async function proxy(req: NextRequest, context: { params: Promise<{ path?: strin
       ? undefined
       : await req.arrayBuffer();
 
-  console.log("[proxy]", req.method, target.toString(), "auth?", !!req.headers.get("authorization"));
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      "[proxy]",
+      req.method,
+      target.toString(),
+      "auth?",
+      !!req.headers.get("authorization"),
+    );
+  }
 
   const upstream = await fetch(target.toString(), {
     method: req.method,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { generateRegistrantOtp, validateOtp } from "@/lib/api";
+import { setOtpCookie } from "@/lib/auth/otpCookie";
 import { setTokenCookie } from "@/lib/auth/session";
 import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
 import { toUserMessage } from "@/lib/errors";
@@ -58,6 +59,8 @@ export function EmailVerification({
     try {
       const { reference } = await generateRegistrantOtp(trimmed);
       setOtpReference(reference);
+      // Keep a short-lived (7d) hint so dashboard landing can prefill ReturningUser
+      setOtpCookie(trimmed);
       setVerificationSent(true);
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {

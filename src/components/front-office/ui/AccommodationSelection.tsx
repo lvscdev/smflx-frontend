@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { UserProfile } from "@/lib/api/dashboardTypes";
 import { ArrowLeft, Check, AlertCircle, Loader2, MapPin } from "lucide-react";
 import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
 import { initiateHostelAllocation, initiateHotelAllocation } from "@/lib/api";
@@ -27,7 +28,7 @@ function safeLoadFlowState() {
   }
 }
 
-function safeSaveFlowState(state: any) {
+function safeSaveFlowState(state: unknown) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(FLOW_STATE_KEY, JSON.stringify(state));
@@ -56,7 +57,7 @@ interface AccommodationSelectionProps {
   onComplete: (data: AccommodationData) => Promise<void> | void;
   onBack: () => void;
   initialData?: AccommodationData | null;
-  profile?: any;
+  profile?: UserProfile | null;
   isSubmitting?: boolean;
   serverError?: string | null;
   categoryId: string;
@@ -75,10 +76,12 @@ export function AccommodationSelection({
   isSubmitting: externalSubmitting,
   serverError: externalError,
 }: AccommodationSelectionProps) {
-  console.log("userId", userId);
-  console.log("registrationId", registrationId);
-  console.log("eventId", eventId);
-  console.log("profile", profile);
+  if (process.env.NODE_ENV !== "production") {
+    console.log("userId", userId);
+    console.log("registrationId", registrationId);
+    console.log("eventId", eventId);
+    console.log("profile", profile);
+  }
 
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [hotelRooms, setHotelRooms] = useState<HotelRoom[]>([]);

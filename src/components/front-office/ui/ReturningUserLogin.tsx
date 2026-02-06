@@ -2,22 +2,25 @@
 
 import { useState, type FormEvent } from "react";
 import { generateLoginOtp, validateOtp } from "@/lib/api";
+import { setOtpCookie } from "@/lib/auth/otpCookie";
 import { setTokenCookie } from "@/lib/auth/session";
 import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
 import { toUserMessage } from "@/lib/errors";
 import { InlineAlert } from "./InlineAlert";
 
 interface ReturningUserLoginProps {
+  initialEmail?: string;
   onLoginSuccess: (email?: string) => void; 
   onCancel: () => void;
 }
 
 export function ReturningUserLogin({
+  initialEmail,
   onLoginSuccess,
   onCancel,
 }: ReturningUserLoginProps) {
   const [step, setStep] = useState<"email" | "code">("email");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail || "");
   const [code, setCode] = useState("");
   const [otpReference, setOtpReference] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,6 +39,8 @@ export function ReturningUserLogin({
     try {
       const { reference } = await generateLoginOtp(trimmed);
       setOtpReference(reference);
+      // Keep a short-lived (7d) hint so dashboard landing can prefill ReturningUser
+      setOtpCookie(trimmed);
       setStep("code");
     } catch (err: any) {
       setError(toUserMessage(err, { feature: "otp", action: "send" }));

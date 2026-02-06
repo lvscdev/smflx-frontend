@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import { getHostelUnoccupiedCapacity } from "@/lib/api/accommodations";
 
 const backgroundImage = "/assets/images/sidebar-bg.png";
 const logo = "/assets/images/sidebar-logo.png";
@@ -22,6 +23,38 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesLeft }: SidebarProps) {
+  const [hostelSpacesLeftFallback, setHostelSpacesLeftFallback] = useState<
+    number | undefined
+  >(undefined);
+
+  // If the parent didn't provide a value (or it hasn't loaded yet), fetch it here.
+  // This keeps the UI stable without changing layout.
+  useEffect(() => {
+    if (typeof hostelSpacesLeft === "number") return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const left = await getHostelUnoccupiedCapacity();
+        if (!cancelled && typeof left === "number") {
+          setHostelSpacesLeftFallback(left);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hostelSpacesLeft]);
+
+  const hostelLeft =
+    typeof hostelSpacesLeft === "number"
+      ? hostelSpacesLeft
+      : hostelSpacesLeftFallback;
+
   // Calculate progress percentage
   const completedSteps = steps.filter((step) => step.completed).length;
   const totalSteps = steps.length;
@@ -179,7 +212,7 @@ export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesL
         <div className="mt-auto hidden lg:block">
           <div className="bg-white/10 backdrop-blur-sm rounded-xl px-5 py-4 border border-white/20">
             <p className="text-white text-sm font-light">
-              <span className="font-semibold text-[64px]">{hostelSpacesLeft ?? 'Limited'}</span> Hostel Spaces left.<br />
+              <span className="font-semibold text-[64px]">{hostelLeft ?? 'Limited'}</span> Hostel Spaces left.<br />
               Book your space now.
             </p>
           </div>

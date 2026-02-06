@@ -145,7 +145,7 @@ function PaymentCallbackInner() {
           try again from your dashboard.
         </p>
         <button
-          onClick={() => router.replace("/")}
+          onClick={() => router.replace("/dashboard")}
           className="w-full py-3 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
         >
           Back to Dashboard

@@ -1,5 +1,6 @@
 'use client';
 
+import type { Dependent } from "./DependentsModal";
 import { useState } from 'react';
 import { X, CreditCard } from 'lucide-react';
 import { InlineAlert } from './InlineAlert';
@@ -9,7 +10,7 @@ import { toUserMessage } from '@/lib/errors';
 interface DependentsPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  dependents: any[];
+  dependents: Dependent[];
   onPaymentComplete: () => void;
   eventId?: string;
 }
@@ -45,10 +46,7 @@ export function DependentsPaymentModal({
       const user = raw ? JSON.parse(raw) : null;
       const userId = user?.userId;
 
-      const resolvedEventId =
-        eventId ||
-        dependents?.[0]?.eventId ||
-        dependents?.[0]?.event?.eventId;
+      const resolvedEventId = eventId;
 
       if (!userId || !resolvedEventId) {
         throw new Error('Missing user/event context for payment checkout.');
@@ -84,9 +82,7 @@ export function DependentsPaymentModal({
           'smflx_pending_payment_ctx',
           JSON.stringify({
             type: 'dependents',
-            dependentIds: (dependents || [])
-              .map((d: any) => d?.dependentId || d?.id || d?.dependentRegistrationId)
-              .filter(Boolean),
+            dependentIds: (dependents || []).map((d) => d.id).filter(Boolean),
             amount: totalAmount,
             startedAt: new Date().toISOString(),
           })
@@ -96,7 +92,7 @@ export function DependentsPaymentModal({
       }
 
       window.location.href = checkoutUrl;
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(toUserMessage(err, { feature: 'payment', action: 'init' }));
     } finally {
       setPaymentProcessing(false);

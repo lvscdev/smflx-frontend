@@ -6,16 +6,17 @@ import { EventActions } from "./event-actions";
 import { formatDate } from "@/helpers/format-date";
 import { Event } from "@/features/admin/events/types";
 import { getEventStatusBadge } from "@/helpers/getEventStatus";
-import { getRegistrationsPaginated } from "@/features/admin/registration/server-actions";
+import { getRegistrationsByEventId } from "@/features/admin/registration/server-actions";
 
 async function EventCard({ event }: { event: Event }) {
   const role = "ADMIN"; // TODO: replace with real role from session
   const status = getEventStatusBadge(event.eventStatus);
 
-  const { data: registrations, totalPages } = await getRegistrationsPaginated({
-    eventId: event.eventId,
-    page: 1,
-  });
+  const { data: registrations, totalRegistrations } =
+    await getRegistrationsByEventId({
+      eventId: event.eventId,
+      page: 1,
+    });
 
   return (
     <Card className="rounded-2xl bg-slate-50 border-slate-300">
@@ -39,7 +40,7 @@ async function EventCard({ event }: { event: Event }) {
         <div className="grid gap-4 md:grid-cols-3">
           <StatsCard
             label="Total Registrations"
-            value={registrations.length ?? 0}
+            value={totalRegistrations ?? 0}
           />
 
           <StatsCard label="Total Revenue" value={`₦${(0).toLocaleString()}`} />

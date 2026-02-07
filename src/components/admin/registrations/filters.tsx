@@ -59,9 +59,9 @@ function RegistrationsFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="Camper">Camper</SelectItem>
-            <SelectItem value="Non-Camper">Non-Camper</SelectItem>
-            <SelectItem value="Online">Online</SelectItem>
+            <SelectItem value="CAMPER">Camper</SelectItem>
+            <SelectItem value="NON_CAMPER">Non-Camper</SelectItem>
+            <SelectItem value="ONLINE">Online</SelectItem>
           </SelectContent>
         </Select>
 
@@ -74,8 +74,8 @@ function RegistrationsFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Genders</SelectItem>
-            <SelectItem value="Male">Male</SelectItem>
-            <SelectItem value="Female">Female</SelectItem>
+            <SelectItem value="MALE">Male</SelectItem>
+            <SelectItem value="FEMALE">Female</SelectItem>
           </SelectContent>
         </Select>
 
@@ -88,8 +88,8 @@ function RegistrationsFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Payments</SelectItem>
-            <SelectItem value="Completed">Completed</SelectItem>
-            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="COMPLETED">Completed</SelectItem>
+            <SelectItem value="PENDING">Pending</SelectItem>
           </SelectContent>
         </Select>
 

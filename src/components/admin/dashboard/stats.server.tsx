@@ -8,39 +8,38 @@ import {
   UserRoundIcon,
 } from "lucide-react";
 
-async function getStats() {
-  // Mocked API – replace with real backend later
-  return {
-    total: 45,
-    campers: 35,
-    nonCampers: 10,
-    online: 0,
-  };
-}
+import { getAllRegistrations } from "@/features/admin/registration/server-actions";
 
 async function DashboardStats() {
-  const stats = await getStats();
+  const { data: stats, totalRegistrations } = await getAllRegistrations();
+
+  const campers =
+    stats.filter(s => s.participationMode === "CAMPER").length ?? 0;
+  const nonCampers =
+    stats.filter(s => s.participationMode === "NON_CAMPER").length ?? 0;
+  const online =
+    stats.filter(s => s.participationMode === "ONLINE").length ?? 0;
 
   return (
     <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Stat
         title="Total Registrations"
-        value={stats.total}
+        value={totalRegistrations}
         icon={<UserRound className="size-6 text-brand-blue-50" />}
       />
       <Stat
         title="Campers"
-        value={stats.campers}
+        value={campers}
         icon={<FlameKindling className="size-6 text-brand-blue-50" />}
       />
       <Stat
         title="Non-Campers"
-        value={stats.nonCampers}
+        value={nonCampers}
         icon={<UsersRoundIcon className="size-6 text-brand-blue-50" />}
       />
       <Stat
         title="Online Attendees"
-        value={stats.online}
+        value={online}
         icon={<Wifi className="size-6 text-brand-blue-50" />}
       />
     </section>
@@ -54,19 +53,17 @@ function Stat({ title, value, icon }: any) {
         <div className="flex justify-between w-full">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-heading font-semibold">
-              {value || "–"}
-            </p>
+            <p className="text-2xl font-heading font-semibold">{value}</p>
           </div>
           <div
             className={`rounded-sm ${
               icon.type === UserRound
                 ? "bg-brand-blue-500"
                 : icon.type === FlameKindling
-                ? "bg-brand-yellow-200"
-                : icon.type === UsersRoundIcon
-                ? "bg-indigo-500"
-                : "bg-brand-red"
+                  ? "bg-brand-yellow-200"
+                  : icon.type === UsersRoundIcon
+                    ? "bg-indigo-500"
+                    : "bg-brand-red"
             } p-1.5 h-fit self-center`}
           >
             {icon}

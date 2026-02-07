@@ -61,7 +61,7 @@ function AdminSidebar() {
   }
 
   return (
-    <aside className="hidden w-80 py-4 flex-col items-center border-r border-neutral-100 bg-slate-200 lg:flex">
+    <aside className="hidden w-78 shrink-0 py-4 flex-col items-center border-r border-neutral-100 bg-slate-200 lg:flex">
       <div className="flex items-center justify-center w-full h-fit">
         <Image src={logo} alt="logo" height={60} className="object-contain" />
       </div>

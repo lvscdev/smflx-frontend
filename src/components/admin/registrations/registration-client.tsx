@@ -23,17 +23,18 @@ import { RegistrationsFilters } from "./filters";
 
 import { Registration } from "@/features/admin/registration/types/mapped-types"; // ✅ ADD THIS
 import { AddRegistrationModal } from "./add-registration/add-registration-modal";
+import { useEventInfo } from "@/hooks/useEventInfo";
 
 export default function RegistrationsClient({
   eventId,
-  // event,
   data,
   totalPages,
+  totalRegistrations,
 }: {
   eventId: string;
-  // event: any;
   data: Registration[];
   totalPages: number;
+  totalRegistrations: number;
 }) {
   const isReadOnly = false; // Assuming event is always open for now
   const router = useRouter();
@@ -43,6 +44,8 @@ export default function RegistrationsClient({
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  const eventInfo = useEventInfo(eventId);
 
   const filters = {
     q: params.get("q") ?? "",
@@ -86,9 +89,11 @@ export default function RegistrationsClient({
         </div>
         <div className="flex justify-between">
           <div>
-            <h6 className="font-bold text-xl">Registration</h6>
+            <h6 className="font-bold text-xl">
+              {eventInfo?.eventName} Registrations
+            </h6>
             <p className="text-slate-500">
-              View and manage all event registrations
+              View and manage all {eventInfo?.eventName} registrations
             </p>
           </div>
 
@@ -128,7 +133,7 @@ export default function RegistrationsClient({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           label="Total Registrations"
-          value={200}
+          value={totalRegistrations}
           icon={<UsersIcon size={20} />}
           iconBg="blue"
           meta="+0% from last year"
@@ -136,7 +141,7 @@ export default function RegistrationsClient({
 
         <StatsCard
           label="Campers"
-          value={80}
+          value={data.filter(r => r.participationMode === "CAMPER").length}
           icon={<User2Icon size={20} />}
           iconBg="orange"
           meta="+0% from last year"
@@ -144,7 +149,7 @@ export default function RegistrationsClient({
 
         <StatsCard
           label="Non-Campers"
-          value={100}
+          value={data.filter(r => r.participationMode === "NON_CAMPER").length}
           icon={<UserPlus2Icon size={20} />}
           iconBg="purple"
           meta="+0% from last year"
@@ -152,7 +157,7 @@ export default function RegistrationsClient({
 
         <StatsCard
           label="Online Attendees"
-          value={20}
+          value={data.filter(r => r.participationMode === "ONLINE").length}
           icon={<User2Icon size={20} />}
           iconBg="red"
           meta="+0% from last year"
@@ -181,19 +186,6 @@ export default function RegistrationsClient({
           />
         </div>
       </div>
-      {/* <RegistrationsTable
-        data={data}
-        page={page}
-        totalPages={totalPages}
-        onPageChange={p =>
-          router.push(
-            `?${new URLSearchParams({
-              ...Object.fromEntries(params),
-              page: String(p),
-            })}`
-          )
-        }
-      /> */}
       <SendEmailModal open={emailOpen} onClose={() => setEmailOpen(false)} />
       <SendNotificationModal
         open={notifyOpen}

@@ -12,9 +12,11 @@ export async function generateAdminOtp(input: AdminEmailInput) {
     },
     body: JSON.stringify(input),
   });
-
+  console.log("RES:", res);
   if (!res.ok) {
-    throw new Error("Failed to generate OTP");
+    const errorData = await res.json();
+
+    throw new Error(errorData.message || "Failed to generate OTP");
   }
 
   return res.json();

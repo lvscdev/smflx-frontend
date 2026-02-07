@@ -9,7 +9,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen bg-muted/40 overflow-auto">
       <AdminSidebar />
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col min-w-0">
         <AdminNavbar />
         <main className="flex-1 p-6 lg:p-12">{children}</main>
       </div>

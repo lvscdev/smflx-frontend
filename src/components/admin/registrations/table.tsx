@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   ColumnDef,
   flexRender,
@@ -24,10 +25,11 @@ import { Registration } from "@/features/admin/registration/types/mapped-types";
 import {
   participationModeLabel,
   genderLabel,
-  paymentStatusLabel,
   paymentStatusBadgeClass,
   accommodationTypeLabel,
 } from "@/features/admin/registration/registration-mapper";
+
+import { paymentStatusLabel } from "@/features/admin/registration/types/registration-ui";
 
 function getColumns(isReadOnly: boolean): ColumnDef<Registration>[] {
   return [
@@ -61,15 +63,25 @@ function getColumns(isReadOnly: boolean): ColumnDef<Registration>[] {
       accessorKey: "payment",
       header: "Payment",
       cell: ({ row }) => {
-        const value = paymentStatusLabel[row.original.paymentStatus];
+        const value = paymentStatusLabel[row.original.user?.paymentStatus];
         return (
           <Badge
             variant="secondary"
-            className={paymentStatusBadgeClass[row.original.paymentStatus]}
+            className={
+              paymentStatusBadgeClass[row.original.user?.paymentStatus]
+            }
           >
-            {paymentStatusLabel[row.original.paymentStatus]}
+            {value}
           </Badge>
         );
+      },
+    },
+    {
+      accessorKey: "amount",
+      header: "Amount",
+      cell: ({ row }) => {
+        const amount = row.original.user?.amount ?? 0;
+        return `₦${amount.toLocaleString("en-NG")}`;
       },
     },
     {
@@ -110,9 +122,11 @@ function RegistrationsTable({
   // onSearch: (value: string) => void;
   // onFilter: (key: "type" | "gender" | "payment", value?: string) => void;
 }) {
+  const columns = useMemo(() => getColumns(isReadOnly), [isReadOnly]);
+
   const table = useReactTable({
     data,
-    columns: getColumns(isReadOnly),
+    columns,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true, // ✅ server-side pagination
     pageCount: totalPages,
@@ -157,7 +171,7 @@ function RegistrationsTable({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={getColumns(isReadOnly).length}
+                  colSpan={columns.length}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No registrations found.
@@ -169,29 +183,6 @@ function RegistrationsTable({
       </div>
 
       {/* Pagination */}
-      {/* <div className="flex items-center justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-        >
-          Previous
-        </Button>
-
-        <span className="text-sm text-muted-foreground">
-          Page {page} of {totalPages}
-        </span>
-
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page >= totalPages}
-          onClick={() => onPageChange(page + 1)}
-        >
-          Next
-        </Button>
-      </div> */}
 
       <div className="flex items-center justify-end gap-2">
         <Button

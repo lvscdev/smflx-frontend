@@ -1,52 +1,41 @@
 // import { notFound } from "next/navigation";
-// // import { getEventById } from "@/app/api/event";
-// // import { getRegistrationsPaginated } from "@/app/api/get-registrations";
+// import { Suspense } from "react";
+
 // import { getRegistrationsPaginated } from "@/features/admin/registration/server-actions";
 // import RegistrationsClient from "@/components/admin/registrations/registration-client";
-// import { Suspense } from "react";
 // import RegistrationsLoading from "./loading";
+// import page from "../../page";
+// // import { getEventById } from "@/features/admin/events/server-actions";
 
 // type PageProps = {
 //   params: Promise<{ eventId: string }>;
-//   searchParams: Promise<{
-//     page?: string;
-//     q?: string;
-//     type?: string;
-//     gender?: string;
-//     payment?: string;
-//   }>;
+//   searchParams: Promise<{ page?: string }>;
 // };
 
 // export default async function RegistrationsPage({
 //   params,
 //   searchParams,
 // }: PageProps) {
-//   const { page = "1", q, type, gender, payment } = await searchParams;
 //   const { eventId } = await params;
-
+//   const page = Number((await searchParams).page ?? "1");
 //   console.log("eventId:", eventId);
 
 //   if (!eventId) notFound();
 
-//   // ✅ Resolve event by ID
-//   const event = await getEventById(eventId);
-
-//   console.log(event);
-//   if (!event) notFound();
-
-//   const result = await getRegistrationsPaginated({
+//   const { data, totalPages } = await getRegistrationsPaginated({
 //     eventId,
-//     page: Number(page),
-//     query: q,
-//     filters: { type, gender, payment },
+//     page,
 //   });
+
+//   // const event = await getEventById(eventId);
 
 //   return (
 //     <Suspense fallback={<RegistrationsLoading />}>
 //       <RegistrationsClient
-//         event={event}
-//         data={result.data}
-//         totalPages={result.totalPages}
+//         eventId={eventId}
+//         // event={event}
+//         data={data}
+//         totalPages={totalPages}
 //       />
 //     </Suspense>
 //   );
@@ -55,15 +44,19 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { getRegistrationsPaginated } from "@/features/admin/registration/server-actions";
+import { getRegistrationsByEventId } from "@/features/admin/registration/server-actions";
 import RegistrationsClient from "@/components/admin/registrations/registration-client";
 import RegistrationsLoading from "./loading";
-import page from "../../page";
-// import { getEventById } from "@/features/admin/events/server-actions";
 
 type PageProps = {
   params: Promise<{ eventId: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    q?: string;
+    type?: string;
+    gender?: string;
+    payment?: string;
+  }>;
 };
 
 export default async function RegistrationsPage({
@@ -71,25 +64,31 @@ export default async function RegistrationsPage({
   searchParams,
 }: PageProps) {
   const { eventId } = await params;
-  const page = Number((await searchParams).page ?? "1");
-  console.log("eventId:", eventId);
 
   if (!eventId) notFound();
 
-  const { data, totalPages } = await getRegistrationsPaginated({
-    eventId,
-    page,
-  });
+  const sp = await searchParams;
+  const page = Number(sp.page ?? "1");
 
-  // const event = await getEventById(eventId);
+  const { data, totalPages, totalRegistrations } =
+    await getRegistrationsByEventId({
+      eventId,
+      page,
+      filters: {
+        q: sp.q,
+        type: sp.type,
+        gender: sp.gender,
+        payment: sp.payment,
+      },
+    });
 
   return (
     <Suspense fallback={<RegistrationsLoading />}>
       <RegistrationsClient
         eventId={eventId}
-        // event={event}
         data={data}
         totalPages={totalPages}
+        totalRegistrations={totalRegistrations}
       />
     </Suspense>
   );

@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 // import { AdminBreadcrumbs } from "@/components/admin/ui/Breadcrumbs";
 import { GlobalSearch } from "@/components/admin/ui/global-search";
 
+import { useAdminSession } from "@/hooks/useAdminSession";
+
 function AdminNavbar() {
+  const session = useAdminSession();
+
+  console.log("Admin Session in Navbar:", session);
   return (
     <header className="flex h-24 items-center justify-between border-b bg-slate-100 px-4 lg:px-16">
       {/* <div className="flex items-center gap-3">
@@ -17,7 +22,7 @@ function AdminNavbar() {
 
       <div>
         <h1 className="text-2xl font-bold leading-9 text-slate-950">
-          Welcome Back, Admin
+          Welcome Back, {session?.firstName}!
         </h1>
         <span className="font-normal text-lg text-slate-500">
           Here's what's happening with SMFLX Event 
@@ -36,12 +41,15 @@ function AdminNavbar() {
         <div className="flex items-center h-full gap-3 border border-slate-300 px-3 py-2 rounded-2xl">
           <Avatar className="h-10 w-10">
             <AvatarImage src="/avatar.png" />
-            <AvatarFallback>DA</AvatarFallback>
+            <AvatarFallback>
+              {session?.firstName?.charAt(0)}
+              {session?.lastName?.charAt(0)}
+            </AvatarFallback>
           </Avatar>
 
           <div className="hidden md:block ">
-            <p className="font-medium text-base leading-4">David Oladele</p>
-            <p className="text-sm text-slate-500">Super Admin</p>
+            <p className="font-medium text-base leading-5">{`${session?.firstName} ${session?.lastName}`}</p>
+            <p className="text-sm text-slate-500">{session?.role}</p>
           </div>
         </div>
       </div>

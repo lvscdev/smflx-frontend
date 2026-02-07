@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminOtpInput, AdminEmailInput } from "./schemas";
 import { AdminSessionResponse } from "./types";
+import { cs } from "zod/v4/locales";
 
 const BASE_URL = "https://loveseal-events-backend.onrender.com/admin-x-auth";
 
@@ -70,6 +71,7 @@ export async function assertAdminSession(): Promise<AdminSessionResponse | null>
   }
 
   const response = (await res.json()).data.userDetails as AdminSessionResponse;
+  console.log("Session Response:", response);
 
   return response;
 }

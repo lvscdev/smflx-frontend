@@ -1,20 +1,15 @@
 import {
   ParticipationMode,
-  PaymentStatus,
   Gender,
   AccommodationType,
 } from "./types/api-types";
+
+import { PaymentStatus } from "./types/registration-ui";
 
 export const participationModeLabel: Record<ParticipationMode, string> = {
   CAMPER: "Camper",
   NON_CAMPER: "Non-Camper",
   ONLINE: "Online",
-};
-
-export const paymentStatusLabel: Record<PaymentStatus, string> = {
-  COMPLETED: "Completed",
-  PENDING: "Pending",
-  FAILED: "Failed",
 };
 
 export const genderLabel: Record<Gender, string> = {

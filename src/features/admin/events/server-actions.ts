@@ -37,7 +37,7 @@ export async function getAllEvents(): Promise<Event[]> {
   }
 
   const response = await res.json();
-  console.log("All Events Response:", response);
+  console.log("All Events Response:", response.data.data);
 
   // ✅ RETURN ARRAY ONLY
   return response.data.data ?? [];

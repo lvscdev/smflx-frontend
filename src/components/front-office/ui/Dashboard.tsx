@@ -112,6 +112,7 @@ interface DashboardProps {
   profile: UserProfile | null;
   registration: DashboardRegistration | null;
   accommodation: DashboardAccommodation | null;
+  isLoggingOut?: boolean;
   onLogout: () => void;
   onAccommodationUpdate?: (data: DashboardAccommodation | null) => void;
   onRegistrationUpdate?: (data: DashboardRegistration | null) => void;
@@ -123,6 +124,7 @@ export function Dashboard({
   profile,
   registration,
   accommodation,
+  isLoggingOut = false,
   onLogout,
   onAccommodationUpdate,
   onRegistrationUpdate,
@@ -669,6 +671,7 @@ type AccommodationData = Parameters<
   }
 
   return (
+    <>
     <div className="flex-1 overflow-auto bg-[#F5F1E8]">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4">
@@ -787,30 +790,53 @@ type AccommodationData = Parameters<
                   "Apr 30th - May 3rd, 2026 · Dansol High School, Agidingbi, Lagos State"}
               </p>
 
-              <div className="flex items-center gap-2 lg:gap-3">
-                <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 text-center min-w-15 lg:min-w-17.5">
-                  <div className="text-2xl lg:text-3xl font-bold">
-                    {timeLeft.days}
+             <div className="flex items-center gap-2 lg:gap-3">
+                {/* Days */}
+                <div className="text-center">
+                  <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 min-w-15 lg:min-w-17.5">
+                    <div className="text-2xl lg:text-3xl font-bold drop-shadow-lg">
+                      {timeLeft.days}
+                    </div>
                   </div>
+                  <span className="text-xs mt-1 opacity-90 block drop-shadow">DAYS</span>
                 </div>
-                <div className="text-2xl lg:text-3xl font-bold">:</div>
-                <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 text-center min-w-15 lg:min-w-17.5">
-                  <div className="text-2xl lg:text-3xl font-bold">
-                    {String(timeLeft.hours).padStart(2, "0")}
+                
+                <div className="text-2xl lg:text-3xl font-bold drop-shadow-lg">:</div>
+                
+                {/* Hours */}
+                <div className="text-center">
+                  <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 min-w-15 lg:min-w-17.5">
+                    <div className="text-2xl lg:text-3xl font-bold drop-shadow-lg">
+                      {String(timeLeft.hours).padStart(2, "0")}
+                    </div>
                   </div>
+                  <span className="text-xs mt-1 opacity-90 block drop-shadow">HRS</span>
                 </div>
-                <div className="text-2xl lg:text-3xl font-bold">:</div>
-                <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 text-center min-w-15 lg:min-w-17.5">
-                  <div className="text-2xl lg:text-3xl font-bold">
-                    {String(timeLeft.minutes).padStart(2, "0")}
+                
+                <div className="text-2xl lg:text-3xl font-bold drop-shadow-lg">:</div>
+                
+                {/* Minutes */}
+                <div className="text-center">
+                  <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 min-w-15 lg:min-w-17.5">
+                    <div className="text-2xl lg:text-3xl font-bold drop-shadow-lg">
+                      {String(timeLeft.minutes).padStart(2, "0")}
+                    </div>
                   </div>
+                  <span className="text-xs mt-1 opacity-90 block drop-shadow">MINS</span>
                 </div>
-                <div className="text-2xl lg:text-3xl font-bold">:</div>
-                <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 text-center min-w-15 lg:min-w-17.5">
-                  <div className="text-2xl lg:text-3xl font-bold">
-                    {String(timeLeft.seconds).padStart(2, "0")}
+                
+                <div className="text-2xl lg:text-3xl font-bold drop-shadow-lg">:</div>
+                
+                {/* Seconds */}
+                <div className="text-center">
+                  <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 lg:px-4 lg:py-3 min-w-15 lg:min-w-17.5">
+                    <div className="text-2xl lg:text-3xl font-bold drop-shadow-lg">
+                      {String(timeLeft.seconds).padStart(2, "0")}
+                    </div>
                   </div>
+                  <span className="text-xs mt-1 opacity-90 block drop-shadow">SECS</span>
                 </div>
+              </div>
               </div>
             </div>
             <div className="absolute inset-0 bg-black/20" />
@@ -860,6 +886,41 @@ type AccommodationData = Parameters<
           </div>
         </div>
 
+        {/* Camper WITHOUT accommodation - show prompt to book */}
+        {!accommodation && attendeeType === "camper" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 lg:p-8 mb-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <Home className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-amber-900 mb-2">
+                  Accommodation Not Assigned
+                </h3>
+                <p className="text-amber-800 mb-4">
+                  As a camper, you need to select and pay for your accommodation. 
+                  Your registration is incomplete until accommodation is confirmed.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => setIsAccommodationModalOpen(true)}
+                    className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Select Accommodation
+                  </button>
+                  <button
+                    onClick={reloadDashboard}
+                    className="px-6 py-3 bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
+                    <RefreshCcw className={dashboardHydrating ? "w-4 h-4 animate-spin" : "w-4 h-4"} />
+                    Refresh
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Camper-only accommodation details */}
         {accommodation && attendeeType === "camper" && (
           <div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
@@ -878,7 +939,7 @@ type AccommodationData = Parameters<
                   : "bg-amber-50 text-amber-800 border border-amber-200")
                 }
                 >
-                {paidForAccommodation ? "Reserved" : "Pending Payment"}
+                {paidForAccommodation ? "✓ Reserved" : "⏳ Pending Payment"}
                 </span>
 
 
@@ -1325,6 +1386,16 @@ type AccommodationData = Parameters<
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+
+    {/* Logout loading overlay */}
+    {isLoggingOut && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center">
+        <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 shadow-2xl">
+          <Loader2 className="w-10 h-10 animate-spin text-red-600" />
+          <p className="text-gray-900 font-semibold text-lg">Logging out...</p>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

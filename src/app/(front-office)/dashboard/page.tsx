@@ -15,6 +15,7 @@ import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, D
 import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
 import { readOtpCookie } from "@/lib/auth/otpCookie";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 
@@ -53,6 +54,7 @@ function hasAccountFootprint(): boolean {
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -70,6 +72,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function boot() {
       const token = getAuthToken();
+      let hasShownSnapshot = false;
 
       // 0) Fast hydrate from 7-day snapshot (multi-event ready)
       const snap = loadDashboardSnapshot();
@@ -108,6 +111,7 @@ export default function DashboardPage() {
 
           // Show dashboard immediately; refresh will run below
           setLoading(false);
+          hasShownSnapshot = true;
         }
       }
 
@@ -201,13 +205,42 @@ export default function DashboardPage() {
               dashboardData.registrations[0] ??
               null;
 
-            const accForEvent =
-              dashboardData.accommodations.find((a) => a.eventId === eventId) ??
-              dashboardData.accommodations[0] ??
-              null;
+            // IMPROVED: Better accommodation matching with multiple strategies
+            let accForEvent: DashboardAccommodation | null = null;
+            
+            
+            // Strategy 1: Match by eventId
+            if (dashboardData.accommodations.length > 0) {
+              accForEvent = dashboardData.accommodations.find(
+                (a) => a.eventId === eventId) ?? null;
+            }
+            
+            // Strategy 2: If camper and only one accommodation, use it
+            if (
+              !accForEvent && 
+              regForEvent?.participationMode === "CAMPER" &&
+              dashboardData.accommodations.length === 1
+            ) {
+              accForEvent = dashboardData.accommodations[0];
+            }
+            
+            // Strategy 3: Fall back to first accommodation
+            if (!accForEvent && dashboardData.accommodations.length > 0) {
+              accForEvent = dashboardData.accommodations[0];
+            }
 
             setRegistration(regForEvent);
             setAccommodation(accForEvent);
+
+            // IMPROVED: Log warning if camper has no accommodation
+            if (regForEvent?.participationMode === "CAMPER" && !accForEvent) {
+              console.warn("⚠️ Camper registration found but no accommodation data:", {
+                eventId,
+                registrationId: regForEvent.registrationId,
+                accommodationsCount: dashboardData.accommodations.length,
+                accommodations: dashboardData.accommodations,
+              });
+            }
 
             if (!selectedEvent && regForEvent) {
               setSelectedEvent({
@@ -221,8 +254,18 @@ export default function DashboardPage() {
 
           } catch (err) {
             console.error("Failed to fetch dashboard data:", err);
-            // Continue without dashboard data - user can still see profile
+            
+            // IMPROVED: Show error to user instead of silently failing
+            if (!hasShownSnapshot) {
+              toast.error("Failed to load dashboard data. Please refresh the page.");
+            } else {
+              toast.warning("Could not refresh dashboard. Showing cached data.");
+            }
           }
+        } else {
+          // IMPROVED: No eventId found - show helpful error
+          console.error("No eventId found for dashboard");
+          toast.error("Could not load your registration. Please try logging in again.");
         }
 
         // Persist to flow state
@@ -247,7 +290,10 @@ export default function DashboardPage() {
           router.replace("/returning-user");
           return;
         }
-        // Other errors: keep going, dashboard can show its own errors
+        
+        // IMPROVED: Show other errors to user
+        console.error("Dashboard boot error:", err);
+        toast.error("Failed to load dashboard. Please try again.");
       }
 
       // 3) Token valid: if there's a saved flow state that isn't dashboard, resume it
@@ -266,16 +312,27 @@ export default function DashboardPage() {
         setSelectedEvent(saved.selectedEvent ?? null);
       }
 
-      setLoading(false);
+      // Final check: if still loading, stop it
+      if (!hasShownSnapshot) {
+        setLoading(false);
+      }
     }
 
     boot();
   }, [router]);
 
+  // IMPROVED: Instant logout with visual feedback
   const handleLogout = () => {
+    // Immediate visual feedback
+    setIsLoggingOut(true);
+    
+    // Clear all data
     setAuthToken(null);
     clearTokenCookie();
     safeClearFlowState();
+    clearDashboardSnapshot();
+    
+    // Navigate
     router.push("/");
   };
 
@@ -293,6 +350,7 @@ export default function DashboardPage() {
             profile={profile}
             registration={registration}
             accommodation={accommodation}
+            isLoggingOut={isLoggingOut}
             onLogout={handleLogout}
             onProfileUpdate={(p) => {
               setProfile(p);

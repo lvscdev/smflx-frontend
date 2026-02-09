@@ -214,7 +214,7 @@ export async function cancelAccommodationBooking(bookingId: string) {
  */
 export async function getHostelUnoccupiedCapacity(): Promise<number | null> {
   const url =
-    'https://loveseal-events-backend.onrender.com/accommodation/hostel/unoccupied';
+    'https://api.smflx.org/accommodation/hostel/unoccupied';
 
   const res = await fetch(url, {
     method: 'GET',

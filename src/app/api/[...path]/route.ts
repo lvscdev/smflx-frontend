@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_BASE_URL =
   process.env.SMFLX_BACKEND_BASE_URL ??
-  "https://loveseal-events-backend.onrender.com";
+  "https://api.smflx.org";
 
 function buildTargetUrl(pathSegments: string[]) {
   const path = pathSegments.map(encodeURIComponent).join("/");

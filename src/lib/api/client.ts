@@ -2,7 +2,7 @@ export const DEFAULT_API_BASE_URL = (() => {
   const env = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
   if (!env || env === "/api" || env.endsWith("/api")) {
-    return "https://api.smflx.org";
+    return "https://loveseal-events-backend.onrender.com";
   }
 
   return env.replace(/\/$/, "");

@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * Security: Korapay sends a signature header for verification - backend must verify it.
  */
 
-const BACKEND_BASE_URL = process.env.SMFLX_BACKEND_BASE_URL || 'https://api.smflx.org';
+const BACKEND_BASE_URL = process.env.SMFLX_BACKEND_BASE_URL || 'https://loveseal-events-backend.onrender.com';
 
 export async function POST(request: NextRequest) {
   try {

@@ -2,8 +2,9 @@ import { cookies } from "next/headers";
 
 import { Registration } from "./types/mapped-types";
 import { RegistrationTableUi } from "./types/registration-ui";
+import { BASE_URL } from "@/lib/base-url";
 
-const BASE_URL = "https://loveseal-events-backend.onrender.com";
+const REGISTRATION_BASE_URL = `${BASE_URL}/registrations`;
 
 type RegistrationFilters = {
   type?: string;
@@ -54,7 +55,7 @@ export async function getRegistrationsByEventId({
 
   // Fetching registrations
   const res = await fetch(
-    `${BASE_URL}/registrations/event/${eventId}?page=${page}`,
+    `${REGISTRATION_BASE_URL}/event/${eventId}?page=${page}`,
     {
       headers: {
         accept: "application/json",
@@ -106,7 +107,7 @@ export async function getAllRegistrations(): Promise<{
   const token = (await cookies()).get("admin_session")?.value;
   if (!token) return { data: [], totalRegistrations: 0 };
 
-  const res = await fetch(`${BASE_URL}/registrations/all`, {
+  const res = await fetch(`${REGISTRATION_BASE_URL}/all`, {
     headers: {
       accept: "application/json",
       Authorization: `Bearer ${token}`,

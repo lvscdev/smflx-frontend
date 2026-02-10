@@ -31,7 +31,7 @@ export function validateDependentDraft(d: DependentDraft): ValidationResult {
 
   const n = parseInt(age, 10);
   if (Number.isNaN(n)) return { ok: false, message: 'Please enter a valid age.' };
-  // Business rule: dependents must be ages 5–12.
+  // Business rule: dependents must be ages 0–12.
   if (n >= 13) {
     return {
       ok: false,
@@ -39,8 +39,8 @@ export function validateDependentDraft(d: DependentDraft): ValidationResult {
         'Ages 13 and above must register as an attendee. Please register them separately.',
     };
   }
-  if (n < 5 || n > 12) {
-    return { ok: false, message: 'Dependents must be between 5 and 12 years old.' };
+  if (n < 0 || n > 12) {
+    return { ok: false, message: 'Dependents must be between 0 and 12 years old.' };
   }
 
   if (!gender) return { ok: false, message: 'Please select the dependent’s gender.' };

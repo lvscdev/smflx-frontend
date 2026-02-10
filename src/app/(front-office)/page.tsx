@@ -9,11 +9,11 @@ import { ReturningUserLogin } from "@/components/front-office/ui/ReturningUserLo
 import { ProfileForm } from "@/components/front-office/ui/ProfileForm";
 import { EventSelection } from "@/components/front-office/ui/EventSelection";
 import { EventRegistration } from "@/components/front-office/ui/EventRegistration";
+import { getHostelUnoccupiedCapacity } from "@/lib/api/accommodations";
 import { AccommodationSelection } from "@/components/front-office/ui/AccommodationSelection";
 import { Payment } from "@/components/front-office/ui/Payment";
-
 import { getAuthToken } from "@/lib/api/client";
-import { createUserRegistration, getAccommodations } from "@/lib/api";
+import { createUserRegistration} from "@/lib/api";
 
 type View =
   | "verify"
@@ -98,28 +98,23 @@ export default function HomePage() {
     setView(nextView);
   }, [router]);
 
-  useEffect(() => {
-    async function fetchHostelAvailability() {
-      try {
-        const eventId = selectedEvent?.eventId;
-        if (!eventId) return;
+useEffect(() => {
+  async function fetchHostelAvailability() {
+    try {
+      if (!selectedEvent?.eventId) return;
 
-        const data = await getAccommodations({
-          eventId,
-          type: "HOSTEL",
-        });
-
-        const available = data?.metadata?.totalAvailable;
-        if (typeof available === "number") {
-          setHostelSpacesLeft(available);
-        }
-      } catch (err) {
-        console.error("Failed to fetch hostel availability:", err);
+      const left = await getHostelUnoccupiedCapacity();
+      if (typeof left === "number") {
+        setHostelSpacesLeft(left);
       }
+    } catch (err) {
+      console.error("Failed to fetch hostel availability:", err);
     }
+  }
 
-    fetchHostelAvailability();
-  }, [selectedEvent?.eventId]);
+  fetchHostelAvailability();
+}, [selectedEvent?.eventId]);
+
 
   useEffect(() => {
     if (view === "verify" || view === "login") return;

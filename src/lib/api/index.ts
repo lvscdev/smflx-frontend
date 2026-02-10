@@ -190,6 +190,19 @@ export async function payForDependant(payload: {
   return response?.data || response;
 }
 
+export async function initiateDependentPayment(payload: {
+  dependantId: string;
+  parentRegId: string;
+}) {
+  const response = await apiRequest<any>("/user-dashboard/pay-for-dependants", {
+    method: "POST",
+    body: payload,
+  });
+  
+  // The response should contain checkoutUrl
+  return response?.data || response;
+}
+
 // Dashboard types
 export type DashboardRegistration = {
   registrationId: string;
@@ -236,6 +249,28 @@ export type UserDashboardData = {
   paymentSummary?: PaymentSummary;
 };
 
+/**
+ * CRITICAL FIX: Maps participationMode to attendeeType
+ * Backend returns participationMode, but Dashboard expects attendeeType
+ */
+function mapParticipationModeToAttendeeType(mode: string | undefined): string | undefined {
+  if (!mode) return undefined;
+  
+  const modeUpper = mode.toUpperCase();
+  
+  switch (modeUpper) {
+    case "CAMPER":
+      return "camper";
+    case "ATTENDEE":
+      return "physical";
+    case "ONLINE":
+      return "online";
+    default:
+      // If already lowercase, return as-is
+      return mode.toLowerCase();
+  }
+}
+
 export async function getUserDashboard(eventId: string): Promise<NormalizedDashboardResponse> {
   const response = await apiRequest<unknown>(`/user-dashboard/${eventId}`, { method: "GET" });
 
@@ -280,6 +315,59 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       ? [regsUnknown as DashboardReg]
       : [];
 
+  // CRITICAL FIX: Map participationMode to attendeeType for each registration
+  registrations.forEach((reg) => {
+    const regObj = reg as Record<string, unknown>;
+    
+    // If attendeeType is missing but participationMode exists, map it
+    if (!regObj.attendeeType && regObj.participationMode) {
+      regObj.attendeeType = mapParticipationModeToAttendeeType(regObj.participationMode as string);
+    }
+    
+    // Also ensure eventId is present (some backends might omit it)
+    if (!regObj.eventId && eventId) {
+      regObj.eventId = eventId;
+    }
+  
+
+  // If backend returns a "flat" dashboard shape (e.g. regId, attendanceType, eventData)
+  // synthesize a single registration so UI logic stays consistent.
+  if (registrations.length === 0) {
+    const flatRegId =
+      (obj["registrationId"] as string | undefined) ??
+      (obj["regId"] as string | undefined) ??
+      (obj["id"] as string | undefined);
+
+    const participationMode =
+      (obj["participationMode"] as string | undefined) ??
+      (obj["attendanceType"] as string | undefined) ??
+      (obj["attendeeType"] as string | undefined);
+
+    const eventData =
+      (obj["eventData"] && typeof obj["eventData"] === "object")
+        ? (obj["eventData"] as Record<string, unknown>)
+        : null;
+
+    if (flatRegId || participationMode || eventData) {
+      const regObj: Record<string, unknown> = {
+        registrationId: flatRegId,
+        regId: flatRegId,
+        eventId: (eventData?.["eventId"] as string | undefined) ?? eventId,
+        participationMode,
+        attendeeType: mapParticipationModeToAttendeeType(participationMode ?? ""),
+        eventTitle:
+          (eventData?.["eventTitle"] as string | undefined) ??
+          (eventData?.["eventName"] as string | undefined),
+        eventName:
+          (eventData?.["eventTitle"] as string | undefined) ??
+          (eventData?.["eventName"] as string | undefined),
+      };
+
+      registrations.push(regObj as DashboardReg);
+    }
+  }
+});
+
   const accUnknown =
     (obj["accommodations"] as unknown) ??
     (obj["accommodation"] as unknown);
@@ -289,6 +377,14 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
     : accUnknown && typeof accUnknown === "object"
       ? [accUnknown as DashboardAcc]
       : [];
+
+  // CRITICAL FIX: Ensure accommodations have eventId
+  accommodations.forEach((acc) => {
+    const accObj = acc as Record<string, unknown>;
+    if (!accObj.eventId && eventId) {
+      accObj.eventId = eventId;
+    }
+  });
 
   const depsUnknown =
     (obj["dependents"] as unknown) ??
@@ -412,4 +508,3 @@ export async function verifyPayment(params: {
   const response = await apiRequest<any>(url, { method: "GET" });
   return response?.data || response;
 }
-

@@ -42,7 +42,6 @@ export function DependentsSection({ dependents, onRegister, onPay }: DependentsS
   }
 
 
-  const allRegistered = dependents.every(d => d.isRegistered);
   const unpaidRegistered = dependents.filter(d => d.isRegistered && !d.isPaid);
   const totalUnpaidAmount = unpaidRegistered.length * 7000;
 
@@ -191,7 +190,7 @@ export function DependentsSection({ dependents, onRegister, onPay }: DependentsS
         </div>
 
         {/* Pay for All Button */}
-        {allRegistered && unpaidRegistered.length > 0 && (
+        {unpaidRegistered.length > 1 && (
           <div className="mt-6 p-5 bg-linear-to-br from-red-50 to-orange-50 rounded-xl border-2 border-red-200">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">

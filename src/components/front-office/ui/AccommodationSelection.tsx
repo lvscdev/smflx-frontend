@@ -92,7 +92,6 @@ export function AccommodationSelection({
   const [submitting, setSubmitting] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<Facility>();
   const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
-
   const isHostel = accommodationType.toLowerCase() === "hostel";
   const isHotel = accommodationType.toLowerCase() === "hotel";
 
@@ -192,16 +191,35 @@ export function AccommodationSelection({
 
       const resolvedUserId = userId || profile?.userId || "";
       const resolvedRegId = registrationId || "";
+      
+      if (!resolvedRegId || !resolvedUserId || !eventId || !selectedFacility?.facilityId) {
+          setError("Missing booking details. Please refresh and try again.");
+          setSubmitting(false);
+          return;
+        }
 
       let response;
 
-      if (isHostel) {
-        response = await initiateHostelAllocation({
-          registrationId: resolvedRegId,
-          eventId: eventId,
-          userId: resolvedUserId,
-          facilityid: selectedFacility?.facilityId || "",
-        });
+    if (isHostel) {
+      const facilityIdResolved =
+        (selectedFacility as any)?.facilityId ||
+        (selectedFacility as any)?.facilityid ||
+        (selectedFacility as any)?.id ||
+        (selectedFacility as any)?._id ||
+        "";
+
+      if (!facilityIdResolved) {
+        setError("Please select a hostel facility before continuing.");
+        setSubmitting(false);
+        return;
+      }
+
+      response = await initiateHostelAllocation({
+        registrationId: resolvedRegId,
+        eventId,
+        userId: resolvedUserId,
+        facilityid: facilityIdResolved,
+      });
       } else {
         response = await initiateHotelAllocation({
           registrationId: resolvedRegId,
@@ -586,3 +604,4 @@ export function AccommodationSelection({
     </div>
   );
 }
+

@@ -609,17 +609,40 @@ type AccommodationData = Parameters<
     }
   };
 
-  const handleRegisterDependent = (id: string) => {
-    const updatedDependents = dependents.map((d) =>
-      d.id === id ? { ...d, isRegistered: true } : d,
-    );
-    const registered = dependents.find((d) => d.id === id);
-    if (registered?.name) {
-      setRegisteredDependentName(registered.name);
-      setIsRegistrationSuccessModalOpen(true);
+const handleRegisterDependent = async (id: string) => {
+  const dependent = dependents.find((d) => d.id === id);
+  if (!dependent) return;
+
+  const updatedDependents = dependents.map((d) =>
+    d.id === id ? { ...d, isRegistered: true } : d,
+  );
+  setDependents(updatedDependents);
+
+  try {
+    const eventId = getEventId(registration);
+    if (!eventId) {
+      throw new Error("Missing eventId");
     }
-    setDependents(updatedDependents);
-  };
+
+    await apiAddDependent({
+      eventId,
+      name: dependent.name,
+      age: Number(dependent.age) || 0,
+      gender: (dependent.gender?.toUpperCase() === "FEMALE" ? "FEMALE" : "MALE") as "MALE" | "FEMALE",
+    });
+
+    setRegisteredDependentName(dependent.name);
+    setIsRegistrationSuccessModalOpen(true);
+
+    await reloadDashboard();
+
+  } catch (err: unknown) {
+    setDependents(dependents);
+    setDashboardLoadError(
+      getErrorMessage(err, `Failed to register ${dependent.name}. Please try again.`)
+    );
+  }
+};
 
   const handlePayForDependents = (ids: string[]) => {
     const selected = dependents.filter((d) => ids.includes(d.id));

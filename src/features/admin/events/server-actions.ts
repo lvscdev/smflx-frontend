@@ -9,15 +9,16 @@ import { mapCreateEventFormToApi } from "./event-mapper";
 import { createEventSchema, editEventSchema } from "./event-form-schema";
 
 import { assertAdminSession } from "../auth/server-actions";
+import { BASE_URL } from "@/lib/base-url";
 
-const BASE_URL = "https://loveseal-events-backend.onrender.com/events";
+const EVENTS_BASE_URL = `${BASE_URL}/events`;
 
 export async function getAllEvents(): Promise<Event[]> {
   const token = (await cookies()).get("admin_session")?.value;
   console.log("Token:", token);
   if (!token) return [];
 
-  const res = await fetch(`${BASE_URL}`, {
+  const res = await fetch(`${EVENTS_BASE_URL}`, {
     headers: {
       accept: "application/json",
       Authorization: `Bearer ${token}`,
@@ -58,7 +59,7 @@ export async function createEventAction(formValues: unknown) {
   console.log("User Session:", session);
   if (!session) throw new Error("Unauthorized");
 
-  const res = await fetch(BASE_URL, {
+  const res = await fetch(EVENTS_BASE_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -124,7 +125,7 @@ export async function updateEventAction(eventId: string, formValues: unknown) {
   };
 
   // 4️⃣ Call backend
-  const res = await fetch(`${BASE_URL}/${eventId}`, {
+  const res = await fetch(`${EVENTS_BASE_URL}/${eventId}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -147,7 +148,7 @@ export async function setEventStatus(
   id: string,
   status: "draft" | "active" | "closed",
 ) {
-  const res = await fetch(`${BASE_URL}/${id}/${status}`, {
+  const res = await fetch(`${EVENTS_BASE_URL}/${id}/${status}`, {
     method: "PATCH",
     headers: await authHeaders(),
   });

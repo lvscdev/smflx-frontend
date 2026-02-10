@@ -6,13 +6,15 @@ import { AdminOtpInput, AdminEmailInput } from "./schemas";
 import { AdminSessionResponse } from "./types";
 import { cs } from "zod/v4/locales";
 
-const BASE_URL = "https://loveseal-events-backend.onrender.com/admin-x-auth";
+import { BASE_URL } from "@/lib/base-url";
+
+const AUTH_BASE_URL = `${BASE_URL}/admin-x-auth`;
 
 export async function validateAdminOtpAction(
   input: AdminOtpInput,
   redirectTo: string,
 ) {
-  const res = await fetch(`${BASE_URL}/otp-validate`, {
+  const res = await fetch(`${AUTH_BASE_URL}/otp-validate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -28,7 +30,7 @@ export async function validateAdminOtpAction(
   const data = await res.json();
   console.log("DATA:", data);
   const token = data.data.token;
-  console.log("TOKEN:", token);
+  // console.log("TOKEN:", token);
 
   // 🔐 Set secure, HTTP-only cookie
   (await cookies()).set("admin_session", token, {
@@ -57,7 +59,7 @@ export async function assertAdminSession(): Promise<AdminSessionResponse | null>
 
   if (!token) return null;
 
-  const res = await fetch(`${BASE_URL}/login`, {
+  const res = await fetch(`${AUTH_BASE_URL}/login`, {
     method: "GET",
     headers: {
       accept: "application/json",
@@ -77,7 +79,7 @@ export async function assertAdminSession(): Promise<AdminSessionResponse | null>
 }
 
 export async function resendAdminOtpAction(input: AdminEmailInput) {
-  const res = await fetch(`${BASE_URL}/otp-generate`, {
+  const res = await fetch(`${AUTH_BASE_URL}/otp-generate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

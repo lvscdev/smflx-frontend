@@ -1,10 +1,12 @@
 import { AdminEmailInput } from "./schemas";
 // import { AdminOtpInput } from "./schemas";
 
-const BASE_URL = "https://loveseal-events-backend.onrender.com/admin-x-auth";
+import { CLIENT_API_BASE_URL } from "@/lib/base-url";
+
+const BASE_URL = CLIENT_API_BASE_URL;
 
 export async function generateAdminOtp(input: AdminEmailInput) {
-  const res = await fetch(`${BASE_URL}/otp-generate`, {
+  const res = await fetch(`${BASE_URL}/admin-x-auth/otp-generate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -13,6 +15,7 @@ export async function generateAdminOtp(input: AdminEmailInput) {
     body: JSON.stringify(input),
   });
   console.log("RES:", res);
+  console.log(BASE_URL);
   if (!res.ok) {
     const errorData = await res.json();
 

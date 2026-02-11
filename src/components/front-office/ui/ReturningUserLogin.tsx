@@ -8,9 +8,9 @@ import { AUTH_USER_STORAGE_KEY, setAuthToken } from "@/lib/api/client";
 import { toUserMessage } from "@/lib/errors";
 import { InlineAlert } from "./InlineAlert";
 
-interface ReturningUserLoginProps {
+export interface ReturningUserLoginProps {
   initialEmail?: string;
-  onLoginSuccess: (email?: string) => void; 
+  onLoginSuccess: (email?: string) => void;
   onCancel: () => void;
 }
 
@@ -39,8 +39,9 @@ export function ReturningUserLogin({
     try {
       const { reference } = await generateLoginOtp(trimmed);
       setOtpReference(reference);
-      // Keep a short-lived (7d) hint so dashboard landing can prefill ReturningUser
+
       setOtpCookie(trimmed);
+
       setStep("code");
     } catch (err: any) {
       setError(toUserMessage(err, { feature: "otp", action: "send" }));
@@ -57,6 +58,7 @@ export function ReturningUserLogin({
   const handleCodeSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
+    const trimmed = email.trim();
 
     if (code.length !== 6) {
       setError("Please enter a valid 6-digit code");
@@ -70,15 +72,13 @@ export function ReturningUserLogin({
 
     setLoading(true);
     try {
-      const trimmed = email.trim();
-
       const { token, userDetails } = await validateOtp({
         email: trimmed,
         otp: code,
         otpReference,
       });
 
-      // ✅ Persist session (localStorage + cookie)
+      // Persist session (localStorage + cookie)
       setAuthToken(token);
       setTokenCookie(token);
 
@@ -88,7 +88,7 @@ export function ReturningUserLogin({
         // ignore
       }
 
-      // ✅ give the email back to the parent so it can resume properly
+      // hand back to parent to resume the flow (parent decides routing)
       onLoginSuccess(trimmed);
     } catch (err: any) {
       setError(toUserMessage(err, { feature: "otp", action: "verify" }));
@@ -97,7 +97,7 @@ export function ReturningUserLogin({
     }
   };
 
-  return (
+return (
     <div className="flex-1 flex flex-col bg-white relative">
       {/* Centered Content */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
@@ -228,3 +228,6 @@ export function ReturningUserLogin({
     </div>
   );
 }
+
+
+export default ReturningUserLogin;

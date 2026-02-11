@@ -107,6 +107,33 @@ const toDependent = (d: DashboardDependent): Dependent => {
   return { id, name, age, gender, isRegistered, isPaid };
 };
 
+
+function normalizeAttendeeType(reg: any): "camper" | "physical" | "online" | undefined {
+  const raw = reg?.attendeeType ?? reg?.attendanceType ?? reg?.participationMode;
+  if (!raw) return undefined;
+  const val = String(raw).toLowerCase();
+  if (val.includes("camp")) return "camper";
+  if (val.includes("online")) return "online";
+  return "physical";
+}
+
+function normalizeAccommodation(acc: any) {
+  if (!acc) return null;
+  const status = String(acc?.status ?? acc?.paymentStatus ?? "").toLowerCase();
+  const paid =
+    acc?.paidForAccommodation === true ||
+    acc?.isPaid === true ||
+    status === "paid" ||
+    status === "success" ||
+    status.includes("paid");
+
+  return {
+    ...acc,
+    bed: acc?.bed ?? acc?.bedspace ?? acc?.bedSpace ?? acc?.bed_space ?? null,
+    paidForAccommodation: paid,
+  };
+}
+
 interface DashboardProps {
   userEmail: string;
   profile: UserProfile | null;
@@ -475,16 +502,13 @@ type AccommodationData = Parameters<
   const firstName =
     (localProfile?.firstName ?? "User");
 
-  const attendeeType = registration?.attendeeType as
-    | "camper"
-    | "physical"
-    | "online"
-    | undefined;
+  const attendeeType = normalizeAttendeeType(registration);
+  const normalizedAccommodation = normalizeAccommodation(accommodation);
   const isNonCamper = attendeeType === "physical" || attendeeType === "online";
-  const showAccommodationPromo = isNonCamper && !accommodation;
+  const showAccommodationPromo = isNonCamper && !normalizedAccommodation;
 
   // Camper accommodation payment state (from dashboard API)
-  const paidForAccommodation = accommodation?.paidForAccommodation === true;
+  const paidForAccommodation = normalizedAccommodation?.paidForAccommodation === true;
 
   const handleAccommodationType = (type: string) => {
     setSelectedAccommodationType(type);
@@ -884,8 +908,9 @@ const handleRegisterDependent = async (id: string) => {
         </div>
 
         {/* Camper-only accommodation details */}
-        {accommodation && attendeeType === "camper" && (
-          <div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
+        {attendeeType === "camper" && (
+  accommodation ? (
+<div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-2">
                 <Home className="w-5 h-5 text-gray-700" />
@@ -931,8 +956,8 @@ const handleRegisterDependent = async (id: string) => {
                     Bedspace
                   </span>
                   <span className="text-base font-semibold capitalize">
-                    {typeof (accommodation as Record<string, unknown>).bed === "string"
-                      ? String((accommodation as Record<string, unknown>).bed).replace(/-/g, " ")
+                    {typeof (normalizedAccommodation as Record<string, unknown>).bed === "string"
+                      ? String((normalizedAccommodation as Record<string, unknown>).bed).replace(/-/g, " ")
                       : "Bedspace 101"}
                   </span>
                 </div>
@@ -949,8 +974,9 @@ const handleRegisterDependent = async (id: string) => {
               </div>
             </div>
 
-            {attendeeType === "camper" && accommodation && (
-              <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+            {attendeeType === "camper" && (
+  accommodation ? (
+<div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div className="text-sm text-gray-600">
                   {paidForAccommodation
                     ? "Payment confirmed. Your accommodation is reserved."
@@ -985,9 +1011,25 @@ const handleRegisterDependent = async (id: string) => {
                   )}
                 </div>
               </div>
-            )}
+  ) : (
+<div className="rounded-xl border p-4">
+  <p className="font-medium">Accommodation</p>
+  <p className="text-sm opacity-80">
+    You’re registered as a camper. Your accommodation details aren’t loaded yet.
+  </p>
+</div>
+  )
+)}
           </div>
-        )}
+  ) : (
+<div className="rounded-xl border p-4">
+  <p className="font-medium">Accommodation</p>
+  <p className="text-sm opacity-80">
+    You’re registered as a camper. Your accommodation details aren’t loaded yet.
+  </p>
+</div>
+  )
+)}
 
         {/* Non-camper upgrade CTA (re-using your existing promo card) */}
         {showAccommodationPromo && (

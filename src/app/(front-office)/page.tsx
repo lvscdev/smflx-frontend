@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { WhatsAppFloat } from "@/components/front-office/ui/WhatsAppFloat";
 import { Sidebar } from "@/components/front-office/ui/Sidebar";
 import { EmailVerification } from "@/components/front-office/ui/EmailVerification";
@@ -13,7 +13,8 @@ import { getHostelUnoccupiedCapacity } from "@/lib/api/accommodations";
 import { AccommodationSelection } from "@/components/front-office/ui/AccommodationSelection";
 import { Payment } from "@/components/front-office/ui/Payment";
 import { getAuthToken } from "@/lib/api/client";
-import { createUserRegistration} from "@/lib/api";
+import { createUserRegistration } from "@/lib/api";
+import { setActiveEventCookie } from "@/lib/auth/session";
 
 type View =
   | "verify"
@@ -56,7 +57,16 @@ function safeClearFlowState() {
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [view, setView] = useState<View>("verify");
+
+  // Allow deep-linking into login view (used by /returning-user redirect)
+  useEffect(() => {
+    const v = searchParams.get("view");
+    const e = searchParams.get("email");
+    if (e) setEmail(e);
+    if (v === "login") setView("login");
+  }, [searchParams]);
 
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState<any>(null);
@@ -84,6 +94,7 @@ export default function HomePage() {
     if (!saved) return;
 
     if (saved.view === "dashboard") {
+      if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
       router.push("/dashboard");
       return;
     }
@@ -96,25 +107,24 @@ export default function HomePage() {
 
     const nextView: View = saved.view || "verify";
     setView(nextView);
-  }, [router]);
+  }, [router, selectedEvent?.eventId]);
 
-useEffect(() => {
-  async function fetchHostelAvailability() {
-    try {
-      if (!selectedEvent?.eventId) return;
+  useEffect(() => {
+    async function fetchHostelAvailability() {
+      try {
+        if (!selectedEvent?.eventId) return;
 
-      const left = await getHostelUnoccupiedCapacity();
-      if (typeof left === "number") {
-        setHostelSpacesLeft(left);
+        const left = await getHostelUnoccupiedCapacity();
+        if (typeof left === "number") {
+          setHostelSpacesLeft(left);
+        }
+      } catch (err) {
+        console.error("Failed to fetch hostel availability:", err);
       }
-    } catch (err) {
-      console.error("Failed to fetch hostel availability:", err);
     }
-  }
 
-  fetchHostelAvailability();
-}, [selectedEvent?.eventId]);
-
+    fetchHostelAvailability();
+  }, [selectedEvent?.eventId]);
 
   useEffect(() => {
     if (view === "verify" || view === "login") return;
@@ -224,6 +234,7 @@ useEffect(() => {
 
         {view === "login" && (
           <ReturningUserLogin
+            initialEmail={email}
             onLoginSuccess={(userEmail) => {
               const nextEmail = (userEmail || email).trim();
               if (nextEmail) setEmail(nextEmail);
@@ -250,6 +261,7 @@ useEffect(() => {
                 accommodation,
               });
 
+              if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
               router.push("/dashboard");
             }}
             onCancel={() => setView("verify")}
@@ -275,6 +287,7 @@ useEffect(() => {
             onBack={() => setView("profile")}
             onSelectEvent={(eventId, eventName) => {
               setSelectedEvent({ eventId, eventName });
+              if (eventId) setActiveEventCookie(eventId);
               setView("event-registration");
             }}
           />
@@ -349,6 +362,7 @@ useEffect(() => {
                   registration: next,
                   accommodation,
                 });
+                if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
                 router.push("/dashboard");
               } catch (e: any) {
                 setRegistrationPersistError(
@@ -373,6 +387,7 @@ useEffect(() => {
             onBack={() => setView("event-registration")}
             onComplete={async (data) => {
               setAccommodation(data);
+              setView("payment");
             }}
           />
         )}
@@ -380,6 +395,13 @@ useEffect(() => {
         {view === "payment" && (
           <Payment
             amount={paymentAmount}
+            eventId={selectedEvent?.eventId}
+            userId={registration?.userId}
+            registrationId={registration?.registrationId}
+            email={email}
+            profile={profile}
+            registration={registration}
+            accommodation={accommodation}
             onBack={() => setView("accommodation")}
             onComplete={() => {
               safeSaveFlowState({
@@ -390,6 +412,7 @@ useEffect(() => {
                 registration,
                 accommodation,
               });
+              if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
               router.push("/dashboard");
             }}
           />

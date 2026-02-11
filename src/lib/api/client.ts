@@ -134,7 +134,7 @@ export async function apiRequest<T>(
 
     if (hasBody) retryHeaders["Content-Type"] = "application/json";
 
-    retryHeaders["Authorization"] = rawToken;
+    retryHeaders["Authorization"] = `Bearer ${rawToken}`;
 
     res = await doFetch(retryHeaders);
   }

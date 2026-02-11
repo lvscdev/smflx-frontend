@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeProvider } from "@/components/theme-provider"; // keep your current import path
 
 export const metadata: Metadata = {
-  title: "SMFLX Registration Portal",
-  description: "Register for WOTH Camp Meeting and other SMFLX events",
+  title: "SMFLX",
+  description: "SMFLX Front Office",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full light">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body className="h-full antialiased">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-            {children}
-            <Toaster />
+          {children}
         </ThemeProvider>
       </body>
     </html>

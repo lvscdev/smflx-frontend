@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_BASE_URL =
-  process.env.SMFLX_BACKEND_BASE_URL ??
-  "https://loveseal-events-backend.onrender.com/";
+function getBackendBaseUrl() {
+  const raw = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!raw) {
+    // Do NOT throw at module scope. Return a response error when called.
+    return null;
+  }
+  return raw.replace(/\/$/, "");
+}
 
-function buildTargetUrl(pathSegments: string[]) {
+function buildTargetUrl(base: string, pathSegments: string[]) {
   const path = pathSegments.map(encodeURIComponent).join("/");
-  return `${BACKEND_BASE_URL}/${path}`;
+  return `${base}/${path}`;
 }
 
 async function proxy(req: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
-  const { path = [] } = await context.params;
+  const base = getBackendBaseUrl(); if (!base) {
+    return NextResponse.json(
+      { error: "NEXT_PUBLIC_API_BASE_URL is not defined" },
+      { status: 500 }
+    );
+  }
 
+  const { path: pathSegments = [] } = await context.params;
   const incomingUrl = new URL(req.url);
-  const target = new URL(buildTargetUrl(path));
+  const target = new URL(buildTargetUrl(base, pathSegments));
   target.search = incomingUrl.search;
 
   // Build safe upstream headers

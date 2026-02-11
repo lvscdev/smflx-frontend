@@ -4,23 +4,22 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 
-/**
- * /payment/callback
- *
- * Korapay (Checkout Standard) redirects the user here after checkout completes.
- * Query-string keys Korapay sends (all optional / provider-dependent):
- *   status   – "success" | "failed" | "pending"
- *   reference – the merchant reference we generated before checkout
- *   trx_ref  – Korapay's own transaction reference
- *
- * We do NOT re-verify the payment server-side here — that is the job of the
- * /billing/verify webhook which Korapay calls independently.  This page only
- * updates the client-side flow state so the dashboard renders correctly and
- * then redirects.
- */
-
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 const PENDING_CTX_KEY = "smflx_pending_payment_ctx";
+
+export type PaymentProps = {
+  amount: number;
+  eventId?: string; 
+  userId?: string;
+  registrationId?: string;
+  email: string;
+  profile?: any;
+  registration?: any;
+  accommodation?: any;
+  onBack: () => void;
+  onComplete: () => void;
+};
+
 
 function safeLoadFlowState(): Record<string, any> | null {
   try {

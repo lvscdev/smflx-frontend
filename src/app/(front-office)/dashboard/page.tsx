@@ -3,16 +3,18 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
-import {
-  AUTH_USER_STORAGE_KEY,
-  getAuthToken,
-  getStoredUser,
-  setAuthToken,
-} from "@/lib/api/client";
-import { clearTokenCookie } from "@/lib/auth/session";
+import { AUTH_USER_STORAGE_KEY, getAuthToken, getStoredUser, setAuthToken } from "@/lib/api/client";
+import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie } from "@/lib/auth/session";
 import { getMe, verifyToken, getUserDashboard, listMyRegistrations } from "@/lib/api";
-import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation } from "@/lib/api/dashboardTypes";
-import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
+import type { NormalizedDashboardResponse, UserProfile,
+  DashboardRegistration,
+  DashboardAccommodation,
+} from "@/lib/api/dashboardTypes";
+import {
+  loadDashboardSnapshot,
+  saveDashboardSnapshot,
+  clearDashboardSnapshot,
+} from "@/lib/storage/dashboardState";
 import { readOtpCookie } from "@/lib/auth/otpCookie";
 import { Loader2 } from "lucide-react";
 
@@ -53,6 +55,7 @@ function hasAccountFootprint(): boolean {
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -64,8 +67,9 @@ export default function DashboardPage() {
   } | null>(null);
 
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
-  const [eventCache, setEventCache] = useState<Record<string, NormalizedDashboardResponse>>({});
-
+  const [eventCache, setEventCache] = useState<Record<string, NormalizedDashboardResponse>>(
+    {}
+  );
 
   useEffect(() => {
     async function boot() {
@@ -82,7 +86,9 @@ export default function DashboardPage() {
         const entries = Object.entries(snap.events);
         if (entries.length > 0) {
           const preferred = snap.activeEventId ?? entries[0][0];
-          setActiveEventId(preferred);
+          if (preferred && String(preferred).trim()) {
+            setActiveEventId(preferred);
+          }
 
           // rebuild cache into normalized responses
           const rebuilt: Record<string, NormalizedDashboardResponse> = {};
@@ -103,25 +109,29 @@ export default function DashboardPage() {
           if (active?.accommodations?.length) setAccommodation(active.accommodations[0]);
           if (active?.registrations?.length) {
             const r0 = active.registrations[0];
-            setSelectedEvent({ eventId: r0.eventId ?? preferred, eventName: (r0.eventName ?? r0.eventTitle ?? "Event") as string });
+            setSelectedEvent({
+              eventId: r0.eventId ?? preferred,
+              eventName: (r0.eventName ?? r0.eventTitle ?? "Event") as string,
+            });
           }
 
-          // Show dashboard immediately; refresh will run below
-          setLoading(false);
+          // Show dashboard immediately only if we have a real eventId; refresh will run below
+          if (preferred && String(preferred).trim()) {
+            setLoading(false);
+          }
         }
       }
-
 
       // 1) No token: decide between new user vs returning user
       if (!token) {
         const otp = readOtpCookie();
         if (otp?.email) {
-          router.replace(`/returning-user?email=${encodeURIComponent(otp.email)}`);
+          router.replace(`/register?view=login&email=${encodeURIComponent(otp.email)}`);
           return;
         }
 
         if (hasAccountFootprint()) {
-          router.replace("/returning-user");
+          router.replace("/register?view=login");
         } else {
           router.replace("/register");
         }
@@ -140,10 +150,7 @@ export default function DashboardPage() {
       // Hydrate email/profile from local storage
       if (storedUser) {
         const storedEmail =
-          storedUser?.email ||
-          storedUser?.user?.email ||
-          storedUser?.data?.email ||
-          "";
+          storedUser?.email || storedUser?.user?.email || storedUser?.data?.email || "";
 
         if (storedEmail) setEmail(storedEmail);
         setProfile(storedUser);
@@ -152,7 +159,12 @@ export default function DashboardPage() {
       try {
         await verifyToken();
 
-        // Fetch fresh profile from backend
+        // Local references to freshly derived items (avoid relying on async React state)
+        let regForEvent: any = null;
+        let accForEvent: any = null;
+        let localSelectedEvent: { eventId: string; eventName: string } | null = null;
+
+        // 3) Fetch fresh profile from backend
         const me = await getMe();
         const mergedProfile = { ...(storedUser || {}), ...(me || {}) };
         setProfile(mergedProfile);
@@ -160,94 +172,185 @@ export default function DashboardPage() {
         const apiEmail = (me as any)?.email || "";
         if (apiEmail) setEmail(apiEmail);
 
-        // Get eventId from flow state or fetch from registrations
-        const saved0 = safeLoadFlowState() || {};
-        let eventId = saved0?.selectedEvent?.eventId || saved0?.registration?.eventId;
+        // 4) ✅ CRITICAL FIX: Fetch registrations FIRST to get valid eventId
+        let eventId: string | null = null;
 
-        // If no eventId in flow state, fetch from user's registrations
-        if (!eventId) {
-          try {
-            const registrations = await listMyRegistrations();
-            
-            if (Array.isArray(registrations) && registrations.length > 0) {
-              const mostRecent = registrations[0];
-              eventId = mostRecent.eventId;
-              setSelectedEvent({
-                eventId: mostRecent.eventId,
-                eventName: mostRecent.eventName || "Event",
-              });
+        try {
+          console.log("📋 Fetching user registrations...");
+          const registrations = await listMyRegistrations();
+
+          if (!Array.isArray(registrations) || registrations.length === 0) {
+            console.warn("⚠️ User has no event registrations");
+
+            // Check if there's a saved flow state for incomplete registration
+            const saved = safeLoadFlowState();
+            if (saved?.view && saved.view !== "dashboard") {
+              console.log("📍 Resuming incomplete registration flow");
+              router.replace("/register");
+              return;
             }
-          } catch (err) {
-            console.error("Failed to fetch registrations:", err);
+
+            // No registrations and no incomplete flow - redirect to event selection
+            console.log("🔄 Redirecting to event selection (no registrations)");
+            setError("You haven't registered for any events yet. Please select an event to continue.");
+            setLoading(false);
+            
+            // Redirect after showing error briefly
+            setTimeout(() => {
+              router.replace("/register?view=event-selection");
+            }, 2000);
+            return;
           }
-        } else {
-          // Load selectedEvent from saved state
-          if (saved0?.selectedEvent) {
-            setSelectedEvent(saved0.selectedEvent);
+
+          // ✅ Use the most recent registration
+          const mostRecent = registrations[0];
+          eventId = mostRecent.eventId;
+
+          if (!eventId) {
+            console.error("❌ Registration exists but has no eventId:", mostRecent);
+            setError("Registration data is incomplete. Please contact support.");
+            setLoading(false);
+            return;
           }
+
+          console.log(`✅ Found eventId from registrations: ${eventId}`);
+
+          localSelectedEvent = {
+            eventId: eventId,
+            eventName: mostRecent.eventName || (mostRecent as any)?.eventTitle || "Event",
+          };
+          setSelectedEvent(localSelectedEvent);
+
+        } catch (regErr: any) {
+          console.error("❌ Failed to fetch registrations:", regErr);
+          setError(regErr?.message || "Failed to load your registrations. Please try again.");
+          setLoading(false);
+          return;
         }
 
-        // Fetch dashboard data if we have an eventId
+        // 5) ✅ Now fetch dashboard data with valid eventId
         if (eventId) {
           try {
+            console.log(`📊 Fetching dashboard for eventId: ${eventId}`);
             const dashboardData = await getUserDashboard(eventId);
 
-            setEventCache((prev) => ({ ...prev, [eventId]: dashboardData }));
+            setEventCache((prev) => ({ ...prev, [eventId!]: dashboardData }));
             setActiveEventId(eventId);
 
             // Pick the most relevant items for this event
-            const regForEvent =
+            regForEvent =
               dashboardData.registrations.find((r) => r.eventId === eventId) ??
               dashboardData.registrations[0] ??
               null;
 
-            const accForEvent =
-              dashboardData.accommodations.find((a) => a.eventId === eventId) ??
-              dashboardData.accommodations[0] ??
-              null;
+            
 
-            setRegistration(regForEvent);
+const regAttendanceRaw =
+  (regForEvent as any)?.attendeeType ??
+  (regForEvent as any)?.attendanceType ??
+  (regForEvent as any)?.participationMode ??
+  (regForEvent as any)?.participation ??
+  "";
+
+const isCamper = String(regAttendanceRaw).toLowerCase().includes("camp");
+
+const normalizedRegistration = {
+  ...(regForEvent || {}),
+  attendeeType:
+    (regForEvent as any)?.attendeeType ??
+    (regForEvent as any)?.attendanceType ??
+    (regForEvent as any)?.participationMode ??
+    (regForEvent as any)?.participation ??
+    "",
+};
+
+// IMPROVED: Better accommodation matching - multiple strategies
+            accForEvent = null;
+
+            // Strategy 1: Match by eventId
+            if (dashboardData.accommodations.length > 0) {
+              accForEvent =
+                dashboardData.accommodations.find((a) => a.eventId === eventId) ?? null;
+            }
+
+            // Strategy 2: If only one accommodation exists, use it (single-event user)
+            if (!accForEvent && dashboardData.accommodations.length === 1) {
+              accForEvent = dashboardData.accommodations[0];
+              console.log("✅ Using single accommodation for camper");
+            }
+
+            // Strategy 3: If user is camper and has any accommodation, use first one
+            const participationMode = (regForEvent as any)?.participationMode;
+            const attendeeType = (regForEvent as any)?.attendeeType;
+
+            if (!accForEvent && isCamper && dashboardData.accommodations.length > 0) {
+              accForEvent = dashboardData.accommodations[0];
+              console.log("✅ Using first accommodation for camper (no eventId match)");
+            }
+
+            setRegistration(normalizedRegistration);
             setAccommodation(accForEvent);
 
-            if (!selectedEvent && regForEvent) {
-              setSelectedEvent({
-                eventId: regForEvent.eventId || eventId,
-                eventName: (regForEvent.eventName || regForEvent.eventTitle || "Event") as string,
+            // Debug logging for campers without accommodation
+            if (isCamper && !accForEvent) {
+              console.warn("⚠️ Camper registration but no accommodation found:", {
+                eventId,
+                registrationId: regForEvent?.registrationId,
+                participationMode,
+                attendeeType,
+                accommodationsCount: dashboardData.accommodations.length,
+                accommodations: dashboardData.accommodations,
               });
+            }
+
+            if (regForEvent) {
+              localSelectedEvent = {
+                eventId: (regForEvent.eventId || eventId) as string,
+                eventName: (regForEvent.eventName ||
+                  regForEvent.eventTitle ||
+                  "Event") as string,
+              };
+              if (!selectedEvent) setSelectedEvent(localSelectedEvent);
             }
 
             // Persist multi-event snapshot (7-day resume)
             saveDashboardSnapshot(eventId, mergedProfile as unknown as UserProfile, dashboardData);
-
-          } catch (err) {
-            console.error("Failed to fetch dashboard data:", err);
+            
+            console.log("✅ Dashboard data loaded successfully");
+          } catch (dashErr: any) {
+            console.error("❌ Failed to fetch dashboard data:", dashErr);
+            setError(dashErr?.message || "Failed to load dashboard. Please try again.");
             // Continue without dashboard data - user can still see profile
           }
         }
 
         // Persist to flow state
+        const saved0 = safeLoadFlowState() || {};
         safeSaveFlowState({
           ...saved0,
           view: "dashboard",
           email: apiEmail || (storedUser?.email ?? saved0?.email ?? ""),
           profile: mergedProfile,
-          selectedEvent: selectedEvent || saved0?.selectedEvent,
-          registration: registration || saved0?.registration,
-          accommodation: accommodation || saved0?.accommodation,
-          activeEventId: activeEventId || saved0?.activeEventId,
+          selectedEvent: localSelectedEvent || selectedEvent || saved0?.selectedEvent,
+          registration: regForEvent || saved0?.registration,
+          accommodation: accForEvent || saved0?.accommodation,
+          activeEventId: eventId || activeEventId || saved0?.activeEventId,
         });
+
       } catch (err: any) {
-        // If backend returns 401/403, treat as expired/invalid session
+        console.error("❌ Auth verification failed:", err);
         const status = err?.status;
         if (status === 401 || status === 403) {
           setAuthToken(null);
           clearTokenCookie();
+          clearActiveEventCookie();
           safeClearFlowState();
           clearDashboardSnapshot();
-          router.replace("/returning-user");
+          router.replace("/register?view=login");
           return;
         }
-        // Other errors: keep going, dashboard can show its own errors
+        // Other errors: show error but keep user on page
+        setError(err?.message || "Failed to verify your session. Please try again.");
       }
 
       // 3) Token valid: if there's a saved flow state that isn't dashboard, resume it
@@ -275,7 +378,9 @@ export default function DashboardPage() {
   const handleLogout = () => {
     setAuthToken(null);
     clearTokenCookie();
+    clearActiveEventCookie();
     safeClearFlowState();
+    clearDashboardSnapshot();
     router.push("/");
   };
 
@@ -287,45 +392,89 @@ export default function DashboardPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="mb-4">
+            <svg
+              className="w-16 h-16 text-red-500 mx-auto"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Unable to Load Dashboard</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Dashboard
-            userEmail={email}
-            profile={profile}
-            registration={registration}
-            accommodation={accommodation}
-            onLogout={handleLogout}
-            onProfileUpdate={(p) => {
-              setProfile(p);
-              const eid = activeEventId ?? (registration?.eventId ?? null);
-              if (eid) saveDashboardSnapshot(eid, p, eventCache[eid] ?? null);
-            }}
-            onRegistrationUpdate={(r) => {
-              setRegistration(r);
-              const eid = activeEventId ?? (r?.eventId ?? registration?.eventId ?? null);
-              if (!eid) return;
-              setActiveEventId(eid);
-              setEventCache((prev) => {
-                const existing = prev[eid];
-                if (!existing) return prev;
-                const nextRegs = r ? [r, ...existing.registrations.filter((x) => x !== r)] : existing.registrations;
-                const next = { ...existing, registrations: nextRegs };
-                saveDashboardSnapshot(eid, profile, next);
-                return { ...prev, [eid]: next };
-              });
-            }}
-            onAccommodationUpdate={(a) => {
-              setAccommodation(a);
-              const eid = activeEventId ?? (registration?.eventId ?? null);
-              if (!eid) return;
-              setEventCache((prev) => {
-                const existing = prev[eid];
-                if (!existing) return prev;
-                const nextAcc = a ? [a, ...existing.accommodations.filter((x) => x !== a)] : existing.accommodations;
-                const next = { ...existing, accommodations: nextAcc };
-                saveDashboardSnapshot(eid, profile, next);
-                return { ...prev, [eid]: next };
-              });
-            }}
-          />
+      userEmail={email}
+      profile={profile}
+      registration={registration}
+      accommodation={accommodation}
+      onLogout={handleLogout}
+      onProfileUpdate={(p) => {
+        setProfile(p);
+        const eid = activeEventId ?? (registration?.eventId ?? null);
+        if (eid) saveDashboardSnapshot(eid, p, eventCache[eid] ?? null);
+      }}
+      onRegistrationUpdate={(r) => {
+        setRegistration(r);
+        const eid = activeEventId ?? (r?.eventId ?? registration?.eventId ?? null);
+        if (!eid) return;
+        setActiveEventId(eid);
+        setEventCache((prev) => {
+          const existing = prev[eid];
+          if (!existing) return prev;
+          const nextRegs = r
+            ? [r, ...existing.registrations.filter((x) => x !== r)]
+            : existing.registrations;
+          const next = { ...existing, registrations: nextRegs };
+          saveDashboardSnapshot(eid, profile, next);
+          return { ...prev, [eid]: next };
+        });
+      }}
+      onAccommodationUpdate={(a) => {
+        setAccommodation(a);
+        const eid = activeEventId ?? (registration?.eventId ?? null);
+        if (!eid) return;
+        setEventCache((prev) => {
+          const existing = prev[eid];
+          if (!existing) return prev;
+          const nextAcc = a
+            ? [a, ...existing.accommodations.filter((x) => x !== a)]
+            : existing.accommodations;
+          const next = { ...existing, accommodations: nextAcc };
+          saveDashboardSnapshot(eid, profile, next);
+          return { ...prev, [eid]: next };
+        });
+      }}
+    />
   );
 }

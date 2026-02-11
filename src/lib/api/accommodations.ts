@@ -2,6 +2,7 @@
 
 
 import { apiRequest } from './client';
+import { API_BASE_URL } from "./client";
 
 // ============================================================================
 // Types
@@ -98,11 +99,6 @@ export async function getAccommodations(params: {
   eventId: string;
   type: 'HOSTEL' | 'HOTEL';
 }): Promise<GetAccommodationsResponse> {
-  // Preferred path (per current swagger):
-  // 1) GET /accommodation/categories
-  // 2) GET /accommodation/facility/{categoryId}
-  // This is tagged as "Admin" in docs, but in practice may be available to users.
-  // If it is not available (401/403/404), we fall back to the legacy /accommodations endpoint.
 
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
@@ -133,7 +129,6 @@ export async function getAccommodations(params: {
           location: undefined,
           images: undefined,
           totalSpaces: Number(f?.totalCapacity ?? 0) || 0,
-          // Swagger only exposes availability boolean + total capacity. We can't safely compute remaining.
           availableSpaces: f?.available === false ? 0 : Number(f?.totalCapacity ?? 0) || 0,
           rooms: [],
           amenities: undefined,
@@ -214,7 +209,7 @@ export async function cancelAccommodationBooking(bookingId: string) {
  */
 export async function getHostelUnoccupiedCapacity(): Promise<number | null> {
   const url =
-    'https://api.smflx.org/accommodation/hostel/unoccupied';
+    `${API_BASE_URL}/accommodation/hostel/unoccupied`;
 
   const res = await fetch(url, {
     method: 'GET',

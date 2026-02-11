@@ -64,6 +64,35 @@ export function EmailVerification({
       setVerificationSent(true);
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {
+      // ✅ FIX: Check for duplicate user error
+      const isUserExists = 
+        err?.status === 409 || 
+        err?.code === "USER_ALREADY_EXISTS" ||
+        err?.code === "EMAIL_EXISTS" ||
+        err?.code === "DUPLICATE_EMAIL" ||
+        (err?.message && (
+          err.message.toLowerCase().includes("already registered") ||
+          err.message.toLowerCase().includes("user exists") ||
+          err.message.toLowerCase().includes("email exists") ||
+          err.message.toLowerCase().includes("already exists")
+        ));
+      
+      if (isUserExists) {
+        // Store email for login page
+        setOtpCookie(trimmed);
+        
+        // Show message before redirecting
+        setError("This email is already registered. Redirecting to login...");
+        
+        // Redirect to login after brief delay
+        setTimeout(() => {
+          onAlreadyRegistered();
+        }, 1500);
+        
+        setIsVerifying(false);
+        return;
+      }
+      
       setError(toUserMessage(err, { feature: "otp", action: "send" }));
     } finally {
       setIsVerifying(false);
@@ -146,7 +175,11 @@ export function EmailVerification({
           </div>
 
           {error && (
-            <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+            <InlineAlert 
+              variant={error.includes("already registered") ? "info" : "error"} 
+              title={error.includes("already registered") ? "Existing Account" : "Something went wrong"} 
+              className="mb-4"
+            >
               {error}
             </InlineAlert>
           )}

@@ -7,14 +7,19 @@ import { initiateRegistrationPayment } from '@/lib/api';
 import { toUserMessage } from '@/lib/errors';
 import { validatePaymentContext } from '@/lib/validation/payment';
 
-interface PaymentProps {
+export type PaymentProps = {
   amount: number;
-  onComplete?: () => void;
-  onBack: () => void;
+  eventId?: string;
+  userId?: string;
+  registrationId?: string;
+  email: string;
   profile?: any;
-  accommodation?: any;
   registration?: any;
-}
+  accommodation?: any;
+  onBack: () => void;
+  onComplete: () => void;
+};
+
 
 export function Payment({ amount, onBack, profile, accommodation, registration }: PaymentProps) {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
@@ -42,7 +47,7 @@ export function Payment({ amount, onBack, profile, accommodation, registration }
 
       // Derive the absolute origin so Korapay can redirect back and
       // so the backend can forward notification_url to Korapay.
-      const origin = window.location.origin; // e.g. https://smflx.vercel.app
+      const origin = window.location.origin;
 
       const resp = await initiateRegistrationPayment({
         amount,

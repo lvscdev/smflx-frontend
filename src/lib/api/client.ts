@@ -1,12 +1,11 @@
-export const DEFAULT_API_BASE_URL = (() => {
-  const env = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  (() => {
+    throw new Error(
+      "NEXT_PUBLIC_API_BASE_URL is not defined. Check your environment variables."
+    );
+  })();
 
-  if (!env || env === "/api" || env.endsWith("/api")) {
-    return "https://api.smflx.org";
-  }
-
-  return env.replace(/\/$/, "");
-})();
 
 export type ApiEnvelope<T> = {
   code?: string;
@@ -97,7 +96,7 @@ export async function apiRequest<T>(
     auth?: boolean;
   }
 ): Promise<T> {
-  const baseUrl = (opts?.baseUrl || DEFAULT_API_BASE_URL).replace(/\/$/, "");
+  const baseUrl = (opts?.baseUrl || API_BASE_URL).replace(/\/$/, "");
   const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
   const method = (opts?.method || "GET").toUpperCase();
@@ -134,7 +133,7 @@ export async function apiRequest<T>(
 
     if (hasBody) retryHeaders["Content-Type"] = "application/json";
 
-    retryHeaders["Authorization"] = rawToken;
+    retryHeaders["Authorization"] = `Bearer ${rawToken}`;
 
     res = await doFetch(retryHeaders);
   }

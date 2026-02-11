@@ -59,7 +59,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     ".next/dev/dev/types/**/*.ts"
-  ],
+, "src/app/(front-office)/dashboard/page.tsx.backup", "src/lib/api/index.ts"  ],
   "exclude": [
     "node_modules"
   ]

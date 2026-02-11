@@ -4,7 +4,7 @@ import type { Dependent } from "./DependentsModal";
 import { useState } from 'react';
 import { X, CreditCard } from 'lucide-react';
 import { InlineAlert } from './InlineAlert';
-import { initiateRegistrationPayment } from '@/lib/api';
+import { initiateDependentsPayment } from '@/lib/api';
 import { toUserMessage } from '@/lib/errors';
 
 interface DependentsPaymentModalProps {
@@ -15,11 +15,6 @@ interface DependentsPaymentModalProps {
   eventId?: string;
 }
 
-/**
- * Stage 3 requirement:
- * - Initiate checkout and redirect in the SAME TAB using checkoutUrl.
- * - No demo simulations / fallbacks.
- */
 export function DependentsPaymentModal({
   isOpen,
   onClose,
@@ -42,58 +37,65 @@ export function DependentsPaymentModal({
     setPaymentProcessing(true);
 
     try {
-      const raw = typeof window !== 'undefined' ? localStorage.getItem('smflx_user') : null;
+      const raw =
+        typeof window !== "undefined" ? localStorage.getItem("smflx_user") : null;
       const user = raw ? JSON.parse(raw) : null;
       const userId = user?.userId;
 
       const resolvedEventId = eventId;
 
       if (!userId || !resolvedEventId) {
-        throw new Error('Missing user/event context for payment checkout.');
+        throw new Error("Missing user/event context for payment checkout.");
       }
 
-      // Generate a unique reference for this transaction
-      const reference = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
-        ? crypto.randomUUID()
-        : `smflx_dep_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      const dependentIds = dependents
+        .map((d) => d.id)
+        .filter(Boolean) as string[];
 
-      const origin = window.location.origin;
+      if (!dependentIds.length || dependentIds.length !== dependents.length) {
+        throw new Error(
+          "One or more dependents are missing an ID. Please register them first and refresh."
+        );
+      }
 
-      // Use /accommodation/initialize — the only payment-init endpoint in the
-      // backend.  reason + narration (optional in the schema) tell the backend
-      // this is a dependents payment so it can record it correctly.
-      const resp = await initiateRegistrationPayment({
-        amount: totalAmount,
+      // Initiate ONCE for all dependents (API supports multiple dependentIds)
+      const resp = await initiateDependentsPayment({
         userId,
         eventId: resolvedEventId,
-        reference,
-        reason: 'dependents_registration',
-        narration: `Registration payment for ${dependents.length} dependent(s)`,
-        notification_url: `${origin}/api/billing/verify`,
-        redirect_url: `${origin}/payment/callback`,
+        dependentIds,
+        amount: totalAmount,
+        currency: "NGN",
+        metadata: {
+          reason: "dependents_registration",
+          dependentCount: dependents.length,
+        },
       });
 
       const checkoutUrl = resp?.checkoutUrl;
-      if (!checkoutUrl) throw new Error('Payment initiation succeeded but checkoutUrl was not returned.');
+      if (!checkoutUrl) {
+        throw new Error(
+          "Payment initiation succeeded but checkoutUrl was not returned."
+        );
+      }
 
-      // Persist context so the callback page knows this was a dependents payment
+      // Persist context (so dashboard can resume nicely after returning)
       try {
         localStorage.setItem(
-          'smflx_pending_payment_ctx',
+          "smflx_pending_payment_ctx",
           JSON.stringify({
-            type: 'dependents',
-            dependentIds: (dependents || []).map((d) => d.id).filter(Boolean),
+            type: "dependents",
+            dependentIds,
             amount: totalAmount,
             startedAt: new Date().toISOString(),
           })
         );
       } catch {
-        // ignore storage failures
+        // ignore
       }
 
       window.location.href = checkoutUrl;
     } catch (err: unknown) {
-      setError(toUserMessage(err, { feature: 'payment', action: 'init' }));
+      setError(toUserMessage(err, { feature: "payment", action: "init" }));
     } finally {
       setPaymentProcessing(false);
     }
@@ -174,7 +176,11 @@ export function DependentsPaymentModal({
               }`}
             >
               <CreditCard className="w-5 h-5" />
-              {paymentProcessing ? 'Redirecting to checkout…' : `Proceed to Checkout (₦${totalAmount.toLocaleString('en-NG')})`}
+              {paymentProcessing
+                ? 'Redirecting to checkout…'
+                : dependents.length > 1
+                ? `Pay for All Dependents (₦${totalAmount.toLocaleString('en-NG')})`
+                : `Pay for Dependent (₦${totalAmount.toLocaleString('en-NG')})`}
             </button>
           </form>
         </div>

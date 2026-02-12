@@ -1,37 +1,12 @@
 "use client";
 
 import type { Dependent as ModalDependent } from "./DependentsModal";
-import { useState, useEffect, useRef, type ComponentProps } from "react";
-import {
-  Home,
-  Tent,
-  User,
-  LogOut,
-  X,
-  Building2,
-  Hotel,
-  Users,
-  Facebook,
-  Instagram,
-  Twitter,
-  Youtube,
-  Radio,
-  Loader2,
-  RefreshCcw,
-} from "lucide-react";
+import { useState, useEffect, useRef, useMemo, type ComponentProps } from "react";
+import { Home, Tent, User, LogOut, X, Building2, Hotel, Users, Facebook, Instagram, Twitter, Youtube, Radio, Loader2, RefreshCcw } from "lucide-react";
 import { InlineAlert } from "./InlineAlert";
 import Image from "next/image";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AccommodationSelection } from "./AccommodationSelection";
 import { DependentsBanner } from "./DependentsBanner";
 import { DependentsModal } from "./DependentsModal";
@@ -39,12 +14,7 @@ import { DependentsPaymentModal } from "./DependentsPaymentModal";
 import { DependentsSection } from "./DependentsSection";
 import { DependentRegistrationSuccess } from "./DependentRegistrationSuccess";
 import { UserProfile as UserProfileView } from "./UserProfile";
-import {
-  getUserDashboard,
-  addDependent as apiAddDependent,
-  removeDependent as apiRemoveDependent,
-  getAccommodations,
-} from "@/lib/api";
+import { getUserDashboard, addDependent as apiAddDependent, removeDependent as apiRemoveDependent, getAccommodations } from "@/lib/api";
 import { toUserMessage } from "@/lib/errors";
 import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation, DashboardDependent } from "@/lib/api/dashboardTypes";
 
@@ -503,217 +473,435 @@ type AccommodationData = Parameters<
     (localProfile?.firstName ?? "User");
 
   const attendeeType = normalizeAttendeeType(registration);
-  const normalizedAccommodation = normalizeAccommodation(accommodation);
-  const isNonCamper = attendeeType === "physical" || attendeeType === "online";
-  const showAccommodationPromo = isNonCamper && !normalizedAccommodation;
+  const attendeeTypeNorm = (typeof attendeeType === "string" ? attendeeType.toLowerCase() : "");
+  const isCamper = attendeeTypeNorm === "" || attendeeTypeNorm === "camper";
+  // Memoize to avoid creating a new object every render (which would retrigger effects).
+  const normalizedAccommodation = useMemo(
+    () => normalizeAccommodation(accommodation),
+    [accommodation],
+  );
+  
+  const accAny = normalizedAccommodation as any;
 
+  const accommodationFacilityName: string =
+    (accAny?.room?.facilityName as string) ||
+    (accAny?.facilityName as string) ||
+    (accAny?.facility as string) ||
+    "";
+
+  const accommodationRoomLabel: string =
+    (accAny?.room?.roomIdentifier as string) ||
+    (accAny?.room?.roomCode as string) ||
+    (accAny?.roomIdentifier as string) ||
+    (accAny?.roomCode as string) ||
+    "";
+
+  const accommodationBedspaceLabel: string =
+    (accAny?.bedspace?.bedspaceName as string) ||
+    (accAny?.bedspaceName as string) ||
+    (typeof accAny?.bed === "string" ? (accAny?.bed as string) : "") ||
+    "";
+
+  const accommodationImageUrl: string =
+    (accAny?.accommodationImageUrl as string) ||
+    (accAny?.imageUrl as string) ||
+    "";
+const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online";
   // Camper accommodation payment state (from dashboard API)
   const paidForAccommodation = normalizedAccommodation?.paidForAccommodation === true;
 
-  const handleAccommodationType = (type: string) => {
-    setSelectedAccommodationType(type);
-    setModalStep(2);
-  };
+  // Camper: when accommodation payment is pending, the space is held for 1 hour.
+  const [accommodationHold, setAccommodationHold] = useState<{
+    startedAtMs: number | null;
+    expiresAtMs: number | null;
+    remainingMs: number | null;
+    expired: boolean;
+  }>({ startedAtMs: null, expiresAtMs: null, remainingMs: null, expired: false });
 
-  const handleAccommodationComplete = (data: AccommodationData) => {
-    // Save selection snapshot for UI, then close modal.
-    const snapshot: DashboardAccommodation = {
-      accommodationType: data.type,
+  // Avoid effect-dependency churn when parent passes a new function identity each render.
+  const onAccommodationUpdateRef = useRef(onAccommodationUpdate);
+  useEffect(() => {
+    onAccommodationUpdateRef.current = onAccommodationUpdate;
+  }, [onAccommodationUpdate]);
 
-      // AccommodationData uses IDs in this zip
-      facility: data.facilityId ?? "",
-      room: data.roomId ?? "",
-      bedspace: data.bedSpaceId ?? "",
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-      // keep stable UI flags (actual "paid" flips after verification/poll)
-      requiresAccommodation: true,
-      paidForAccommodation: false,
+    const isCamperLocal = isCamper;
+    const hasPendingAccommodation = !!normalizedAccommodation && !paidForAccommodation;
+
+    // If not in a pending accommodation state, clear countdown state.
+    if (!isCamperLocal || !hasPendingAccommodation) {
+      // Only update state if it isn't already cleared to avoid render loops.
+      setAccommodationHold((prev) => {
+        if (
+          prev.startedAtMs === null &&
+          prev.expiresAtMs === null &&
+          prev.remainingMs === null &&
+          prev.expired === false
+        ) {
+          return prev;
+        }
+        return {
+          startedAtMs: null,
+          expiresAtMs: null,
+          remainingMs: null,
+          expired: false,
+        };
+      });
+
+      // If payment becomes confirmed, clear markers.
+      if (paidForAccommodation) {
+        try {
+          localStorage.removeItem("smflx_pending_accommodation_payment");
+          localStorage.removeItem("smflx_pending_accommodation_payment_started_at");
+        } catch {
+          // ignore
+        }
+      }
+      return;
+    }
+
+    const HOLD_MS = 60 * 60 * 1000;
+
+    const readStartedAt = (): number | null => {
+      try {
+        const raw = localStorage.getItem("smflx_pending_accommodation_payment_started_at");
+        const n = raw ? Number(raw) : NaN;
+        if (Number.isFinite(n) && n > 0) return n;
+      } catch {
+        // ignore
+      }
+      return null;
     };
 
-    onAccommodationUpdate?.(snapshot);
-    resetModal();
-  };
+    const ensureStartedAt = (): number => {
+      const existing = readStartedAt();
+      if (existing) return existing;
 
+      // Fallback for older flows that only saved the pending flag.
+      const now = Date.now();
+      try {
+        const pending = localStorage.getItem("smflx_pending_accommodation_payment");
+        if (pending === "1") {
+          localStorage.setItem(
+            "smflx_pending_accommodation_payment_started_at",
+            String(now),
+          );
+        }
+      } catch {
+        // ignore
+      }
+      return now;
+    };
 
-  const resetModal = () => {
-    setIsAccommodationModalOpen(false);
-    setModalStep(1);
-    setSelectedAccommodationType("");
-  };
+    const startedAtMs = ensureStartedAt();
+    const expiresAtMs = startedAtMs + HOLD_MS;
 
-  const handleModalClose = () => resetModal();
+    let handledExpire = false;
 
-  const handleModalBack = () => {
-    if (modalStep > 1) {
-      setModalStep((s) => s - 1);
-    } else {
-      handleModalClose();
-    }
-  };
+    const tick = () => {
+      const remainingMs = Math.max(0, expiresAtMs - Date.now());
+      const expired = remainingMs <= 0;
 
-  // Check if there are unregistered dependents
-  const hasUnregisteredDependents = dependents.some((d) => !d.isRegistered);
+      setAccommodationHold((prev) => {
+        if (
+          prev.startedAtMs === startedAtMs &&
+          prev.expiresAtMs === expiresAtMs &&
+          prev.remainingMs === remainingMs &&
+          prev.expired === expired
+        ) {
+          return prev;
+        }
+        return { startedAtMs, expiresAtMs, remainingMs, expired };
+      });
 
-  const handleSaveDependents = async (updatedDependents: ModalDependent[]) => {
-    // optimistic UI
-    const prev = dependents;
-    setDependents(updatedDependents as ModalDependent[]);
+      if (!expired || handledExpire) return;
 
-    // Stage 2: persist newly added dependents (no demo fallbacks)
-    try {
-      const eventId = getEventId(registration);
-      if (!eventId) {
-        throw new Error("Missing eventId: cannot save dependents.");
+      handledExpire = true;
+
+      // Hold expired: clear markers and switch UI back to “Book Accommodation”.
+      try {
+        localStorage.removeItem("smflx_pending_accommodation_payment");
+        localStorage.removeItem("smflx_pending_accommodation_payment_started_at");
+
+        // Clear saved accommodation snapshot so the promo card matches “book again”.
+        const raw =
+          localStorage.getItem("smflx_flow_state_v1") ||
+          localStorage.getItem("smflx_flow_state") ||
+          localStorage.getItem("flowState");
+        if (raw) {
+          const flow = JSON.parse(raw) as Record<string, unknown>;
+          const next = { ...flow, accommodation: null };
+          // Prefer the v1 key if it exists; otherwise fall back.
+          if (localStorage.getItem("smflx_flow_state_v1")) {
+            localStorage.setItem("smflx_flow_state_v1", JSON.stringify(next));
+          } else {
+            localStorage.setItem("smflx_flow_state", JSON.stringify(next));
+          }
+        }
+      } catch {
+        // ignore
       }
 
-      const prevIds = new Set(prev.map((d) => d.id));
-      const toCreate = updatedDependents.filter((d) => !prevIds.has(d.id));
+      onAccommodationUpdateRef.current?.(null);
+        };
 
-      for (const d of toCreate) {
-        const gender = (d?.gender || "male").toString().toUpperCase();
-        const normalizedGender = gender === "FEMALE" ? "FEMALE" : "MALE";
+        tick();
+        const id = window.setInterval(tick, 1000);
+        return () => window.clearInterval(id);
+      }, [attendeeType, Boolean(normalizedAccommodation), paidForAccommodation]);
+
+      const accommodationHoldExpired = accommodationHold.expired;
+      const accommodationHoldRemainingMs = accommodationHold.remainingMs;
+
+      const formatHoldRemaining = (ms: number | null) => {
+        if (ms == null) return "";
+        const totalSec = Math.max(0, Math.ceil(ms / 1000));
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        return `${m}m ${s}s`;
+      };
+
+      const acc = normalizedAccommodation;
+
+      const facilityName =
+        acc?.room?.facilityName ||
+        (acc as any)?.facilityName ||
+        (acc as any)?.facility ||
+        "";
+
+      const roomLabel =
+        acc?.room?.roomIdentifier ||
+        acc?.room?.roomCode ||
+        (acc as any)?.room?.roomIdentifier ||
+        (acc as any)?.room?.roomCode ||
+        (acc as any)?.room ||
+        "";
+
+      const accommodationTypeLabel =
+        acc?.accommodationType || (acc as any)?.accommodationType || "";
+
+      const paidAmount =
+        typeof acc?.amountPaidForAccommodation === "number"
+          ? acc.amountPaidForAccommodation
+          : Number((acc as any)?.amountPaidForAccommodation ?? (acc as any)?.amountPaid ?? 0) || 0;
+
+      const imageUrl =
+        (acc as any)?.accommodationImageUrl ||
+        (acc as any)?.imageUrl ||
+        "";
+
+
+      // Non-campers can book accommodation. Campers see the same CTA when the 1-hour hold expires.
+      const showAccommodationPromo =
+        (isNonCamper && !normalizedAccommodation) ||
+        (isCamper && accommodationHoldExpired);
+
+      const handleAccommodationType = (type: string) => {
+        setSelectedAccommodationType(type);
+        setModalStep(2);
+      };
+
+      const handleAccommodationComplete = (data: AccommodationData) => {
+        // Save selection snapshot for UI, then close modal.
+        const snapshot: DashboardAccommodation = {
+          accommodationType: data.type,
+
+          // AccommodationData uses IDs in this zip
+          facility: data.facilityId ?? "",
+          room: data.roomId ?? "",
+          bedspace: data.bedSpaceId ?? "",
+
+          // keep stable UI flags (actual "paid" flips after verification/poll)
+          requiresAccommodation: true,
+          paidForAccommodation: false,
+        };
+
+        onAccommodationUpdate?.(snapshot);
+        resetModal();
+      };
+
+
+      const resetModal = () => {
+        setIsAccommodationModalOpen(false);
+        setModalStep(1);
+        setSelectedAccommodationType("");
+      };
+
+      const handleModalClose = () => resetModal();
+
+      const handleModalBack = () => {
+        if (modalStep > 1) {
+          setModalStep((s) => s - 1);
+        } else {
+          handleModalClose();
+        }
+      };
+
+      // Check if there are unregistered dependents
+      const hasUnregisteredDependents = dependents.some((d) => !d.isRegistered);
+
+      const handleSaveDependents = async (updatedDependents: ModalDependent[]) => {
+        // optimistic UI
+        const prev = dependents;
+        setDependents(updatedDependents as ModalDependent[]);
+
+        // Stage 2: persist newly added dependents (no demo fallbacks)
+        try {
+          const eventId = getEventId(registration);
+          if (!eventId) {
+            throw new Error("Missing eventId: cannot save dependents.");
+          }
+
+          const prevIds = new Set(prev.map((d) => d.id));
+          const toCreate = updatedDependents.filter((d) => !prevIds.has(d.id));
+
+          for (const d of toCreate) {
+            const gender = (d?.gender || "male").toString().toUpperCase();
+            const normalizedGender = gender === "FEMALE" ? "FEMALE" : "MALE";
+            await apiAddDependent({
+              eventId,
+              name: d?.name,
+              age: Number(d?.age || 0),
+              gender: normalizedGender,
+            });
+          }
+        } catch (err: unknown) {
+          // revert optimistic update and surface error
+          setDependents(prev);
+          setDashboardLoadError(
+            getErrorMessage(err, "Failed to save dependents. Please try again."),
+          );
+        }
+      };
+
+      const handleRemoveDependent = (dependentId: string) => {
+        const dependent = dependents.find((d) => d.id === dependentId);
+        if (!dependent) return;
+
+        // Open confirmation dialog instead of window.confirm
+        setDependentToDelete(dependent);
+        setConfirmDeleteOpen(true);
+      };
+
+      const confirmRemoveDependent = async () => {
+        if (!dependentToDelete) return;
+
+        const dependentId = dependentToDelete.id;
+        const dependentName = dependentToDelete.name;
+
+        // Prevent double-click / parallel deletes
+        if (removingDependentId) return;
+        setRemovingDependentId(dependentId);
+
+        const prev = dependents;
+        setDependents((ds) => ds.filter((d) => d.id !== dependentId));
+
+        try {
+          await apiRemoveDependent(dependentId);
+
+          // ✅ SUCCESS TOAST
+          toast.success(`${dependentName} removed successfully`, {
+            description: "The dependent has been removed from your registration.",
+          });
+        } catch (err: unknown) {
+          setDependents(prev);
+          const msg =
+            getErrorMessage(err, `Failed to remove ${dependentName}. Please try again.`);
+          setDashboardLoadError(msg);
+
+          // Error toast
+          toast.error("Failed to remove dependent", {
+            description: msg,
+          });
+        } finally {
+          setRemovingDependentId(null);
+          setDependentToDelete(null);
+        }
+      };
+
+    const handleRegisterDependent = async (id: string) => {
+      const dependent = dependents.find((d) => d.id === id);
+      if (!dependent) return;
+
+      const updatedDependents = dependents.map((d) =>
+        d.id === id ? { ...d, isRegistered: true } : d,
+      );
+      setDependents(updatedDependents);
+
+      try {
+        const eventId = getEventId(registration);
+        if (!eventId) {
+          throw new Error("Missing eventId");
+        }
+
         await apiAddDependent({
           eventId,
-          name: d?.name,
-          age: Number(d?.age || 0),
-          gender: normalizedGender,
+          name: dependent.name,
+          age: Number(dependent.age) || 0,
+          gender: (dependent.gender?.toUpperCase() === "FEMALE" ? "FEMALE" : "MALE") as "MALE" | "FEMALE",
         });
+
+        setRegisteredDependentName(dependent.name);
+        setIsRegistrationSuccessModalOpen(true);
+
+        await reloadDashboard();
+
+      } catch (err: unknown) {
+        setDependents(dependents);
+        setDashboardLoadError(
+          getErrorMessage(err, `Failed to register ${dependent.name}. Please try again.`)
+        );
       }
-    } catch (err: unknown) {
-      // revert optimistic update and surface error
-      setDependents(prev);
-      setDashboardLoadError(
-        getErrorMessage(err, "Failed to save dependents. Please try again."),
-      );
-    }
-  };
+    };
 
-  const handleRemoveDependent = (dependentId: string) => {
-    const dependent = dependents.find((d) => d.id === dependentId);
-    if (!dependent) return;
+      const handlePayForDependents = (ids: string[]) => {
+        const selected = dependents.filter((d) => ids.includes(d.id));
+        setSelectedDependentsForPayment(selected);
+        setIsDependentsPaymentModalOpen(true);
+      };
 
-    // Open confirmation dialog instead of window.confirm
-    setDependentToDelete(dependent);
-    setConfirmDeleteOpen(true);
-  };
+      const handleRegisterAndPayDependents = (selected: ModalDependent[]) => {
+        setSelectedDependentsForPayment(selected);
+        // mark them registered before payment
+        const updatedDependents = dependents.map((d) =>
+          selected.find((sd) => sd.id === d.id)
+            ? { ...d, isRegistered: true }
+            : d,
+        );
+        setDependents(updatedDependents);
+        setIsDependentsModalOpen(false);
+        setIsDependentsPaymentModalOpen(true);
+      };
 
-  const confirmRemoveDependent = async () => {
-    if (!dependentToDelete) return;
+      const handleDependentsPaymentComplete = () => {
+        const updatedDependents = dependents.map((d) =>
+          selectedDependentsForPayment.find((sd) => sd.id === d.id)
+            ? { ...d, isPaid: true }
+            : d,
+        );
+        setDependents(updatedDependents);
+        setSelectedDependentsForPayment([]);
+        setIsDependentsPaymentModalOpen(false);
+      };
 
-    const dependentId = dependentToDelete.id;
-    const dependentName = dependentToDelete.name;
-
-    // Prevent double-click / parallel deletes
-    if (removingDependentId) return;
-    setRemovingDependentId(dependentId);
-
-    const prev = dependents;
-    setDependents((ds) => ds.filter((d) => d.id !== dependentId));
-
-    try {
-      await apiRemoveDependent(dependentId);
-
-      // ✅ SUCCESS TOAST
-      toast.success(`${dependentName} removed successfully`, {
-        description: "The dependent has been removed from your registration.",
-      });
-    } catch (err: unknown) {
-      setDependents(prev);
-      const msg =
-        getErrorMessage(err, `Failed to remove ${dependentName}. Please try again.`);
-      setDashboardLoadError(msg);
-
-      // Error toast
-      toast.error("Failed to remove dependent", {
-        description: msg,
-      });
-    } finally {
-      setRemovingDependentId(null);
-      setDependentToDelete(null);
-    }
-  };
-
-const handleRegisterDependent = async (id: string) => {
-  const dependent = dependents.find((d) => d.id === id);
-  if (!dependent) return;
-
-  const updatedDependents = dependents.map((d) =>
-    d.id === id ? { ...d, isRegistered: true } : d,
-  );
-  setDependents(updatedDependents);
-
-  try {
-    const eventId = getEventId(registration);
-    if (!eventId) {
-      throw new Error("Missing eventId");
-    }
-
-    await apiAddDependent({
-      eventId,
-      name: dependent.name,
-      age: Number(dependent.age) || 0,
-      gender: (dependent.gender?.toUpperCase() === "FEMALE" ? "FEMALE" : "MALE") as "MALE" | "FEMALE",
-    });
-
-    setRegisteredDependentName(dependent.name);
-    setIsRegistrationSuccessModalOpen(true);
-
-    await reloadDashboard();
-
-  } catch (err: unknown) {
-    setDependents(dependents);
-    setDashboardLoadError(
-      getErrorMessage(err, `Failed to register ${dependent.name}. Please try again.`)
-    );
-  }
-};
-
-  const handlePayForDependents = (ids: string[]) => {
-    const selected = dependents.filter((d) => ids.includes(d.id));
-    setSelectedDependentsForPayment(selected);
-    setIsDependentsPaymentModalOpen(true);
-  };
-
-  const handleRegisterAndPayDependents = (selected: ModalDependent[]) => {
-    setSelectedDependentsForPayment(selected);
-    // mark them registered before payment
-    const updatedDependents = dependents.map((d) =>
-      selected.find((sd) => sd.id === d.id)
-        ? { ...d, isRegistered: true }
-        : d,
-    );
-    setDependents(updatedDependents);
-    setIsDependentsModalOpen(false);
-    setIsDependentsPaymentModalOpen(true);
-  };
-
-  const handleDependentsPaymentComplete = () => {
-    const updatedDependents = dependents.map((d) =>
-      selectedDependentsForPayment.find((sd) => sd.id === d.id)
-        ? { ...d, isPaid: true }
-        : d,
-    );
-    setDependents(updatedDependents);
-    setSelectedDependentsForPayment([]);
-    setIsDependentsPaymentModalOpen(false);
-  };
-
-  if (activeDashboardPage === "user-profile") {
-    return (
-      <UserProfileView
-        profile={localProfile}
-        userEmail={userEmail}
-        userPhone={asString((localProfile as Record<string, unknown> | null | undefined)?.["phone"]) || asString(localProfile?.phoneNumber)}
-        dependents={dependents}
-        onBack={() => setActiveDashboardPage("dashboard")}
-        onUpdate={(updated) => {
-          setLocalProfile(updated);
-          onProfileUpdate?.(updated);
-        }}
-        onUpdateDependents={(updated) => setDependents(updated)}
-      />
-    );
-  }
+      if (activeDashboardPage === "user-profile") {
+        return (
+          <UserProfileView
+            profile={localProfile}
+            userEmail={userEmail}
+            userPhone={asString((localProfile as Record<string, unknown> | null | undefined)?.["phone"]) || asString(localProfile?.phoneNumber)}
+            dependents={dependents}
+            onBack={() => setActiveDashboardPage("dashboard")}
+            onUpdate={(updated) => {
+              setLocalProfile(updated);
+              onProfileUpdate?.(updated);
+            }}
+            onUpdateDependents={(updated) => setDependents(updated)}
+          />
+        );
+      }
 
   return (
     <div className="flex-1 overflow-auto bg-[#F5F1E8]">
@@ -815,6 +1003,8 @@ const handleRegisterDependent = async (id: string) => {
           onRegister={handleRegisterDependent}
           onPay={handlePayForDependents}
         />
+
+        
         {/* Top grid */}
         <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
           {/* Event card */}
@@ -876,7 +1066,7 @@ const handleRegisterDependent = async (id: string) => {
 
                 <div className="flex items-center gap-2">
                   <span className="text-base font-medium">
-                    {attendeeType === "camper" && "Camper"}
+                    {isCamper && "Camper"}
                     {attendeeType === "physical" && "Physical Attendance"}
                     {attendeeType === "online" && "Online Participant"}
                     {!attendeeType && "Camper"}
@@ -908,37 +1098,35 @@ const handleRegisterDependent = async (id: string) => {
         </div>
 
         {/* Camper-only accommodation details */}
-        {attendeeType === "camper" && (
-  accommodation ? (
-<div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Home className="w-5 h-5 text-gray-700" />
-                <h3 className="text-lg lg:text-xl font-semibold">
-                  Accommodation Details
-                </h3>
-              </div>
-              <span
-                className={
-                   "px-3 py-1 text-sm rounded-full " +
-                (paidForAccommodation
-                  ? "bg-gray-100 text-gray-700"
-                  : "bg-amber-50 text-amber-800 border border-amber-200")
-                }
-                >
-                {paidForAccommodation ? "Reserved" : "Pending Payment"}
-                </span>
-
-
+        {isCamper && (
+          normalizedAccommodation && !accommodationHoldExpired ? (
+            <div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <Home className="w-5 h-5 text-gray-700" />
+                    <h3 className="text-lg lg:text-xl font-semibold">
+                      Accommodation Details
+                    </h3>
+                  </div>
+                  <span
+                    className={
+                      "px-3 py-1 text-sm rounded-full " +
+                    (paidForAccommodation
+                      ? "bg-gray-100 text-gray-700"
+                      : "bg-amber-50 text-amber-800 border border-amber-200")
+                    }
+                    >
+                    {paidForAccommodation ? "Reserved" : "Pending Payment"}
+                    </span>
             </div>
 
             <div className="grid lg:grid-cols-2 gap-6 items-center">
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                 <div>
                   <span className="text-sm text-gray-500 block mb-2">Type</span>
-                      <span className="text-base font-semibold capitalize">
+                      <span className="text-base font-semibold">
                         {(() => {
-                          const a = accommodation as Record<string, unknown>;
+                          const a = normalizedAccommodation as Record<string, unknown>;
                           if (typeof a.accommodationType === "string") return a.accommodationType;
                           if (typeof a.type === "string") return a.type;
                           return "Hostel";
@@ -947,25 +1135,23 @@ const handleRegisterDependent = async (id: string) => {
                 </div>
                 <div>
                   <span className="text-sm text-gray-500 block mb-2">Hall</span>
-                  <span className="text-base font-semibold capitalize">
-                    {accommodation.facility?.replace("-", " ") || "Grace Hall"}
+                  <span className="text-base font-semibold">
+                    {(accommodationFacilityName || "").replace(/-/g, " ") || "—"}
                   </span>
                 </div>
                 <div>
                   <span className="text-sm text-gray-500 block mb-2">
-                    Bedspace
+                    Room
                   </span>
-                  <span className="text-base font-semibold capitalize">
-                    {typeof (normalizedAccommodation as Record<string, unknown>).bed === "string"
-                      ? String((normalizedAccommodation as Record<string, unknown>).bed).replace(/-/g, " ")
-                      : "Bedspace 101"}
+                  <span className="text-base font-semibold">
+                    {(accommodationBedspaceLabel || accommodationRoomLabel || "—").replace(/-/g, " ")}
                   </span>
                 </div>
               </div>
 
               <div className="rounded-2xl overflow-hidden h-35 lg:h-40">
                 <Image
-                  src="https://images.unsplash.com/photo-1694595437436-2ccf5a95591f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1080"
+                  src={accommodationImageUrl || "https://images.unsplash.com/photo-1694595437436-2ccf5a95591f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1080"}
                   alt="Accommodation"
                   width={1080}
                   height={400}
@@ -974,13 +1160,34 @@ const handleRegisterDependent = async (id: string) => {
               </div>
             </div>
 
-            {attendeeType === "camper" && (
-  accommodation ? (
-<div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+            {isCamper && (
+              normalizedAccommodation ? (
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div className="text-sm text-gray-600">
-                  {paidForAccommodation
-                    ? "Payment confirmed. Your accommodation is reserved."
-                    : "Payment not confirmed yet. If you just completed checkout, this may take a moment."}
+                  {paidForAccommodation ? (
+                    "Payment confirmed. Your accommodation is reserved."
+                  ) : (
+                    <div className="space-y-1">
+                      <div>
+                        Payment not confirmed yet. If you just completed checkout, this may take a moment.
+                      </div>
+                      <div className="text-xs text-amber-700">
+                        Your accommodation is being held for{" "}
+                        <span className="font-semibold">1 hour</span>.
+                        {typeof accommodationHoldRemainingMs === "number" &&
+                        accommodationHoldRemainingMs > 0 ? (
+                          <>
+                            {" "}Time left:{" "}
+                            <span className="font-semibold">
+                              {formatHoldRemaining(accommodationHoldRemainingMs)}
+                            </span>
+                            .
+                          </>
+                        ) : null}{" "}
+                        If the hold expires, you’ll need to book again.
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2">
@@ -1046,9 +1253,18 @@ const handleRegisterDependent = async (id: string) => {
                   </h3>
                 </div>
                 <p className="text-gray-700 mb-4 text-base">
-                  You can still book your accommodation space. You have just{" "}
-                  <span className="font-bold text-purple-800">100 spaces</span>{" "}
-                  available, book now.
+                  {isCamper && accommodationHoldExpired ? (
+                    <>
+                      Your <span className="font-semibold">1-hour</span> accommodation hold has expired.
+                      Please book again.
+                    </>
+                  ) : (
+                    <>
+                      You can still book your accommodation space. You have just{" "}
+                      <span className="font-bold text-purple-800">100 spaces</span>{" "}
+                      available, book now.
+                    </>
+                  )}
                 </p>
                 <button
                   onClick={() => setIsAccommodationModalOpen(true)}

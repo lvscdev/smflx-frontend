@@ -862,7 +862,7 @@ export function ProfileForm({
   };
 
   return (
-    <div className="flex-1 overflow-auto px-4 lg:px-[32px] py-8 lg:py-[60.32px] lg:pt-[72px] lg:pr-[32px] lg:pb-[32px] lg:pl-[32px]">
+    <div className="w-full px-4 lg:px-8 py-8 lg:py-[60.32px] lg:pt-18 lg:pr-8 lg:pb-8 lg:pl-8">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6 lg:mb-8">
           <div className="flex items-start justify-between gap-3 mb-2">
@@ -970,7 +970,7 @@ export function ProfileForm({
                     phoneCountryCode: normalizeDialCode(e.target.value),
                   })
                 }
-                className="h-10 w-[140px] rounded-md border border-gray-200 bg-white px-3 text-sm"
+                className="h-10 w-27.5 sm:w-35 rounded-md border border-gray-200 bg-white px-3 text-sm"
               >
                 {dialCodes.map((d) => (
                   <option key={`${d.code}-${d.label}`} value={d.code}>
@@ -1268,7 +1268,7 @@ export function ProfileForm({
             <label className="block text-sm text-gray-700 font-medium">
               Employment Status *
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <GridOption
                 value="employed"
                 selected={profile.employmentStatus === "employed"}

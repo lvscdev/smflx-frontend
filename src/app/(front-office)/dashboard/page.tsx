@@ -386,7 +386,7 @@ const normalizedRegistration = {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex min-h-[100svh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -394,7 +394,7 @@ const normalizedRegistration = {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center p-6">
+      <div className="flex min-h-[100svh] items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
           <div className="mb-4">
             <svg

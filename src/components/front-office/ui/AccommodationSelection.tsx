@@ -234,6 +234,11 @@ export function AccommodationSelection({
         // Mark pending accommodation payment so dashboard can auto-refresh/poll after return.
         try {
           localStorage.setItem("smflx_pending_accommodation_payment", "1");
+          // Track when the 1-hour hold started so dashboard can show a countdown and auto-expire UI.
+          localStorage.setItem(
+            "smflx_pending_accommodation_payment_started_at",
+            String(Date.now()),
+          );
         } catch {
           // ignore
         }
@@ -572,7 +577,7 @@ export function AccommodationSelection({
         <form onSubmit={handleSubmit} className="space-y-8">
           {isHostel ? renderHostelAccommodation() : renderHotelAccommodation()}
 
-          <div className="flex gap-4 sticky bottom-0 bg-white pt-4 pb-2 border-t">
+          <div className="flex gap-4 sticky bottom-0 bg-white pt-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] border-t">
             <Button
               type="button"
               variant="outline"

@@ -5,6 +5,11 @@ import { ThemeProvider } from "@/components/theme-provider"; // keep your curren
 export const metadata: Metadata = {
   title: "SMFLX",
   description: "SMFLX Front Office",
+  icons: {
+    icon: "/assets/images/smflx_fav_icon.png",
+    shortcut: "/assets/images/smflx_fav_icon.png",
+    apple: "/assets/images/smflx_fav_icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

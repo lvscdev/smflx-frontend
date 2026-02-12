@@ -188,7 +188,7 @@ export function EventRegistration({
   };
 
   return (
-    <div className="flex-1 overflow-auto px-4 lg:px-8 py-8 lg:py-[60.32px] lg:pt-[72px] lg:pr-[32px] lg:pb-[32px] lg:pl-[32px]">
+    <div className="w-full px-4 lg:px-8 py-8 lg:py-[60.32px] lg:pt-18 lg:pr-8 lg:pb-8 lg:pl-8">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6 lg:mb-8">
           <h1 className="text-2xl lg:text-3xl mb-2">Event Registration</h1>
@@ -347,7 +347,7 @@ export function EventRegistration({
               </label>
 
               {loadingAccommodations ? (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div
                       key={i}
@@ -368,7 +368,7 @@ export function EventRegistration({
                   {loadError}
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {accommodationCategories &&
                     accommodationCategories.length > 0 &&
                     accommodationCategories.map((category) => (

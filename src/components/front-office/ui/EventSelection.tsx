@@ -79,7 +79,7 @@ export function EventSelection({
     : events.filter((event) => !event.name.toLowerCase().includes("yat"));
 
   return (
-    <div className="flex-1 overflow-auto pt-8 lg:pt-[150px] px-4 lg:pr-[32px] lg:pb-[32px] lg:pl-[32px]">
+    <div className="w-full pt-8 lg:pt-37.5 px-4 lg:pr-8 lg:pb-8 lg:pl-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 lg:mb-8">
           <h1 className="text-2xl lg:text-3xl mb-2 text-center">

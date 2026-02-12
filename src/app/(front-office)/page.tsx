@@ -211,7 +211,7 @@ export default function HomePage() {
   const showSidebar = true;
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen w-full">
+    <div className="flex flex-col lg:flex-row min-h-svh w-full">
       {showSidebar && (
         <Sidebar
           currentStep={currentStep}

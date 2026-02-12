@@ -27,8 +27,6 @@ export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesL
     number | undefined
   >(undefined);
 
-  // If the parent didn't provide a value (or it hasn't loaded yet), fetch it here.
-  // This keeps the UI stable without changing layout.
   useEffect(() => {
     if (typeof hostelSpacesLeft === "number") return;
 
@@ -108,7 +106,7 @@ export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesL
   }, []);
 
   return (
-    <div className="w-full lg:w-[42%] relative overflow-hidden flex flex-col shrink-0 h-24 sm:h-27.5 lg:h-full">
+    <div className="w-full lg:w-[42%] relative overflow-hidden flex flex-col shrink-0 h-24 sm:h-28 lg:h-full">
       {/* Background Image */}
       <div className="absolute inset-0">
         <Image src={backgroundImage} alt="" fill priority className="object-cover" />

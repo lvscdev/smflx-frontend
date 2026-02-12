@@ -27,21 +27,14 @@ const getEventId = (registration: unknown): string | undefined => {
 
   const reg = registration as Record<string, unknown>;
 
-  // Common shapes
   if ("eventId" in reg && reg.eventId != null) return String(reg.eventId);
-  if ("eventID" in reg && (reg as any).eventID != null) return String((reg as any).eventID);
-  if ("event_id" in reg && (reg as any).event_id != null) return String((reg as any).event_id);
 
-  // Some APIs return { event: { id / eventId } }
   const evt = reg.event;
   if (typeof evt === "object" && evt !== null) {
     const e = evt as Record<string, unknown>;
     if ("eventId" in e && e.eventId != null) return String(e.eventId);
-    if ("id" in e && e.id != null) return String(e.id);
-    if ("eventID" in e && (e as any).eventID != null) return String((e as any).eventID);
   }
 
-  // Some payloads return { id: <registrationId>, eventId: ... } – already handled above.
   return undefined;
 };
 
@@ -84,6 +77,46 @@ const toDependent = (d: DashboardDependent): Dependent => {
   return { id, name, age, gender, isRegistered, isPaid };
 };
 
+const getRegId = (registration: unknown): string | undefined => {
+  if (typeof registration !== "object" || registration === null) return undefined;
+
+  const reg = registration as Record<string, unknown>;
+
+  // Most common on dashboard payload
+  if ("regId" in reg && reg.regId != null) return String(reg.regId);
+
+  // Some backends might use id / registrationId
+  if ("registrationId" in reg && reg.registrationId != null) return String(reg.registrationId);
+  if ("id" in reg && reg.id != null) return String(reg.id);
+
+  return undefined;
+};
+
+const getOwnerRegId = (profile: unknown): string | undefined => {
+  if (typeof profile !== "object" || profile === null) return undefined;
+  const p = profile as Record<string, unknown>;
+
+  if ("userId" in p && p.userId != null) return String(p.userId);
+  if ("id" in p && p.id != null) return String(p.id);
+  if ("registrantId" in p && p.registrantId != null) return String(p.registrantId);
+
+  const user = (p as any).user;
+  if (user && typeof user === "object") {
+    if (user.userId != null) return String(user.userId);
+    if (user.id != null) return String(user.id);
+  }
+
+  const data = (p as any).data;
+  if (data && typeof data === "object") {
+    if (data.userId != null) return String(data.userId);
+    if (data.id != null) return String(data.id);
+    if (data.registrantId != null) return String(data.registrantId);
+  }
+
+  return undefined;
+};
+
+
 
 function normalizeAttendeeType(reg: any): "camper" | "physical" | "online" | undefined {
   const raw = reg?.attendeeType ?? reg?.attendanceType ?? reg?.participationMode;
@@ -116,6 +149,10 @@ interface DashboardProps {
   profile: UserProfile | null;
   registration: DashboardRegistration | null;
   accommodation: DashboardAccommodation | null;
+  /**
+   * Optional explicit active event id from the page/router layer.
+   * Dashboard will still resolve from `registration.eventId` (preferred) or persisted flow state.
+   */
   activeEventId?: string | null;
   onLogout: () => void;
   onAccommodationUpdate?: (data: DashboardAccommodation | null) => void;
@@ -129,12 +166,51 @@ export function Dashboard({
   registration,
   accommodation,
   activeEventId,
-
   onLogout,
   onAccommodationUpdate,
   onRegistrationUpdate,
   onProfileUpdate,
 }: DashboardProps) {
+  // Resolve eventId from the current registration (source of truth)
+  const resolvedEventId = (() => {
+    // 1. Primary source: registration
+    if (registration?.eventId) return registration.eventId;
+
+    // 2. Page/router provided value
+    if (activeEventId) return activeEventId;
+
+    // 3. Flow state fallback
+    try {
+      const flowRaw =
+        localStorage.getItem("smflx_flow_state") ||
+        localStorage.getItem("flowState");
+
+      if (flowRaw) {
+        const flow = JSON.parse(flowRaw);
+        const fromFlow =
+          flow?.selectedEvent?.eventId ||
+          flow?.event?.eventId ||
+          flow?.eventId;
+
+        if (fromFlow) return fromFlow;
+      }
+    } catch {
+      // ignore corrupted storage
+    }
+
+    // 3. Legacy fallback
+    try {
+      const legacy = localStorage.getItem("smflx_selected_event");
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (parsed?.eventId) return parsed.eventId;
+      }
+    } catch {
+      // ignore
+    }
+
+    return undefined;
+  })();
 // Avatar dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -155,7 +231,7 @@ export function Dashboard({
     setDashboardLoadError(null);
 
     // Resolve eventId (registration → flow state → legacy)
-    const resolvedEventIdLocal: string | undefined = (() => {
+    const resolvedEventId: string | undefined = (() => {
       if (registration?.eventId) return registration.eventId;
       if (typeof window === "undefined") return undefined;
 
@@ -199,7 +275,7 @@ export function Dashboard({
       return undefined;
     })();
 
-    if (!resolvedEventIdLocal) {
+    if (!resolvedEventId) {
       setDashboardLoadError(
         "We couldn’t determine the active event. Please refresh or reselect your event."
       );
@@ -208,7 +284,7 @@ export function Dashboard({
     }
 
     try {
-      const data = await getUserDashboard(resolvedEventIdLocal);
+      const data = await getUserDashboard(resolvedEventId);
 
       // Dependents (already normalized by API)
       const nextDependents: ModalDependent[] = data.dependents.map((d: DashboardDependent) => {
@@ -264,51 +340,6 @@ export function Dashboard({
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
-
-  // Prefer the dashboard page’s activeEventId when available (returning users may have registration without eventId).
-  const resolvedEventId = useMemo(() => {
-    const fromProp = activeEventId ? String(activeEventId).trim() : "";
-    if (fromProp) return fromProp;
-
-    const fromReg = getEventId(registration);
-    if (fromReg && String(fromReg).trim()) return String(fromReg).trim();
-
-    // Fallback: some accommodation payloads carry eventId
-    const accAny = accommodation as any;
-    const fromAcc =
-      accAny?.eventId ??
-      accAny?.eventID ??
-      accAny?.event_id ??
-      accAny?.event?.eventId ??
-      accAny?.event?.id;
-    if (fromAcc && String(fromAcc).trim()) return String(fromAcc).trim();
-
-    // Last-ditch fallback: try persisted flow state (useful when returning users land here without registration.eventId yet)
-    if (typeof window !== "undefined") {
-      try {
-        const flowRaw =
-          localStorage.getItem("smflx_flow_state_v1") ||
-          localStorage.getItem("smflx_flow_state") ||
-          localStorage.getItem("flowState");
-        if (flowRaw) {
-          const flow = JSON.parse(flowRaw);
-          const fromFlow =
-            flow?.activeEventId ??
-            flow?.selectedEvent?.eventId ??
-            flow?.selectedEvent?.id ??
-            flow?.registration?.eventId ??
-            flow?.registration?.event?.eventId ??
-            flow?.registration?.event?.id;
-          if (fromFlow && String(fromFlow).trim()) return String(fromFlow).trim();
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    return "";
-  }, [activeEventId, registration, accommodation]);
-
 // Accommodation modal state
   const [isAccommodationModalOpen, setIsAccommodationModalOpen] =
     useState(false);
@@ -327,7 +358,7 @@ export function Dashboard({
   }>({ loading: false, error: null });
 
   useEffect(() => {
-    const eventId = resolvedEventId;
+    const eventId = registration?.eventId;
     if (!isAccommodationModalOpen || modalStep !== 1 || !eventId) return;
 
     let cancelled = false;
@@ -390,7 +421,7 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [isAccommodationModalOpen, modalStep, resolvedEventId]);
+  }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
 
   // Dependents state
   type Dependent = {
@@ -493,7 +524,6 @@ type AccommodationData = Parameters<
   const attendeeType = normalizeAttendeeType(registration);
   const attendeeTypeNorm = (typeof attendeeType === "string" ? attendeeType.toLowerCase() : "");
   const isCamper = attendeeTypeNorm === "" || attendeeTypeNorm === "camper";
-  // Memoize to avoid creating a new object every render (which would retrigger effects).
   const normalizedAccommodation = useMemo(
     () => normalizeAccommodation(accommodation),
     [accommodation],
@@ -525,7 +555,6 @@ type AccommodationData = Parameters<
     (accAny?.imageUrl as string) ||
     "";
 const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online";
-  // Camper accommodation payment state (from dashboard API)
   const paidForAccommodation = normalizedAccommodation?.paidForAccommodation === true;
 
   // Camper: when accommodation payment is pending, the space is held for 1 hour.
@@ -725,13 +754,9 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         // Save selection snapshot for UI, then close modal.
         const snapshot: DashboardAccommodation = {
           accommodationType: data.type,
-
-          // AccommodationData uses IDs in this zip
           facility: data.facilityId ?? "",
           room: data.roomId ?? "",
           bedspace: data.bedSpaceId ?? "",
-
-          // keep stable UI flags (actual "paid" flips after verification/poll)
           requiresAccommodation: true,
           paidForAccommodation: false,
         };
@@ -767,9 +792,13 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
         // Stage 2: persist newly added dependents (no demo fallbacks)
         try {
-          const eventId = resolvedEventId || getEventId(registration);
+          const eventId = resolvedEventId;
+          const regId = getOwnerRegId(profile) ?? getRegId(registration);
           if (!eventId) {
             throw new Error("Missing eventId: cannot save dependents.");
+          }
+          if (!regId) {
+            throw new Error("Missing userId (regId): cannot save dependents.");
           }
 
           const prevIds = new Set(prev.map((d) => d.id));
@@ -779,6 +808,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
             const gender = (d?.gender || "male").toString().toUpperCase();
             const normalizedGender = gender === "FEMALE" ? "FEMALE" : "MALE";
             await apiAddDependent({
+              regId,
               eventId,
               name: d?.name,
               age: Number(d?.age || 0),
@@ -849,12 +879,17 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
       setDependents(updatedDependents);
 
       try {
-        const eventId = resolvedEventId || getEventId(registration);
+        const eventId = resolvedEventId;
+        const regId = getOwnerRegId(profile) ?? getRegId(registration);
         if (!eventId) {
           throw new Error("Missing eventId");
         }
+        if (!regId) {
+          throw new Error("Missing regId");
+        }
 
         await apiAddDependent({
+          regId,
           eventId,
           name: dependent.name,
           age: Number(dependent.age) || 0,
@@ -1084,7 +1119,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
                 <div className="flex items-center gap-2">
                   <span className="text-base font-medium">
-                    {isCamper && "Camper"}
                     {attendeeType === "physical" && "Physical Attendance"}
                     {attendeeType === "online" && "Online Participant"}
                     {!attendeeType && "Camper"}
@@ -1226,11 +1260,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   {!paidForAccommodation && (
                     <button
                       onClick={() => {
-                        const rawType = String((accommodation as any)?.accommodationType ?? (accommodation as any)?.type ?? "").toLowerCase();
-                        const nextType = rawType.includes("hotel") ? "hotel" : "hostel";
-                        setSelectedAccommodationType(nextType);
                         setIsAccommodationModalOpen(true);
-                        setModalStep(2);
+                        setModalStep(1);
                       }}
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
                     >
@@ -1322,7 +1353,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
             <div className="bg-linear-to-br from-amber-900 via-orange-900 to-red-900 rounded-2xl p-6 text-white cursor-pointer hover:opacity-90 transition-opacity min-h-30 flex items-end">
               <div>
                 <h4 className="font-semibold text-lg">WOTH 2025 Teens</h4>
-                <p className="text-base opacity-90">an YA Messages</p>
+                <p className="text-base opacity-90">and YA Messages</p>
               </div>
             </div>
 
@@ -1348,7 +1379,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
             <div className="grid grid-cols-2 gap-3">
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/wothsmflx/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-blue-600 to-blue-700 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1360,7 +1391,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://instagram.com"
+                href="https://www.instagram.com/smflxofficial"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-pink-600 via-purple-600 to-orange-500 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1372,7 +1403,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://x.com"
+                href="https://x.com/smflxofficial"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-gray-800 to-black rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1384,7 +1415,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://youtube.com"
+                href="https://youtube.com/@smflxofficial"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-red-600 to-red-700 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1408,7 +1439,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
             <div className="grid grid-cols-2 gap-3">
               <a
-                href="https://mixlr.com"
+                href="https://wothsmflx.mixlr.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-orange-500 to-orange-600 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1420,7 +1451,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://youtube.com"
+                href="https://youtube.com/@smflxofficial"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-red-600 to-red-700 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1432,7 +1463,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://waystream.com"
+                href="https://app.waystream.io/wothsmflx"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-teal-600 to-cyan-600 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1444,7 +1475,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/wothsmflx/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-blue-600 to-blue-700 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1458,6 +1489,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           </div>
         </div>
       </div>
+
 
       {/* Accommodation Modal */}
       {isAccommodationModalOpen && (
@@ -1532,7 +1564,15 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               )}
 
               {modalStep === 2 && (() => {
-                const eventId = resolvedEventId;
+                const eventId =
+                  registration?.eventId ??
+                  (registration?.event &&
+                  typeof registration.event === "object" &&
+                  "eventId" in registration.event
+                    ? String(
+                        (registration.event as { eventId?: unknown }).eventId || ""
+                      )
+                    : "");
 
                 if (!eventId) {
                   return (
@@ -1545,7 +1585,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                 return (
                   <AccommodationSelection
                     categoryId=""
-                    accommodationType={selectedAccommodationType || (String((accommodation as any)?.accommodationType ?? "").toLowerCase().includes("hotel") ? "hotel" : "hostel")}
+                    accommodationType={selectedAccommodationType}
                     eventId={eventId}
                     registrationId={
                       typeof registration?.id === "string"
@@ -1584,7 +1624,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         isOpen={isDependentsPaymentModalOpen}
         onClose={() => setIsDependentsPaymentModalOpen(false)}
         dependents={selectedDependentsForPayment}
-        eventId={resolvedEventId}
+        eventId={getEventId(registration)}
         onPaymentComplete={handleDependentsPaymentComplete}
       />
 

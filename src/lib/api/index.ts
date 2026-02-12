@@ -158,6 +158,16 @@ export async function listMyRegistrations(): Promise<EventRegistration[]> {
 // --- User dashboard ---
 
 export type AddDependentPayload = {
+  /**
+   * Backend expects the *parent registration id* (regId) so the dependant can be
+   * associated with the correct event registration.
+   */
+  regId: string;
+  /**
+   * Legacy field (some older clients used userId). Kept optional for backwards
+   * compatibility; do not rely on it.
+   */
+  userId?: string;
   eventId: string;
   name: string;
   age: number;

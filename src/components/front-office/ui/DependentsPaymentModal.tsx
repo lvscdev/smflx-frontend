@@ -4,7 +4,7 @@ import type { Dependent } from "./DependentsModal";
 import { useState } from 'react';
 import { X, CreditCard } from 'lucide-react';
 import { InlineAlert } from './InlineAlert';
-import { initiateDependentsPayment } from '@/lib/api';
+import { initiateDependentPayment } from '@/lib/api';
 import { toUserMessage } from '@/lib/errors';
 
 interface DependentsPaymentModalProps {
@@ -13,6 +13,7 @@ interface DependentsPaymentModalProps {
   dependents: Dependent[];
   onPaymentComplete: () => void;
   eventId?: string;
+  parentRegId?: string;
 }
 
 export function DependentsPaymentModal({
@@ -20,6 +21,7 @@ export function DependentsPaymentModal({
   onClose,
   dependents,
   eventId,
+  parentRegId,
   onPaymentComplete,
 }: DependentsPaymentModalProps) {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
@@ -37,15 +39,10 @@ export function DependentsPaymentModal({
     setPaymentProcessing(true);
 
     try {
-      const raw =
-        typeof window !== "undefined" ? localStorage.getItem("smflx_user") : null;
-      const user = raw ? JSON.parse(raw) : null;
-      const userId = user?.userId;
+      const resolvedParentRegId = parentRegId;
 
-      const resolvedEventId = eventId;
-
-      if (!userId || !resolvedEventId) {
-        throw new Error("Missing user/event context for payment checkout.");
+      if (!resolvedParentRegId) {
+        throw new Error("Missing parentRegId (owner regId). Please refresh your dashboard and try again.");
       }
 
       const dependentIds = dependents
@@ -58,20 +55,20 @@ export function DependentsPaymentModal({
         );
       }
 
-      // Initiate ONCE for all dependents (API supports multiple dependentIds)
-      const resp = await initiateDependentsPayment({
-        userId,
-        eventId: resolvedEventId,
-        dependentIds,
-        amount: totalAmount,
-        currency: "NGN",
-        metadata: {
-          reason: "dependents_registration",
-          dependentCount: dependents.length,
-        },
+      // Backend payment endpoint currently supports initiating payment per dependent.
+      const [firstId, ...remainingIds] = dependentIds;
+
+      const resp = await initiateDependentPayment({
+        dependantId: firstId,
+        parentRegId: resolvedParentRegId,
       });
 
-      const checkoutUrl = resp?.checkoutUrl;
+      const checkoutUrl =
+        resp?.checkoutUrl ||
+        resp?.data?.checkoutUrl ||
+        resp?.paymentUrl ||
+        resp?.data?.paymentUrl;
+
       if (!checkoutUrl) {
         throw new Error(
           "Payment initiation succeeded but checkoutUrl was not returned."
@@ -84,8 +81,9 @@ export function DependentsPaymentModal({
           "smflx_pending_payment_ctx",
           JSON.stringify({
             type: "dependents",
-            dependentIds,
-            amount: totalAmount,
+            parentRegId: resolvedParentRegId,
+            paidDependentId: firstId,
+            remainingDependentIds: remainingIds,
             startedAt: new Date().toISOString(),
           })
         );

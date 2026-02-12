@@ -6,11 +6,17 @@ import { Dashboard } from "@/components/front-office/ui/Dashboard";
 import { AUTH_USER_STORAGE_KEY, getAuthToken, getStoredUser, setAuthToken } from "@/lib/api/client";
 import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie } from "@/lib/auth/session";
 import { getMe, verifyToken, getUserDashboard, listMyRegistrations } from "@/lib/api";
-import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation } from "@/lib/api/dashboardTypes";
-import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
+import type { NormalizedDashboardResponse, UserProfile,
+  DashboardRegistration,
+  DashboardAccommodation,
+} from "@/lib/api/dashboardTypes";
+import {
+  loadDashboardSnapshot,
+  saveDashboardSnapshot,
+  clearDashboardSnapshot,
+} from "@/lib/storage/dashboardState";
 import { readOtpCookie } from "@/lib/auth/otpCookie";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 
@@ -168,10 +174,14 @@ export default function DashboardPage() {
 
         // 4) ✅ CRITICAL FIX: Fetch registrations FIRST to get valid eventId
         let eventId: string | null = null;
+        let myRegistrations: any[] = [];
+        let myRegIdForEvent: string | null = null;
 
         try {
           console.log("📋 Fetching user registrations...");
-          const registrations = await listMyRegistrations();
+          myRegistrations = await listMyRegistrations();
+
+          const registrations = myRegistrations;
 
           if (!Array.isArray(registrations) || registrations.length === 0) {
             console.warn("⚠️ User has no event registrations");
@@ -199,6 +209,10 @@ export default function DashboardPage() {
           // ✅ Use the most recent registration
           const mostRecent = registrations[0];
           eventId = mostRecent.eventId;
+
+          // Persist the owner regId for this event (used for dependents payment & registration)
+          const matchForEvent = registrations.find((r: any) => r?.eventId === eventId) ?? mostRecent;
+          myRegIdForEvent = matchForEvent?.regId ? String(matchForEvent.regId) : null;
 
           if (!eventId) {
             console.error("❌ Registration exists but has no eventId:", mostRecent);
@@ -250,6 +264,8 @@ const isCamper = String(regAttendanceRaw).toLowerCase().includes("camp");
 
 const normalizedRegistration = {
   ...(regForEvent || {}),
+  // Ensure regId is present (backend requires it for dependents flows)
+  regId: (regForEvent as any)?.regId ?? myRegIdForEvent ?? (regForEvent as any)?.registrationId ?? (regForEvent as any)?.id,
   attendeeType:
     (regForEvent as any)?.attendeeType ??
     (regForEvent as any)?.attendanceType ??
@@ -370,8 +386,6 @@ const normalizedRegistration = {
   }, [router]);
 
   const handleLogout = () => {
-    toast.loading("Logging out...");
-
     setAuthToken(null);
     clearTokenCookie();
     clearActiveEventCookie();

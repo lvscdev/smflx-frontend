@@ -40,10 +40,19 @@ export default function SelectEventPage() {
 
       try {
         const regs = await listMyRegistrations();
-        const list = (Array.isArray(regs) ? regs : []).map((r: any) => ({
-          eventId: r?.eventId || r?.event?.eventId || r?.event || "",
-          eventName: r?.eventName || r?.event?.eventName || r?.eventTitle || r?.event?.title || undefined,
-        })).filter((x) => !!x.eventId);
+        type EventItem = { eventId: string; eventName?: string };
+        const list: EventItem[] = (Array.isArray(regs) ? regs : [])
+          .map((r: any): EventItem | null => {
+            const rawEventId = r?.eventId ?? r?.event?.eventId ?? r?.event ?? "";
+            const eventId = typeof rawEventId === "string" ? rawEventId : String(rawEventId || "");
+            if (!eventId) return null;
+
+            const rawName = r?.eventName ?? r?.event?.eventName ?? r?.eventTitle ?? r?.event?.title;
+            const eventName = typeof rawName === "string" && rawName.trim() ? rawName : undefined;
+
+            return { eventId, eventName };
+          })
+          .filter((x): x is EventItem => x !== null);
 
         if (cancelled) return;
 

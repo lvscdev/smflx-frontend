@@ -43,7 +43,8 @@ export function DependentsSection({ dependents, onRegister, onPay }: DependentsS
 
 
   const unpaidRegistered = dependents.filter(d => d.isRegistered && !d.isPaid);
-  const totalUnpaidAmount = unpaidRegistered.length * 7000;
+  const DEPENDENT_PRICE = Number(process.env.NEXT_PUBLIC_DEPENDENT_PRICE) || 7000;
+  const totalUnpaidAmount = unpaidRegistered.length * DEPENDENT_PRICE;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">

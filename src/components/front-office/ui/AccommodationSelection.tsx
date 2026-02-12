@@ -116,6 +116,7 @@ export function AccommodationSelection({
 
       const response = await getAccommodationCategoryFacilities({
         categoryId,
+        regId: registrationId,
       });
 
       setFacilities(response);
@@ -138,7 +139,7 @@ export function AccommodationSelection({
     if (categoryId) {
       loadAccommodations();
     }
-  }, [categoryId]);
+  }, [categoryId, registrationId]);
 
   const loadHotelRooms = async (facilityId: string) => {
     try {

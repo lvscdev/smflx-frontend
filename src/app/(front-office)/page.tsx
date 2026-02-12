@@ -210,7 +210,7 @@ export default function HomePage() {
   console.log("cuurent view, ", view);
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-svh w-full">
+    <div className="flex flex-col lg:flex-row min-h-svh lg:h-screen w-full">
       {showSidebar && (
         <Sidebar
           currentStep={currentStep}

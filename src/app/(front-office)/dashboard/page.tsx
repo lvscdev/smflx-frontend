@@ -6,15 +6,8 @@ import { Dashboard } from "@/components/front-office/ui/Dashboard";
 import { AUTH_USER_STORAGE_KEY, getAuthToken, getStoredUser, setAuthToken } from "@/lib/api/client";
 import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie } from "@/lib/auth/session";
 import { getMe, verifyToken, getUserDashboard, listMyRegistrations } from "@/lib/api";
-import type { NormalizedDashboardResponse, UserProfile,
-  DashboardRegistration,
-  DashboardAccommodation,
-} from "@/lib/api/dashboardTypes";
-import {
-  loadDashboardSnapshot,
-  saveDashboardSnapshot,
-  clearDashboardSnapshot,
-} from "@/lib/storage/dashboardState";
+import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation } from "@/lib/api/dashboardTypes";
+import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
 import { readOtpCookie } from "@/lib/auth/otpCookie";
 import { Loader2 } from "lucide-react";
 
@@ -438,6 +431,7 @@ const normalizedRegistration = {
       profile={profile}
       registration={registration}
       accommodation={accommodation}
+      activeEventId={activeEventId}
       onLogout={handleLogout}
       onProfileUpdate={(p) => {
         setProfile(p);

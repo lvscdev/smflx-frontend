@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider"; // keep your current import path
+import { ThemeProvider } from "@/components/theme-provider"; 
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "SMFLX",
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full antialiased">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           {children}
+           <Toaster />
         </ThemeProvider>
       </body>
     </html>

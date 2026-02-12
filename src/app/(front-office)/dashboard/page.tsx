@@ -10,6 +10,7 @@ import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, D
 import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
 import { readOtpCookie } from "@/lib/auth/otpCookie";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 
@@ -369,6 +370,8 @@ const normalizedRegistration = {
   }, [router]);
 
   const handleLogout = () => {
+    toast.loading("Logging out...");
+
     setAuthToken(null);
     clearTokenCookie();
     clearActiveEventCookie();

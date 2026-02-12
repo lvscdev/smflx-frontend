@@ -35,8 +35,7 @@ export function EventSelector({
                   className="w-full px-4 py-3 border rounded-md hover:bg-gray-100 text-left"
                   onClick={() => onSelect(e.eventId)}
                 >
-                  <div className="font-medium">{e.eventName || "Event"}</div>
-                  <div className="text-xs text-gray-500 break-all">{e.eventId}</div>
+                  <div className="font-medium">{e.eventName || e.eventId || "Event"}</div>
                 </button>
               </li>
             ))}

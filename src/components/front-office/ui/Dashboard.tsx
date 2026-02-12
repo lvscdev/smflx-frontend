@@ -27,14 +27,21 @@ const getEventId = (registration: unknown): string | undefined => {
 
   const reg = registration as Record<string, unknown>;
 
+  // Common shapes
   if ("eventId" in reg && reg.eventId != null) return String(reg.eventId);
+  if ("eventID" in reg && (reg as any).eventID != null) return String((reg as any).eventID);
+  if ("event_id" in reg && (reg as any).event_id != null) return String((reg as any).event_id);
 
+  // Some APIs return { event: { id / eventId } }
   const evt = reg.event;
   if (typeof evt === "object" && evt !== null) {
     const e = evt as Record<string, unknown>;
     if ("eventId" in e && e.eventId != null) return String(e.eventId);
+    if ("id" in e && e.id != null) return String(e.id);
+    if ("eventID" in e && (e as any).eventID != null) return String((e as any).eventID);
   }
 
+  // Some payloads return { id: <registrationId>, eventId: ... } – already handled above.
   return undefined;
 };
 
@@ -109,6 +116,7 @@ interface DashboardProps {
   profile: UserProfile | null;
   registration: DashboardRegistration | null;
   accommodation: DashboardAccommodation | null;
+  activeEventId?: string | null;
   onLogout: () => void;
   onAccommodationUpdate?: (data: DashboardAccommodation | null) => void;
   onRegistrationUpdate?: (data: DashboardRegistration | null) => void;
@@ -120,48 +128,13 @@ export function Dashboard({
   profile,
   registration,
   accommodation,
+  activeEventId,
+
   onLogout,
   onAccommodationUpdate,
   onRegistrationUpdate,
   onProfileUpdate,
 }: DashboardProps) {
-  // Resolve eventId from the current registration (source of truth)
-  const resolvedEventId = (() => {
-    // 1. Primary source: registration
-    if (registration?.eventId) return registration.eventId;
-
-    // 2. Flow state fallback
-    try {
-      const flowRaw =
-        localStorage.getItem("smflx_flow_state") ||
-        localStorage.getItem("flowState");
-
-      if (flowRaw) {
-        const flow = JSON.parse(flowRaw);
-        const fromFlow =
-          flow?.selectedEvent?.eventId ||
-          flow?.event?.eventId ||
-          flow?.eventId;
-
-        if (fromFlow) return fromFlow;
-      }
-    } catch {
-      // ignore corrupted storage
-    }
-
-    // 3. Legacy fallback
-    try {
-      const legacy = localStorage.getItem("smflx_selected_event");
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (parsed?.eventId) return parsed.eventId;
-      }
-    } catch {
-      // ignore
-    }
-
-    return undefined;
-  })();
 // Avatar dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -182,7 +155,7 @@ export function Dashboard({
     setDashboardLoadError(null);
 
     // Resolve eventId (registration → flow state → legacy)
-    const resolvedEventId: string | undefined = (() => {
+    const resolvedEventIdLocalLocal: string | undefined = (() => {
       if (registration?.eventId) return registration.eventId;
       if (typeof window === "undefined") return undefined;
 
@@ -226,7 +199,7 @@ export function Dashboard({
       return undefined;
     })();
 
-    if (!resolvedEventId) {
+    if (!resolvedEventIdLocal) {
       setDashboardLoadError(
         "We couldn’t determine the active event. Please refresh or reselect your event."
       );
@@ -235,7 +208,7 @@ export function Dashboard({
     }
 
     try {
-      const data = await getUserDashboard(resolvedEventId);
+      const data = await getUserDashboard(resolvedEventIdLocal);
 
       // Dependents (already normalized by API)
       const nextDependents: ModalDependent[] = data.dependents.map((d: DashboardDependent) => {
@@ -291,6 +264,51 @@ export function Dashboard({
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
+
+  // Prefer the dashboard page’s activeEventId when available (returning users may have registration without eventId).
+  const resolvedEventId = useMemo(() => {
+    const fromProp = activeEventId ? String(activeEventId).trim() : "";
+    if (fromProp) return fromProp;
+
+    const fromReg = getEventId(registration);
+    if (fromReg && String(fromReg).trim()) return String(fromReg).trim();
+
+    // Fallback: some accommodation payloads carry eventId
+    const accAny = accommodation as any;
+    const fromAcc =
+      accAny?.eventId ??
+      accAny?.eventID ??
+      accAny?.event_id ??
+      accAny?.event?.eventId ??
+      accAny?.event?.id;
+    if (fromAcc && String(fromAcc).trim()) return String(fromAcc).trim();
+
+    // Last-ditch fallback: try persisted flow state (useful when returning users land here without registration.eventId yet)
+    if (typeof window !== "undefined") {
+      try {
+        const flowRaw =
+          localStorage.getItem("smflx_flow_state_v1") ||
+          localStorage.getItem("smflx_flow_state") ||
+          localStorage.getItem("flowState");
+        if (flowRaw) {
+          const flow = JSON.parse(flowRaw);
+          const fromFlow =
+            flow?.activeEventId ??
+            flow?.selectedEvent?.eventId ??
+            flow?.selectedEvent?.id ??
+            flow?.registration?.eventId ??
+            flow?.registration?.event?.eventId ??
+            flow?.registration?.event?.id;
+          if (fromFlow && String(fromFlow).trim()) return String(fromFlow).trim();
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return "";
+  }, [activeEventId, registration, accommodation]);
+
 // Accommodation modal state
   const [isAccommodationModalOpen, setIsAccommodationModalOpen] =
     useState(false);
@@ -309,7 +327,7 @@ export function Dashboard({
   }>({ loading: false, error: null });
 
   useEffect(() => {
-    const eventId = registration?.eventId;
+    const eventId = resolvedEventId;
     if (!isAccommodationModalOpen || modalStep !== 1 || !eventId) return;
 
     let cancelled = false;
@@ -372,7 +390,7 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
+  }, [isAccommodationModalOpen, modalStep, resolvedEventId]);
 
   // Dependents state
   type Dependent = {
@@ -749,7 +767,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
         // Stage 2: persist newly added dependents (no demo fallbacks)
         try {
-          const eventId = getEventId(registration);
+          const eventId = resolvedEventId || getEventId(registration);
           if (!eventId) {
             throw new Error("Missing eventId: cannot save dependents.");
           }
@@ -831,7 +849,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
       setDependents(updatedDependents);
 
       try {
-        const eventId = getEventId(registration);
+        const eventId = resolvedEventId || getEventId(registration);
         if (!eventId) {
           throw new Error("Missing eventId");
         }
@@ -1208,8 +1226,11 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   {!paidForAccommodation && (
                     <button
                       onClick={() => {
+                        const rawType = String((accommodation as any)?.accommodationType ?? (accommodation as any)?.type ?? "").toLowerCase();
+                        const nextType = rawType.includes("hotel") ? "hotel" : "hostel";
+                        setSelectedAccommodationType(nextType);
                         setIsAccommodationModalOpen(true);
-                        setModalStep(1);
+                        setModalStep(2);
                       }}
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
                     >
@@ -1511,15 +1532,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               )}
 
               {modalStep === 2 && (() => {
-                const eventId =
-                  registration?.eventId ??
-                  (registration?.event &&
-                  typeof registration.event === "object" &&
-                  "eventId" in registration.event
-                    ? String(
-                        (registration.event as { eventId?: unknown }).eventId || ""
-                      )
-                    : "");
+                const eventId = resolvedEventId;
 
                 if (!eventId) {
                   return (
@@ -1532,7 +1545,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                 return (
                   <AccommodationSelection
                     categoryId=""
-                    accommodationType={selectedAccommodationType}
+                    accommodationType={selectedAccommodationType || (String((accommodation as any)?.accommodationType ?? "").toLowerCase().includes("hotel") ? "hotel" : "hostel")}
                     eventId={eventId}
                     registrationId={
                       typeof registration?.id === "string"
@@ -1571,7 +1584,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         isOpen={isDependentsPaymentModalOpen}
         onClose={() => setIsDependentsPaymentModalOpen(false)}
         dependents={selectedDependentsForPayment}
-        eventId={getEventId(registration)}
+        eventId={resolvedEventId}
         onPaymentComplete={handleDependentsPaymentComplete}
       />
 

@@ -155,7 +155,7 @@ export function Dashboard({
     setDashboardLoadError(null);
 
     // Resolve eventId (registration → flow state → legacy)
-    const resolvedEventIdLocalLocal: string | undefined = (() => {
+    const resolvedEventIdLocal: string | undefined = (() => {
       if (registration?.eventId) return registration.eventId;
       if (typeof window === "undefined") return undefined;
 

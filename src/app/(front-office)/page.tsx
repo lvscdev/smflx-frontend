@@ -101,12 +101,10 @@ export default function HomePage() {
 
     setEmail(saved.email || "");
     setProfile(saved.profile ?? null);
-    setSelectedEvent(saved.selectedEvent ?? null);
     setRegistration(saved.registration ?? null);
     setAccommodation(saved.accommodation ?? null);
 
     const nextView: View = saved.view || "verify";
-    setView(nextView);
   }, [router, selectedEvent?.eventId]);
 
   useEffect(() => {
@@ -209,6 +207,7 @@ export default function HomePage() {
   }, [view]);
 
   const showSidebar = true;
+  console.log("cuurent view, ", view);
 
   return (
     <div className="flex flex-col lg:flex-row min-h-svh w-full">
@@ -261,7 +260,8 @@ export default function HomePage() {
                 accommodation,
               });
 
-              if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
+              if (selectedEvent?.eventId)
+                setActiveEventCookie(selectedEvent.eventId);
               router.push("/dashboard");
             }}
             onCancel={() => setView("verify")}
@@ -362,11 +362,13 @@ export default function HomePage() {
                   registration: next,
                   accommodation,
                 });
-                if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
+                if (selectedEvent?.eventId)
+                  setActiveEventCookie(selectedEvent.eventId);
                 router.push("/dashboard");
               } catch (e: any) {
                 setRegistrationPersistError(
-                  e?.message || "Unable to save registration. Please try again.",
+                  e?.message ||
+                    "Unable to save registration. Please try again.",
                 );
               } finally {
                 setRegistrationSubmitting(false);
@@ -412,7 +414,8 @@ export default function HomePage() {
                 registration,
                 accommodation,
               });
-              if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
+              if (selectedEvent?.eventId)
+                setActiveEventCookie(selectedEvent.eventId);
               router.push("/dashboard");
             }}
           />

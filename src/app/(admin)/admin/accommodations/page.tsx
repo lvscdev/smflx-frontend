@@ -62,19 +62,19 @@ export default function AccommodationsPage() {
   }, []);
 
   // 2️⃣ Load facilities when event changes
-  useEffect(() => {
+  async function loadFacilities() {
     if (!selectedEventId) return;
 
-    async function loadFacilities() {
-      setLoading(true);
-      try {
-        const data = await getFacilitiesByEvent(selectedEventId);
-        setFacilities(data);
-      } finally {
-        setLoading(false);
-      }
+    setLoading(true);
+    try {
+      const data = await getFacilitiesByEvent(selectedEventId);
+      setFacilities(data);
+    } finally {
+      setLoading(false);
     }
+  }
 
+  useEffect(() => {
     loadFacilities();
   }, [selectedEventId]);
 
@@ -113,6 +113,7 @@ export default function AccommodationsPage() {
           <CreateFacilityModal
             defaultEventId={selectedEventId}
             categories={categories}
+            onSuccess={loadFacilities}
           >
             <Button className="bg-brand-red hover:bg-brand-red/90">
               <Plus className="w-4 h-4 mr-0.5" />
@@ -131,7 +132,11 @@ export default function AccommodationsPage() {
           title="No accommodation created"
           description="Create a facility for this event to get started."
           action={
-            <CreateFacilityModal>
+            <CreateFacilityModal
+              defaultEventId={selectedEventId}
+              categories={categories}
+              onSuccess={loadFacilities}
+            >
               <Button className="bg-brand-red hover:bg-brand-red/90">
                 <Plus className="w-4 h-4 mr-0.5" /> Create Facility
               </Button>

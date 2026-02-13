@@ -48,10 +48,12 @@ function CreateFacilityModal({
   children,
   defaultEventId,
   categories,
+  onSuccess,
 }: {
   children: ReactNode;
   defaultEventId?: string;
   categories?: AccommodationCategory[];
+  onSuccess?: () => void;
 }) {
   const [events, setEvents] = useState<Event[]>([]);
 
@@ -69,6 +71,12 @@ function CreateFacilityModal({
   });
 
   useEffect(() => {
+    if (defaultEventId) {
+      form.setValue("eventId", defaultEventId);
+    }
+  }, [defaultEventId, form]);
+
+  useEffect(() => {
     getAllEvents().then(setEvents);
   }, []);
 
@@ -76,6 +84,7 @@ function CreateFacilityModal({
     try {
       await createFacilityAction(values);
       toast.success("Facility created successfully");
+      onSuccess?.();
       form.reset();
     } catch (err) {
       toast.error(
@@ -111,7 +120,11 @@ function CreateFacilityModal({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Event Type</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={!!defaultEventId}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Choose an event" />
                       </SelectTrigger>

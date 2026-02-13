@@ -14,7 +14,7 @@ import { DependentsPaymentModal } from "./DependentsPaymentModal";
 import { DependentsSection } from "./DependentsSection";
 import { DependentRegistrationSuccess } from "./DependentRegistrationSuccess";
 import { UserProfile as UserProfileView } from "./UserProfile";
-import { getUserDashboard, addDependent as apiAddDependent, removeDependent as apiRemoveDependent, getAccommodations } from "@/lib/api";
+import { getUserDashboard, addDependent as apiAddDependent, addDependants as apiAddDependants, removeDependent as apiRemoveDependent, getAccommodations } from "@/lib/api";
 import { toUserMessage } from "@/lib/errors";
 import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation, DashboardDependent } from "@/lib/api/dashboardTypes";
 
@@ -61,14 +61,16 @@ const toDependent = (d: DashboardDependent): Dependent => {
 
   const name = rawName.trim() ? rawName.trim() : "Dependent";
 
-  const ageVal = rec.age;
+  const ageVal = rec.age ?? rec.dependantAge ?? rec.dependentAge;
   const age =
     typeof ageVal === "number" ? String(ageVal) :
     typeof ageVal === "string" ? ageVal.trim() :
     "";
 
-  const gender = typeof rec.gender === "string" ? rec.gender : "";
-  const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : false;
+  const genderVal = rec.gender ?? rec.dependantGender ?? rec.dependentGender;
+  const gender = typeof genderVal === "string" ? genderVal : "";
+  
+  const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : true; // Assume registered if from API
 
   const isPaid =
     typeof rec.isPaid === "boolean" ? rec.isPaid :
@@ -149,11 +151,8 @@ interface DashboardProps {
   profile: UserProfile | null;
   registration: DashboardRegistration | null;
   accommodation: DashboardAccommodation | null;
-  /**
-   * Optional explicit active event id from the page/router layer.
-   * Dashboard will still resolve from `registration.eventId` (preferred) or persisted flow state.
-   */
   activeEventId?: string | null;
+  ownerRegId?: string | null;
   onLogout: () => void;
   onAccommodationUpdate?: (data: DashboardAccommodation | null) => void;
   onRegistrationUpdate?: (data: DashboardRegistration | null) => void;
@@ -166,22 +165,21 @@ export function Dashboard({
   registration,
   accommodation,
   activeEventId,
+  ownerRegId,
   onLogout,
   onAccommodationUpdate,
   onRegistrationUpdate,
   onProfileUpdate,
 }: DashboardProps) {
-  // Resolve eventId from the current registration (source of truth)
-  const resolvedEventId = (() => {
-    // 1. Primary source: registration
-    if (registration?.eventId) return registration.eventId;
 
-    // 2. Page/router provided value
+  const resolvedEventId = (() => {
     if (activeEventId) return activeEventId;
 
-    // 3. Flow state fallback
+    if (registration?.eventId) return registration.eventId;
+
     try {
       const flowRaw =
+        localStorage.getItem("smflx_flow_state_v1") ||
         localStorage.getItem("smflx_flow_state") ||
         localStorage.getItem("flowState");
 
@@ -198,7 +196,7 @@ export function Dashboard({
       // ignore corrupted storage
     }
 
-    // 3. Legacy fallback
+    // Legacy fallback
     try {
       const legacy = localStorage.getItem("smflx_selected_event");
       if (legacy) {
@@ -211,6 +209,19 @@ export function Dashboard({
 
     return undefined;
   })();
+
+  const resolvedRegId = (() => {
+    if (ownerRegId) return ownerRegId;
+    const p: any = profile as any;
+    return (
+      p?.userId ||
+      p?.id ||
+      p?.regId ||
+      getRegId(registration) ||
+      undefined
+    );
+  })();
+
 // Avatar dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -286,25 +297,29 @@ export function Dashboard({
     try {
       const data = await getUserDashboard(resolvedEventId);
 
-      // Dependents (already normalized by API)
       const nextDependents: ModalDependent[] = data.dependents.map((d: DashboardDependent) => {
         const id = (typeof d.id === "string" && d.id) ? d.id :
                    (typeof d.dependantId === "string" && d.dependantId) ? d.dependantId :
+                   (typeof d.dependentId === "string" && d.dependentId) ? d.dependentId :
                    crypto.randomUUID();
+        
+        const ageRaw = d.age ?? (d as any).dependantAge ?? (d as any).dependentAge;
         const ageNum =
-          typeof d.age === "number" ? d.age :
-          typeof d.age === "string" ? Number(d.age) :
+          typeof ageRaw === "number" ? ageRaw :
+          typeof ageRaw === "string" ? Number(ageRaw) :
           undefined;
 
-        const gender =
-          typeof d.gender === "string" ? d.gender : "";
+        const genderRaw = d.gender ?? (d as any).dependantGender ?? (d as any).dependentGender;
+        const gender = typeof genderRaw === "string" ? genderRaw : "";
+        
+        const nameRaw = d.name ?? (d as any).dependantName ?? (d as any).dependentName;
 
         return {
           id,
-          name: typeof d.name === "string" && d.name.trim() ? d.name.trim() : "Dependent",
+          name: typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : "Dependent",
           age: Number.isFinite(ageNum as number) ? String(ageNum as number) : "",
           gender,
-          isRegistered: typeof d.isRegistered === "boolean" ? d.isRegistered : false,
+          isRegistered: typeof d.isRegistered === "boolean" ? d.isRegistered : true, // Assume registered if from API
           isPaid: typeof d.isPaid === "boolean" ? d.isPaid : (d.paymentStatus === "PAID"),
         };
       });
@@ -517,6 +532,35 @@ type AccommodationData = Parameters<
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isDropdownOpen]);
+
+  // Load dependents on mount and when event changes
+  useEffect(() => {
+    let cancelled = false;
+    
+    const loadInitialDependents = async () => {
+      const eventId = activeEventId ?? resolvedEventId;
+      if (!eventId) return;
+
+      try {
+        const data = await getUserDashboard(eventId);
+        if (!cancelled) {
+          const deps = (data.dependents || []).map((d) => toDependent(d));
+          setDependents(deps);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load dependents:", err);
+        }
+      }
+    };
+
+    void loadInitialDependents();
+    
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEventId]); // Only depend on activeEventId, not resolvedEventId
 
   const firstName =
     (localProfile?.firstName ?? "User");
@@ -792,32 +836,54 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
         // Stage 2: persist newly added dependents (no demo fallbacks)
         try {
-          const eventId = resolvedEventId;
-          const regId = getOwnerRegId(profile) ?? getRegId(registration);
-          if (!eventId) {
+          const eventId = activeEventId ?? resolvedEventId;
+          const regId = resolvedRegId;
+        if (!eventId) {
             throw new Error("Missing eventId: cannot save dependents.");
           }
           if (!regId) {
-            throw new Error("Missing userId (regId): cannot save dependents.");
+            throw new Error("Missing regId: cannot save dependents.");
           }
 
           const prevIds = new Set(prev.map((d) => d.id));
           const toCreate = updatedDependents.filter((d) => !prevIds.has(d.id));
 
-          for (const d of toCreate) {
-            const gender = (d?.gender || "male").toString().toUpperCase();
-            const normalizedGender = gender === "FEMALE" ? "FEMALE" : "MALE";
-            await apiAddDependent({
+          const payloads = toCreate.map((d) => {
+            const genderRaw = String(d?.gender ?? "MALE").toUpperCase();
+
+            const normalizedGender: "MALE" | "FEMALE" =
+              genderRaw === "FEMALE" ? "FEMALE" : "MALE";
+
+            return {
               regId,
               eventId,
               name: d?.name,
               age: Number(d?.age || 0),
               gender: normalizedGender,
-            });
+            };
+          });
+
+          console.log("📤 Saving dependents:", {
+            count: payloads.length,
+            payloads,
+            eventId,
+            regId
+          });
+
+          if (payloads.length === 1) {
+            await apiAddDependent(payloads[0]);
+          } else if (payloads.length > 1) {
+            await apiAddDependants(payloads);
           }
+          
+          console.log("✅ Dependents saved successfully");
+          
+          // Reload dashboard to get fresh data
+          await reloadDashboard();
         } catch (err: unknown) {
           // revert optimistic update and surface error
           setDependents(prev);
+          console.error("❌ Failed to save dependents:", err);
           setDashboardLoadError(
             getErrorMessage(err, "Failed to save dependents. Please try again."),
           );
@@ -879,8 +945,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
       setDependents(updatedDependents);
 
       try {
-        const eventId = resolvedEventId;
-        const regId = getOwnerRegId(profile) ?? getRegId(registration);
+        const eventId = activeEventId ?? resolvedEventId;
+        const regId = resolvedRegId;
         if (!eventId) {
           throw new Error("Missing eventId");
         }
@@ -917,7 +983,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
       const handleRegisterAndPayDependents = (selected: ModalDependent[]) => {
         setSelectedDependentsForPayment(selected);
-        // mark them registered before payment
         const updatedDependents = dependents.map((d) =>
           selected.find((sd) => sd.id === d.id)
             ? { ...d, isRegistered: true }
@@ -1625,6 +1690,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         onClose={() => setIsDependentsPaymentModalOpen(false)}
         dependents={selectedDependentsForPayment}
         eventId={getEventId(registration)}
+        parentRegId={resolvedRegId}
         onPaymentComplete={handleDependentsPaymentComplete}
       />
 

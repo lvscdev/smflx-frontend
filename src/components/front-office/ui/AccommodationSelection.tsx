@@ -257,9 +257,12 @@ const response = isHostel && profileAgeRange
             requiresAccommodation: true,
             paidForAccommodation: false,
             accommodationType: accommodationType,
-            facility: selectedFacility?.facilityName || selectedFacility?.facilityId || "",
-            // Hotel rooms use `roomType` (not `roomTypeName`). Hostels don't select rooms/bedspaces in this UI.
-            room: selectedRoom?.roomType || selectedRoom?.roomTypeId || "",
+            facilityId: (selectedFacility as any)?.facilityId || "",
+            facilityName: (selectedFacility as any)?.facilityName || "",
+            roomTypeId: (selectedRoom as any)?.roomTypeId || "",
+            roomTypeName: (selectedRoom as any)?.roomType || "",
+            facility: (selectedFacility as any)?.facilityName || (selectedFacility as any)?.facilityId || "",
+            room: (selectedRoom as any)?.roomType || (selectedRoom as any)?.roomTypeId || "",
           };
           safeSaveFlowState({ ...saved, accommodation: snapshot });
         } catch {

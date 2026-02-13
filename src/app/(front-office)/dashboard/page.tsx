@@ -6,17 +6,12 @@ import { Dashboard } from "@/components/front-office/ui/Dashboard";
 import { AUTH_USER_STORAGE_KEY, getAuthToken, getStoredUser, setAuthToken } from "@/lib/api/client";
 import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie } from "@/lib/auth/session";
 import { getMe, verifyToken, getUserDashboard, listMyRegistrations } from "@/lib/api";
-import type { NormalizedDashboardResponse, UserProfile,
-  DashboardRegistration,
-  DashboardAccommodation,
-} from "@/lib/api/dashboardTypes";
-import {
-  loadDashboardSnapshot,
-  saveDashboardSnapshot,
-  clearDashboardSnapshot,
-} from "@/lib/storage/dashboardState";
+import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation } from "@/lib/api/dashboardTypes";
+import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
 import { readOtpCookie } from "@/lib/auth/otpCookie";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 
@@ -59,6 +54,7 @@ export default function DashboardPage() {
 
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [ownerRegId, setOwnerRegId] = useState<string | null>(null);
   const [registration, setRegistration] = useState<DashboardRegistration | null>(null);
   const [accommodation, setAccommodation] = useState<DashboardAccommodation | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<{
@@ -79,6 +75,13 @@ export default function DashboardPage() {
       const snap = loadDashboardSnapshot();
       if (snap?.profile) {
         setProfile(snap.profile);
+        try {
+          const p: any = snap.profile as any;
+          const oid = p?.userId ?? p?.id ?? p?.registrantId ?? p?.data?.userId ?? p?.data?.id;
+          if (oid) setOwnerRegId(String(oid));
+        } catch {
+          // ignore
+        }
         const snapEmail = (snap.profile.email ?? "") as string;
         if (snapEmail) setEmail(snapEmail);
       }
@@ -154,6 +157,13 @@ export default function DashboardPage() {
 
         if (storedEmail) setEmail(storedEmail);
         setProfile(storedUser);
+        try {
+          const u: any = storedUser as any;
+          const oid = u?.userId ?? u?.id ?? u?.registrantId;
+          if (oid) setOwnerRegId(String(oid));
+        } catch {
+          // ignore
+        }
       }
 
       try {
@@ -168,6 +178,14 @@ export default function DashboardPage() {
         const me = await getMe();
         const mergedProfile = { ...(storedUser || {}), ...(me || {}) };
         setProfile(mergedProfile);
+        try {
+          const m: any = me as any;
+          const mp: any = mergedProfile as any;
+          const oid = m?.userId ?? m?.id ?? mp?.userId ?? mp?.id ?? mp?.registrantId;
+          if (oid) setOwnerRegId(String(oid));
+        } catch {
+          // ignore
+        }
 
         const apiEmail = (me as any)?.email || "";
         if (apiEmail) setEmail(apiEmail);
@@ -213,6 +231,8 @@ export default function DashboardPage() {
           // Persist the owner regId for this event (used for dependents payment & registration)
           const matchForEvent = registrations.find((r: any) => r?.eventId === eventId) ?? mostRecent;
           myRegIdForEvent = matchForEvent?.regId ? String(matchForEvent.regId) : null;
+          // Backend: regId represents the dashboard owner's (registrant) id.
+          if (myRegIdForEvent) setOwnerRegId((prev) => prev ?? myRegIdForEvent);
 
           if (!eventId) {
             console.error("❌ Registration exists but has no eventId:", mostRecent);
@@ -334,16 +354,19 @@ const normalizedRegistration = {
           }
         }
 
-        // Persist to flow state
+        // Persist to flow state (do NOT let stale saved state override current event data)
         const saved0 = safeLoadFlowState() || {};
+        const sameEvent = (saved0?.activeEventId && eventId) ? String(saved0.activeEventId) === String(eventId) : true;
+
         safeSaveFlowState({
           ...saved0,
           view: "dashboard",
           email: apiEmail || (storedUser?.email ?? saved0?.email ?? ""),
           profile: mergedProfile,
+          ownerRegId: ownerRegId || myRegIdForEvent || saved0?.ownerRegId || (mergedProfile as any)?.userId || null,
           selectedEvent: localSelectedEvent || selectedEvent || saved0?.selectedEvent,
-          registration: regForEvent || saved0?.registration,
-          accommodation: accForEvent || saved0?.accommodation,
+          registration: regForEvent || (sameEvent ? saved0?.registration : null),
+          accommodation: accForEvent || (sameEvent ? saved0?.accommodation : null),
           activeEventId: eventId || activeEventId || saved0?.activeEventId,
         });
 
@@ -386,17 +409,21 @@ const normalizedRegistration = {
   }, [router]);
 
   const handleLogout = () => {
+    const id = toast.loading("Logging out...");
+
     setAuthToken(null);
     clearTokenCookie();
     clearActiveEventCookie();
     safeClearFlowState();
     clearDashboardSnapshot();
+    
+    toast.success("Logged out", { id, duration: 900 });
     router.push("/");
-  };
+    };
 
   if (loading) {
     return (
-      <div className="flex min-h-[100svh] items-center justify-center">
+      <div className="flex min-h-svh items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -404,7 +431,7 @@ const normalizedRegistration = {
 
   if (error) {
     return (
-      <div className="flex min-h-[100svh] items-center justify-center p-6">
+      <div className="flex min-h-svh items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
           <div className="mb-4">
             <svg
@@ -449,6 +476,7 @@ const normalizedRegistration = {
       registration={registration}
       accommodation={accommodation}
       activeEventId={activeEventId}
+      ownerRegId={ownerRegId}
       onLogout={handleLogout}
       onProfileUpdate={(p) => {
         setProfile(p);

@@ -48,7 +48,7 @@ export function DependentsModal({
   const [currentFormError, setCurrentFormError] = useState<string | null>(null);
   const [showingForm, setShowingForm] = useState(existingDependents.length === 0);
 
-  // Sync local list from parent every time the modal opens
+  // Sync local list from parent only when the modal opens (not on every existingDependents change)
   useEffect(() => {
     if (isOpen) {
       setDependents(existingDependents);
@@ -57,7 +57,8 @@ export function DependentsModal({
       setCurrentFormError(null);
       setCurrentDependent({ name: '', age: '', gender: '' });
     }
-  }, [isOpen, existingDependents]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // Only depend on isOpen, not existingDependents
 
   if (!isOpen) return null;
 
@@ -171,7 +172,7 @@ export function DependentsModal({
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0"
+            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors shrink-0"
           >
             <X className="w-5 h-5 text-gray-600" />
           </button>

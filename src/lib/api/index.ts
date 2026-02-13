@@ -157,27 +157,43 @@ export async function listMyRegistrations(): Promise<EventRegistration[]> {
 
 // --- User dashboard ---
 
+// NOTE: Backend expects { eventId, regId, name, age, gender }.
 export type AddDependentPayload = {
-  /**
-   * Backend expects the *parent registration id* (regId) so the dependant can be
-   * associated with the correct event registration.
-   */
-  regId: string;
-  /**
-   * Legacy field (some older clients used userId). Kept optional for backwards
-   * compatibility; do not rely on it.
-   */
-  userId?: string;
   eventId: string;
+  regId: string;
   name: string;
-  age: number;
+  age?: number;
   gender: "MALE" | "FEMALE";
 };
 
 export async function addDependent(payload: AddDependentPayload) {
-  const response = await apiRequest<any>("/user-dashboard/add-dependent", {
+  // Backend (single): POST /user-dashboard/add-dependant
+  const body = {
+    eventId: payload.eventId,
+    regId: payload.regId,
+    name: payload.name,
+    // normalize to string to match backend expectations
+    age: payload.age == null ? undefined : Number(payload.age),
+    gender: payload.gender,
+  };
+  const response = await apiRequest<any>("/user-dashboard/add-dependant", {
     method: "POST",
-    body: payload,
+    body,
+  });
+  return response?.data || response;
+}
+
+export async function addDependants(payloads: AddDependentPayload[]) {
+  const body = payloads.map((p) => ({
+    eventId: p.eventId,
+    regId: p.regId,
+    name: p.name,
+    age: p.age == null ? undefined : Number(p.age),
+    gender: p.gender,
+  }));
+  const response = await apiRequest<any>("/user-dashboard/add-dependants", {
+    method: "POST",
+    body,
   });
   return response?.data || response;
 }
@@ -396,14 +412,17 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
     }
   });
 
+  // Dependents/Dependants are notoriously inconsistent in payload shape.
+  // IMPORTANT: prioritize nested arrays (e.g. dependants.dependantsData) BEFORE the raw object,
+  // otherwise we capture the object and never see the array.
   const depsUnknown =
     (obj["dependents"] as unknown) ??
-    (obj["dependants"] as unknown) ??
     (obj["dependentRegistrations"] as unknown) ??
     (obj["dependantsData"] as unknown) ??
     (obj["dependants"] && typeof obj["dependants"] === "object"
       ? (obj["dependants"] as Record<string, unknown>)["dependantsData"]
-      : undefined);
+      : undefined) ??
+    (obj["dependants"] as unknown);
 
   const dependents: DashboardDep[] = Array.isArray(depsUnknown)
     ? (depsUnknown as unknown[]).filter((d): d is Record<string, unknown> => !!d && typeof d === "object").map((d) => d as DashboardDep)

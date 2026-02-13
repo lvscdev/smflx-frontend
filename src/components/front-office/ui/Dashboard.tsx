@@ -38,7 +38,14 @@ const getEventId = (registration: unknown): string | undefined => {
   return undefined;
 };
 
-type Dependent = DashboardDependent;
+type Dependent = {
+  id: string;
+  name: string;
+  age: string;
+  gender: string;
+  isRegistered: boolean;
+  isPaid: boolean;
+};
 
 const toDependent = (d: DashboardDependent): Dependent => {
   const rec = d as unknown as Record<string, unknown>;

@@ -168,33 +168,61 @@ export type AddDependentPayload = {
 
 export async function addDependent(payload: AddDependentPayload) {
   // Backend (single): POST /user-dashboard/add-dependant
-  const body = {
+  const body: Record<string, any> = {
     eventId: payload.eventId,
     regId: payload.regId,
     name: payload.name,
-    // normalize to string to match backend expectations
-    age: payload.age == null ? undefined : Number(payload.age),
     gender: payload.gender,
   };
+  
+  // Only include age if it's a valid number
+  if (payload.age != null) {
+    body.age = Number(payload.age);
+  }
+  
+  console.log("🔵 API Request - addDependent:", {
+    endpoint: "/user-dashboard/add-dependant",
+    body
+  });
+  
   const response = await apiRequest<any>("/user-dashboard/add-dependant", {
     method: "POST",
     body,
   });
+  
+  console.log("🟢 API Response - addDependent:", response);
   return response?.data || response;
 }
 
 export async function addDependants(payloads: AddDependentPayload[]) {
-  const body = payloads.map((p) => ({
-    eventId: p.eventId,
-    regId: p.regId,
-    name: p.name,
-    age: p.age == null ? undefined : Number(p.age),
-    gender: p.gender,
-  }));
+  const body = payloads.map((p) => {
+    const item: Record<string, any> = {
+      eventId: p.eventId,
+      regId: p.regId,
+      name: p.name,
+      gender: p.gender,
+    };
+    
+    // Only include age if it's a valid number
+    if (p.age != null) {
+      item.age = Number(p.age);
+    }
+    
+    return item;
+  });
+  
+  console.log("🔵 API Request - addDependants:", {
+    endpoint: "/user-dashboard/add-dependants",
+    count: body.length,
+    body
+  });
+  
   const response = await apiRequest<any>("/user-dashboard/add-dependants", {
     method: "POST",
     body,
   });
+  
+  console.log("🟢 API Response - addDependants:", response);
   return response?.data || response;
 }
 

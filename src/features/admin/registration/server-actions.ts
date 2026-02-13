@@ -77,13 +77,21 @@ export async function getRegistrationsByEventId({
     registrations.map(async r => {
       const profile = await getUserProfile(r.eventId, r.userId, token);
 
-      // console.log("Profile:", profile);
+      console.log("Profile:", profile);
+
+      const firstName = profile.firstName ?? "";
+      const lastName = profile.lastName ?? "";
+
+      const formattedFirstName =
+        firstName.charAt(0).toUpperCase() + firstName.slice(1);
+
+      const fullName = `${formattedFirstName} ${lastName}`.trim();
 
       return {
         ...r,
         user: {
           id: profile.userId,
-          fullName: `${profile.firstName[0].toUpperCase().concat(profile.firstName.slice(1))} ${profile.lastName}`,
+          fullName: fullName,
           email: profile.email,
           gender: profile.gender,
           paymentStatus: profile.paymentStatus,

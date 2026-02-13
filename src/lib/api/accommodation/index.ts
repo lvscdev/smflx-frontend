@@ -1,4 +1,4 @@
-import { ApiError, apiRequest } from "../client";
+import { apiRequest } from "../client";
 import { AccommodationCategories, Facility, HotelRoom } from "./types";
 
 const ACCOMMODATION_BASE = "/accommodation";
@@ -18,33 +18,14 @@ export async function listAccomodationCategories({
 
 export async function getAccommodationCategoryFacilities({
   categoryId,
-  regId,
 }: {
   categoryId: string;
-  regId?: string;
 }) {
-  const category = encodeURIComponent(categoryId);
-  const reg = regId ? encodeURIComponent(regId) : "";
+  return apiRequest<Facility[]>(
+    `${ACCOMMODATION_BASE}/facility/${categoryId}`,
 
-  if (regId) {
-    const q = `categoryId=${category}&regId=${reg}`;
-
-    try {
-      return await apiRequest<Facility[]>(`${ACCOMMODATION_BASE}/facility?${q}`, {
-        method: "GET",
-      });
-    } catch (e: any) {
-      if (e instanceof ApiError && e.status === 404) {
-        return apiRequest<Facility[]>(`/facility?${q}`, { method: "GET" });
-      }
-      throw e;
-    }
-  }
-
-  // Legacy fallback
-  return apiRequest<Facility[]>(`${ACCOMMODATION_BASE}/facility/${categoryId}`, {
-    method: "GET",
-  });
+    { method: "GET" },
+  );
 }
 
 export async function getHotelRooms({ facilityId }: { facilityId: string }) {
@@ -52,5 +33,18 @@ export async function getHotelRooms({ facilityId }: { facilityId: string }) {
 
   return apiRequest<HotelRoom[]>(`${ACCOMMODATION_BASE}/hotels/${id}`, {
     method: "GET",
+  });
+}
+
+export type FacilitiesByDemographicsPayload = {
+  categoryId: string;
+  gender: "MALE" | "FEMALE";
+  ageRange: string; // e.g. "13-19"
+};
+
+export async function listFacilitiesByDemographics(payload: FacilitiesByDemographicsPayload) {
+  return apiRequest<Facility[]>(`${ACCOMMODATION_BASE}/facilities`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

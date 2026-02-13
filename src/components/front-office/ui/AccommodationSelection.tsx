@@ -9,10 +9,7 @@ import { ArrowLeft, Check, AlertCircle, Loader2, MapPin } from "lucide-react";
 import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
 import { initiateHostelAllocation, initiateHotelAllocation } from "@/lib/api";
 import { ApiError } from "@/lib/api/client";
-import {
-  getAccommodationCategoryFacilities,
-  getHotelRooms,
-} from "@/lib/api/accommodation";
+import { getAccommodationCategoryFacilities, getHotelRooms, listFacilitiesByDemographics} from "@/lib/api/accommodation";
 import { Facility, HotelRoom } from "@/lib/api/accommodation/types";
 
 
@@ -114,10 +111,18 @@ export function AccommodationSelection({
       setLoading(true);
       setError(null);
 
-      const response = await getAccommodationCategoryFacilities({
-        categoryId,
-        regId: registrationId,
-      });
+      // Hostels: prefer demographic filtering (gender + ageRange) when available.
+const profileGenderRaw = (profile?.gender ?? "").toString().toUpperCase();
+const profileGender = profileGenderRaw === "FEMALE" ? "FEMALE" : "MALE";
+const profileAgeRange = (profile?.ageRange ?? "").toString();
+
+const response = isHostel && profileAgeRange
+  ? await listFacilitiesByDemographics({
+      categoryId,
+      gender: profileGender,
+      ageRange: profileAgeRange,
+    })
+  : await getAccommodationCategoryFacilities({ categoryId });
 
       setFacilities(response);
 
@@ -139,7 +144,7 @@ export function AccommodationSelection({
     if (categoryId) {
       loadAccommodations();
     }
-  }, [categoryId, registrationId]);
+  }, [categoryId, isHostel, profile?.gender, profile?.ageRange]);
 
   const loadHotelRooms = async (facilityId: string) => {
     try {

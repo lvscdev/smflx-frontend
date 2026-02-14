@@ -1,11 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { apiRequest } from "./client";
 
 export type InitiateHostelAllocationPayload = {
   registrationId: string;
   eventId: string;
   userId: string;
+  // NOTE: Backend expects lowercase 'facilityid' (not camelCase 'facilityId')
+  // This matches the backend schema exactly - do not change to camelCase
   facilityid: string;
 };
 

@@ -46,8 +46,6 @@ export type GetAccommodationsResponse = {
   };
 };
 
-// Newer facility schema (from the current swagger) is much flatter and does not include
-// room/bed-space breakdown for users.
 type AccommodationCategory = { id: string; name: string };
 type AccommodationFacilityRecord = {
   id?: string;
@@ -102,6 +100,7 @@ export async function getAccommodations(params: {
 
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
+  const isHotel = params.type === 'HOTEL';
 
   try {
     const categoriesResp = await apiRequest<any>('/accommodation/categories', { method: 'GET' });
@@ -115,7 +114,13 @@ export async function getAccommodations(params: {
 
     if (!match?.id) throw new Error('Accommodation categories not available');
 
-    const facilitiesResp = await apiRequest<any>(`/accommodation/facility/${match.id}`, { method: 'GET' });
+    const endpoint = isHotel 
+      ? `/accommodation/hotels/${match.id}`  // ← Hotels use /hotels/ endpoint
+      : `/accommodation/facility/${match.id}`; // ← Hostels use /facility/ endpoint
+    
+    console.log(`🏨 Fetching ${params.type} accommodations from:`, endpoint);
+    
+    const facilitiesResp = await apiRequest<any>(endpoint, { method: 'GET' });
     const raw: AccommodationFacilityRecord[] = facilitiesResp?.data || facilitiesResp?.facilities || facilitiesResp || [];
 
     const facilities: Facility[] = (raw || [])

@@ -111,7 +111,6 @@ export function AccommodationSelection({
       setLoading(true);
       setError(null);
 
-      // Hostels: prefer demographic filtering (gender + ageRange) when available.
 const profileGenderRaw = (profile?.gender ?? "").toString().toUpperCase();
 const profileGender = profileGenderRaw === "FEMALE" ? "FEMALE" : "MALE";
 const profileAgeRange = (profile?.ageRange ?? "").toString();

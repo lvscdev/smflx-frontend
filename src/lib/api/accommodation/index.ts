@@ -3,7 +3,7 @@ import { AccommodationCategories, Facility, HotelRoom } from "./types";
 
 const ACCOMMODATION_BASE = "/accommodation";
 
-export async function listAccomodationCategories({
+export async function listAccommodationCategories({
   eventId,
 }: {
   eventId: string;

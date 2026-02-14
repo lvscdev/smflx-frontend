@@ -26,7 +26,7 @@ import {
   Youtube,
   Facebook,
 } from "lucide-react";
-import { listAccomodationCategories } from "@/lib/api/accommodation";
+import { listAccommodationCategories } from "@/lib/api/accommodation";
 import { AccommodationCategories } from "@/lib/api/accommodation/types";
 
 interface RegistrationData {
@@ -134,7 +134,7 @@ export function EventRegistration({
       if (!eventId) {
           throw new Error("Missing eventId for accommodation categories");
         }
-        const data = await listAccomodationCategories({ eventId });
+        const data = await listAccommodationCategories({ eventId });
 
       setAccommodationCategories(data);
     } catch (error) {

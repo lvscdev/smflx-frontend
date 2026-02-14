@@ -3,34 +3,52 @@ import { AccommodationCategories, Facility, HotelRoom } from "./types";
 
 const ACCOMMODATION_BASE = "/accommodation";
 
-export async function listAccommodationCategories({
-  eventId,
-}: {
-  eventId: string;
-}) {
+/**
+ * GET /accommodation/categories/{eventId}
+ */
+export async function listAccommodationCategories({ eventId }: { eventId: string }) {
   const id = encodeURIComponent(eventId);
-
   return apiRequest<AccommodationCategories[]>(
     `${ACCOMMODATION_BASE}/categories/${id}`,
     { method: "GET" },
   );
 }
 
-export async function getAccommodationCategoryFacilities({
-  categoryId,
-}: {
+/**
+ * GET /accommodation/facilities
+ */
+export async function getFacilitiesByCategoryId(params: {
   categoryId: string;
+  gender?: "MALE" | "FEMALE";
+  ageRange?: string; // e.g. "13-19"
 }) {
-  return apiRequest<Facility[]>(
-    `${ACCOMMODATION_BASE}/facility/${categoryId}`,
+  const qs = new URLSearchParams();
+  qs.set("categoryId", params.categoryId);
+  if (params.gender) qs.set("gender", params.gender);
+  if (params.ageRange) qs.set("ageRange", params.ageRange);
 
-    { method: "GET" },
-  );
+  try {
+    return await apiRequest<Facility[]>(
+      `${ACCOMMODATION_BASE}/facilities?${qs.toString()}`,
+      { method: "GET" },
+    );
+  } catch {
+    return apiRequest<Facility[]>(
+      `${ACCOMMODATION_BASE}/facility/${encodeURIComponent(params.categoryId)}`,
+      { method: "GET" },
+    );
+  }
 }
 
+export async function getAccommodationCategoryFacilities({ categoryId }: { categoryId: string }) {
+  return getFacilitiesByCategoryId({ categoryId });
+}
+
+/**
+ * GET /accommodation/hotels/{facilityId}
+ */
 export async function getHotelRooms({ facilityId }: { facilityId: string }) {
   const id = encodeURIComponent(facilityId);
-
   return apiRequest<HotelRoom[]>(`${ACCOMMODATION_BASE}/hotels/${id}`, {
     method: "GET",
   });
@@ -43,8 +61,12 @@ export type FacilitiesByDemographicsPayload = {
 };
 
 export async function listFacilitiesByDemographics(payload: FacilitiesByDemographicsPayload) {
-  return apiRequest<Facility[]>(`${ACCOMMODATION_BASE}/facilities`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  try {
+    return await getFacilitiesByCategoryId(payload);
+  } catch {
+    return apiRequest<Facility[]>(`${ACCOMMODATION_BASE}/facilities`, {
+      method: "POST",
+      body: payload,
+    });
+  }
 }

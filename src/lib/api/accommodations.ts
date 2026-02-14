@@ -97,44 +97,50 @@ export async function getAccommodations(params: {
   eventId: string;
   type: 'HOSTEL' | 'HOTEL';
 }): Promise<GetAccommodationsResponse> {
-
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
-  const isHotel = params.type === 'HOTEL';
+
+  const unwrap = (resp: any) => resp?.data ?? resp?.facilities ?? resp?.categories ?? resp;
+
+  const getCategories = async () => {
+    try {
+      return unwrap(await apiRequest<any>(`/accommodation/categories/${encodeURIComponent(params.eventId)}`, { method: 'GET' }));
+    } catch {
+      return unwrap(await apiRequest<any>('/accommodation/categories', { method: 'GET' }));
+    }
+  };
+
+  const getFacilities = async (categoryId: string) => {
+    try {
+      const qs = new URLSearchParams({ categoryId }).toString();
+      return unwrap(await apiRequest<any>(`/accommodation/facilities?${qs}`, { method: 'GET' }));
+    } catch {
+      return unwrap(await apiRequest<any>(`/accommodation/facility/${encodeURIComponent(categoryId)}`, { method: 'GET' }));
+    }
+  };
 
   try {
-    const categoriesResp = await apiRequest<any>('/accommodation/categories', { method: 'GET' });
-    const categories: AccommodationCategory[] =
-      categoriesResp?.data || categoriesResp?.categories || categoriesResp || [];
-
-    const match = (categories || []).find((c) => {
-      const name = normalize(String(c?.name || ''));
-      return name.includes(want);
-    });
-
+    const categories: AccommodationCategory[] = (await getCategories()) || [];
+    const match = (categories || []).find((c) => normalize(String((c as any)?.name || '')).includes(want));
     if (!match?.id) throw new Error('Accommodation categories not available');
 
-    const endpoint = isHotel 
-      ? `/accommodation/hotels/${match.id}`  // ← Hotels use /hotels/ endpoint
-      : `/accommodation/facility/${match.id}`; // ← Hostels use /facility/ endpoint
-    
-    console.log(`🏨 Fetching ${params.type} accommodations from:`, endpoint);
-    
-    const facilitiesResp = await apiRequest<any>(endpoint, { method: 'GET' });
-    const raw: AccommodationFacilityRecord[] = facilitiesResp?.data || facilitiesResp?.facilities || facilitiesResp || [];
+    const raw: AccommodationFacilityRecord[] = (await getFacilities(match.id)) || [];
 
     const facilities: Facility[] = (raw || [])
       .filter((f) => !f?.eventId || f.eventId === params.eventId)
       .map((f) => {
         const facilityId = String(f?.id || f?.facilityId || f?._id || '');
+        const total = Number((f as any)?.totalCapacity ?? (f as any)?.capacityTotal ?? 0) || 0;
+        const left = Number((f as any)?.capacityLeft ?? (f as any)?.availableSpaces ?? (f as any)?.capacityRemaining ?? 0) || 0;
+
         return {
           facilityId,
-          name: String(f?.facilityName || 'Accommodation Facility'),
+          name: String((f as any)?.facilityName || (f as any)?.name || 'Accommodation Facility'),
           description: undefined,
           location: undefined,
           images: undefined,
-          totalSpaces: Number(f?.totalCapacity ?? 0) || 0,
-          availableSpaces: f?.available === false ? 0 : Number(f?.totalCapacity ?? 0) || 0,
+          totalSpaces: total,
+          availableSpaces: left > 0 ? left : total,
           rooms: [],
           amenities: undefined,
         };

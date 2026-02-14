@@ -89,8 +89,9 @@ export function AccommodationSelection({
   const [submitting, setSubmitting] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<Facility>();
   const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
-  const isHostel = accommodationType.toLowerCase() === "hostel";
-  const isHotel = accommodationType.toLowerCase() === "hotel";
+  const accommodationKind = (accommodationType || "").toLowerCase();
+  const isHostel = accommodationKind.includes("hostel");
+  const isHotel = accommodationKind.includes("hotel");
 
   const isSelectionComplete = isHostel
     ? !!selectedFacility
@@ -111,6 +112,7 @@ export function AccommodationSelection({
       setLoading(true);
       setError(null);
 
+      // Hostels: prefer demographic filtering (gender + ageRange) when available.
 const profileGenderRaw = (profile?.gender ?? "").toString().toUpperCase();
 const profileGender = profileGenderRaw === "FEMALE" ? "FEMALE" : "MALE";
 const profileAgeRange = (profile?.ageRange ?? "").toString();
@@ -591,7 +593,7 @@ const response = isHostel && profileAgeRange
               variant="outline"
               onClick={onBack}
               disabled={isProcessing}
-              className="flex-shrink-0"
+              className="shrink-0"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back

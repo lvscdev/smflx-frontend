@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EventSelector } from "@/components/front-office/ui/EventSelector";
 import { listActiveEvents } from "@/lib/api";
 import { setActiveEventCookie } from "@/lib/auth/session";
+import { getAuthToken } from "@/lib/api/client";
+import { loadDashboardSnapshot } from "@/lib/storage/dashboardState";
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 
@@ -37,6 +39,38 @@ export default function SelectEventPage() {
     const run = async () => {
       setIsLoading(true);
       setError(null);
+
+      // 0) Auth guard: this page calls authenticated endpoints.
+      // If we don't have a token, route user back to login instead of showing "Unauthorized".
+      const token = getAuthToken();
+      if (!token) {
+        router.replace("/register?view=login");
+        return;
+      }
+
+      // 1) Payment callbacks can land here when the server-side active event cookie is missing.
+      // Recover the last known eventId from local storage (flow state / dashboard snapshot),
+      // set the cookie, then go straight back to /dashboard.
+      try {
+        const flow = safeLoadFlowState() || {};
+        const snap = loadDashboardSnapshot();
+
+        const recoveredEventId =
+          (typeof flow?.eventId === "string" && flow.eventId.trim()) ? flow.eventId.trim() :
+          (typeof flow?.activeEventId === "string" && flow.activeEventId.trim()) ? flow.activeEventId.trim() :
+          (typeof snap?.activeEventId === "string" && snap.activeEventId.trim()) ? snap.activeEventId.trim() :
+          null;
+
+        if (recoveredEventId) {
+          setActiveEventCookie(recoveredEventId);
+          // Ensure flow state has the same eventId for future resumes.
+          safeSaveFlowState({ ...flow, eventId: recoveredEventId, activeEventId: recoveredEventId });
+          router.replace("/dashboard");
+          return;
+        }
+      } catch {
+        // ignore; we'll fall back to listing events
+      }
 
       try {
         const activeEvents = await listActiveEvents();
@@ -84,16 +118,18 @@ export default function SelectEventPage() {
   const onSelect = (eventId: string) => {
     setActiveEventCookie(eventId);
     const saved = safeLoadFlowState() || {};
-    safeSaveFlowState({ ...saved, eventId });
+    safeSaveFlowState({ ...saved, eventId, activeEventId: eventId });
     router.push("/dashboard");
   };
 
   return (
-    <EventSelector
-      events={events}
-      onSelect={onSelect}
-      isLoading={isLoading}
-      error={error}
-    />
+    <div className="min-h-screen flex">
+      <EventSelector
+        events={events}
+        onSelect={onSelect}
+        isLoading={isLoading}
+        error={error}
+      />
+    </div>
   );
 }

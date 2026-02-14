@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EventSelector } from "@/components/front-office/ui/EventSelector";
-import { listMyRegistrations } from "@/lib/api";
+import { listActiveEvents } from "@/lib/api";
 import { setActiveEventCookie } from "@/lib/auth/session";
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
@@ -39,16 +39,15 @@ export default function SelectEventPage() {
       setError(null);
 
       try {
-        const regs = await listMyRegistrations();
+        const activeEvents = await listActiveEvents();
+        
         type EventItem = { eventId: string; eventName?: string };
-        const list: EventItem[] = (Array.isArray(regs) ? regs : [])
-          .map((r: any): EventItem | null => {
-            const rawEventId = r?.eventId ?? r?.event?.eventId ?? r?.event ?? "";
-            const eventId = typeof rawEventId === "string" ? rawEventId : String(rawEventId || "");
+        const list: EventItem[] = (Array.isArray(activeEvents) ? activeEvents : [])
+          .map((event: any): EventItem | null => {
+            const eventId = event?.eventId;
             if (!eventId) return null;
 
-            const rawName = r?.eventName ?? r?.event?.eventName ?? r?.eventTitle ?? r?.event?.title;
-            const eventName = typeof rawName === "string" && rawName.trim() ? rawName : undefined;
+            const eventName = event?.eventName || undefined;
 
             return { eventId, eventName };
           })

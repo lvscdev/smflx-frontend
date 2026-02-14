@@ -105,27 +105,11 @@ const getOwnerRegId = (profile: unknown): string | undefined => {
   if (typeof profile !== "object" || profile === null) return undefined;
   const p = profile as Record<string, unknown>;
 
-  if ("userId" in p && p.userId != null) return String(p.userId);
-  if ("id" in p && p.id != null) return String(p.id);
-  if ("registrantId" in p && p.registrantId != null) return String(p.registrantId);
-
-  const user = (p as any).user;
-  if (user && typeof user === "object") {
-    if (user.userId != null) return String(user.userId);
-    if (user.id != null) return String(user.id);
-  }
-
-  const data = (p as any).data;
-  if (data && typeof data === "object") {
-    if (data.userId != null) return String(data.userId);
-    if (data.id != null) return String(data.id);
-    if (data.registrantId != null) return String(data.registrantId);
-  }
+  if ("regId" in p && p.regId != null) return String(p.regId);
+  if ("registrationId" in p && p.registrationId != null) return String(p.registrationId);
 
   return undefined;
 };
-
-
 
 function normalizeAttendeeType(reg: any): "camper" | "physical" | "online" | undefined {
   const raw = reg?.attendeeType ?? reg?.attendanceType ?? reg?.participationMode;
@@ -217,17 +201,44 @@ export function Dashboard({
     return undefined;
   })();
 
-  const resolvedRegId = (() => {
-    if (ownerRegId) return ownerRegId;
+  const resolvedRegId = useMemo(() => {
+    // Priority 1: ownerRegId prop (passed from dashboard page, extracted from /registrations/my-registrations)
+    if (ownerRegId) {
+      return ownerRegId;
+    }
+    
+    // Priority 2: Get from registration object
+    const regIdFromRegistration = getRegId(registration);
+    if (regIdFromRegistration) {
+      return regIdFromRegistration;
+    }
+    
+    // Priority 3: Check profile for regId field (some backends might store it here)
     const p: any = profile as any;
-    return (
-      p?.userId ||
-      p?.id ||
-      p?.regId ||
-      getRegId(registration) ||
-      undefined
-    );
-  })();
+    if (p?.regId) {
+      return String(p.regId);
+    }
+    
+    // ❌ DO NOT use userId as regId - they are different!
+    // If we reach here, we don't have a valid regId
+    return undefined;
+  }, [ownerRegId, registration, profile]);
+
+  // Log regId resolution only when it changes
+  useEffect(() => {
+    if (resolvedRegId) {
+      console.log("✅ Resolved regId:", resolvedRegId);
+    } else {
+      console.error("❌ NO VALID regId FOUND!", {
+        ownerRegId,
+        registrationHasRegId: !!getRegId(registration),
+        registration,
+        profileHasRegId: !!((profile as any)?.regId),
+        profile,
+        WARNING: "This will cause dependent registration to fail!"
+      });
+    }
+  }, [resolvedRegId]);
 
 // Avatar dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -365,13 +376,10 @@ export function Dashboard({
 // Accommodation modal state
   const [isAccommodationModalOpen, setIsAccommodationModalOpen] =
     useState(false);
-  const [modalStep, setModalStep] = useState(1); // 1: Type selection, 2: Facility selection, 3: Payment
+  const [modalStep, setModalStep] = useState(1); 
   const [selectedAccommodationType, setSelectedAccommodationType] =
     useState("");
 
-  // Availability summary (best-effort) for the accommodation type picker.
-  // Note: the current API docs expose facility `totalCapacity` + `available` but do not expose
-  // real-time remaining spaces/rooms, so we avoid showing misleading "X left" numbers.
   const [availabilitySummary, setAvailabilitySummary] = useState<{
     loading: boolean;
     hostel?: { availableFacilities: number; totalCapacity: number };
@@ -567,7 +575,7 @@ type AccommodationData = Parameters<
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeEventId]); // Only depend on activeEventId, not resolvedEventId
+  }, [activeEventId]); 
 
   const firstName =
     (localProfile?.firstName ?? "User");
@@ -849,7 +857,17 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
             throw new Error("Missing eventId: cannot save dependents.");
           }
           if (!regId) {
-            throw new Error("Missing regId: cannot save dependents.");
+            console.error("❌ Missing regId. Available data:", {
+              ownerRegId,
+              registration,
+              profile,
+              resolvedRegId
+            });
+            throw new Error(
+              "Missing registration ID (regId). This is different from your user ID. " +
+              "Please ensure you have completed event registration first. " +
+              "If you see this error, try refreshing the page or contact support."
+            );
           }
 
           const prevIds = new Set(prev.map((d) => d.id));
@@ -1121,12 +1139,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         <DependentsBanner
           hasDependents={dependents.length > 0}
           onManageDependents={() => setIsDependentsModalOpen(true)}
-        />
-
-        <DependentsSection
-          dependents={dependents}
-          onRegister={handleRegisterDependent}
-          onPay={handlePayForDependents}
         />
 
         
@@ -1410,6 +1422,13 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
             </div>
           </div>
         )}
+
+        {/* Dependents Section - Shows registered dependents */}
+        <DependentsSection
+          dependents={dependents}
+          onRegister={handleRegisterDependent}
+          onPay={handlePayForDependents}
+        />
 
         {/* Resources */}
         <div className="mb-6">

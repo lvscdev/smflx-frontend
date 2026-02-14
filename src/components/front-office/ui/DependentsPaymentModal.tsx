@@ -41,7 +41,14 @@ export function DependentsPaymentModal({
     try {
       const resolvedParentRegId = parentRegId;
 
+      console.log("💳 Starting dependent payment:", {
+        parentRegId: resolvedParentRegId,
+        dependents: dependents.map(d => ({ id: d.id, name: d.name })),
+        totalAmount
+      });
+
       if (!resolvedParentRegId) {
+        console.error("❌ Missing parentRegId for payment!");
         throw new Error("Missing parentRegId (owner regId). Please refresh your dashboard and try again.");
       }
 
@@ -50,18 +57,30 @@ export function DependentsPaymentModal({
         .filter(Boolean) as string[];
 
       if (!dependentIds.length || dependentIds.length !== dependents.length) {
+        console.error("❌ Some dependents missing IDs:", {
+          dependents,
+          dependentIds,
+          missing: dependents.filter(d => !d.id)
+        });
         throw new Error(
           "One or more dependents are missing an ID. Please register them first and refresh."
         );
       }
 
-      // Backend payment endpoint currently supports initiating payment per dependent.
       const [firstId, ...remainingIds] = dependentIds;
+
+      console.log("🔵 Calling payment API:", {
+        dependantId: firstId,
+        parentRegId: resolvedParentRegId,
+        remaining: remainingIds.length
+      });
 
       const resp = await initiateDependentPayment({
         dependantId: firstId,
         parentRegId: resolvedParentRegId,
       });
+
+      console.log("🟢 Payment API response:", resp);
 
       const checkoutUrl =
         resp?.checkoutUrl ||
@@ -70,10 +89,13 @@ export function DependentsPaymentModal({
         resp?.data?.paymentUrl;
 
       if (!checkoutUrl) {
+        console.error("❌ No checkout URL in response:", resp);
         throw new Error(
           "Payment initiation succeeded but checkoutUrl was not returned."
         );
       }
+
+      console.log("✅ Redirecting to checkout:", checkoutUrl);
 
       // Persist context (so dashboard can resume nicely after returning)
       try {
@@ -93,6 +115,7 @@ export function DependentsPaymentModal({
 
       window.location.href = checkoutUrl;
     } catch (err: unknown) {
+      console.error("❌ Payment error:", err);
       setError(toUserMessage(err, { feature: "payment", action: "init" }));
     } finally {
       setPaymentProcessing(false);

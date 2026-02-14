@@ -113,7 +113,6 @@ export async function listActiveEvents() {
     method: "GET",
   });
   
-  // Backend returns { data: { activeEvents: [...] } }
   const data = response?.data || response;
   return data?.activeEvents || [];
 }
@@ -151,13 +150,11 @@ export async function listMyRegistrations(): Promise<EventRegistration[]> {
   const response = await apiRequest<any>("/registrations/my-registrations", {
     method: "GET",
   });
-  // Backend wraps in { code, message, data }
   return response?.data || response || [];
 }
 
 // --- User dashboard ---
 
-// NOTE: Backend expects { eventId, regId, name, age, gender }.
 export type AddDependentPayload = {
   eventId: string;
   regId: string;
@@ -167,7 +164,6 @@ export type AddDependentPayload = {
 };
 
 export async function addDependent(payload: AddDependentPayload) {
-  // Backend (single): POST /user-dashboard/add-dependant
   const body: Record<string, any> = {
     eventId: payload.eventId,
     regId: payload.regId,
@@ -203,7 +199,6 @@ export async function addDependants(payloads: AddDependentPayload[]) {
       gender: p.gender,
     };
     
-    // Only include age if it's a valid number
     if (p.age != null) {
       item.age = Number(p.age);
     }
@@ -227,9 +222,18 @@ export async function addDependants(payloads: AddDependentPayload[]) {
 }
 
 export async function removeDependent(dependentId: string) {
-  const response = await apiRequest<any>(`/user-dashboard/remove-dependent/${dependentId}`, {
+  const endpoint = `/user-dashboard/remove-dependant/${dependentId}`;
+  console.log("🗑️ DELETE Request - removeDependent:", {
+    endpoint,
+    dependentId,
+    note: "Using British spelling: 'dependant' not 'dependent'"
+  });
+  
+  const response = await apiRequest<any>(endpoint, {
     method: "DELETE",
   });
+  
+  console.log("✅ DELETE Response - removeDependent:", response);
   return response?.data || response;
 }
 
@@ -248,12 +252,18 @@ export async function initiateDependentPayment(payload: {
   dependantId: string;
   parentRegId: string;
 }) {
+  console.log("🔵 API Request - initiateDependentPayment:", {
+    endpoint: "/user-dashboard/pay-for-dependants",
+    payload
+  });
+  
   const response = await apiRequest<any>("/user-dashboard/pay-for-dependants", {
     method: "POST",
     body: payload,
   });
   
-  // The response should contain checkoutUrl
+  console.log("🟢 API Response - initiateDependentPayment:", response);
+  
   return response?.data || response;
 }
 
@@ -303,10 +313,7 @@ export type UserDashboardData = {
   paymentSummary?: PaymentSummary;
 };
 
-/**
- * CRITICAL FIX: Maps participationMode to attendeeType
- * Backend returns participationMode, but Dashboard expects attendeeType
- */
+
 function mapParticipationModeToAttendeeType(mode: string | undefined): string | undefined {
   if (!mode) return undefined;
   
@@ -320,7 +327,6 @@ function mapParticipationModeToAttendeeType(mode: string | undefined): string | 
     case "ONLINE":
       return "online";
     default:
-      // If already lowercase, return as-is
       return mode.toLowerCase();
   }
 }
@@ -328,8 +334,6 @@ function mapParticipationModeToAttendeeType(mode: string | undefined): string | 
 export async function getUserDashboard(eventId: string): Promise<NormalizedDashboardResponse> {
   const response = await apiRequest<unknown>(`/user-dashboard/${eventId}`, { method: "GET" });
 
-  // Backend often wraps responses in { code, message, data }.
-  // We normalize once here so UI code stays typed and stable.
   const root: unknown =
     (response && typeof response === "object" && "data" in (response as Record<string, unknown>))
       ? (response as Record<string, unknown>)["data"]
@@ -369,7 +373,6 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       ? [regsUnknown as DashboardReg]
       : [];
 
-  // CRITICAL FIX: Map participationMode to attendeeType for each registration
   registrations.forEach((reg) => {
     const regObj = reg as Record<string, unknown>;
     
@@ -378,14 +381,11 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       regObj.attendeeType = mapParticipationModeToAttendeeType(regObj.participationMode as string);
     }
     
-    // Also ensure eventId is present (some backends might omit it)
     if (!regObj.eventId && eventId) {
       regObj.eventId = eventId;
     }
   
 
-  // If backend returns a "flat" dashboard shape (e.g. regId, attendanceType, eventData)
-  // synthesize a single registration so UI logic stays consistent.
   if (registrations.length === 0) {
     const flatRegId =
       (obj["registrationId"] as string | undefined) ??
@@ -432,7 +432,6 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       ? [accUnknown as DashboardAcc]
       : [];
 
-  // CRITICAL FIX: Ensure accommodations have eventId
   accommodations.forEach((acc) => {
     const accObj = acc as Record<string, unknown>;
     if (!accObj.eventId && eventId) {
@@ -440,9 +439,6 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
     }
   });
 
-  // Dependents/Dependants are notoriously inconsistent in payload shape.
-  // IMPORTANT: prioritize nested arrays (e.g. dependants.dependantsData) BEFORE the raw object,
-  // otherwise we capture the object and never see the array.
   const depsUnknown =
     (obj["dependents"] as unknown) ??
     (obj["dependentRegistrations"] as unknown) ??
@@ -472,7 +468,6 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
   };
 }
 
-// Re-export accommodation functions
 export {
   getAccommodations,
   bookAccommodation,
@@ -486,7 +481,6 @@ export {
   type BookAccommodationResponse,
 } from "./accommodations";
 
-// Re-export accommodation allocation functions
 export {
   initiateHostelAllocation,
   initiateHotelAllocation,

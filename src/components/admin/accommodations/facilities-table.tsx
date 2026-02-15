@@ -70,7 +70,8 @@ export function FacilitiesTable({
     const q = search.trim().toLowerCase();
 
     return facilities.filter(f => {
-      if (facilityType !== "all" && f.categoryRecord.name !== facilityType)
+      // if (facilityType !== "all" && f.categoryRecord.name !== facilityType)
+      if (facilityType !== "all" && f.facilityName !== facilityType)
         return false;
 
       if (q && !f.facilityName.toLowerCase().includes(q)) return false;
@@ -149,11 +150,15 @@ export function FacilitiesTable({
           ) : (
             filteredFacilities.map(facility => (
               <TableRow key={facility.facilityId}>
-                <TableCell>{facility.eventRecord.eventName}</TableCell>
+                {/* <TableCell>{facility.eventRecord.eventName}</TableCell> */}
+                <TableCell>{facility.facilityName}</TableCell>
                 <TableCell className="font-medium">
                   {facility.facilityName}
                 </TableCell>
-                <TableCell>{facility.categoryRecord.name}</TableCell>
+                <TableCell>
+                  {/* {facility.categoryRecord.name || "Nothing"} */}
+                  {facility.selfEmployedUserPrice}
+                </TableCell>
                 <TableCell>
                   ₦{facility.employedUserPrice?.toLocaleString()}
                 </TableCell>
@@ -184,7 +189,7 @@ export function FacilitiesTable({
                       </Button>
                     </DropdownMenuTrigger>
 
-                    <DropdownMenuContent align="end">
+                    {/* <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() =>
                           router.push(
@@ -199,7 +204,7 @@ export function FacilitiesTable({
                         Delete
                       </DropdownMenuItem>
                       <DropdownMenuItem>Create Rooms</DropdownMenuItem>
-                    </DropdownMenuContent>
+                    </DropdownMenuContent> */}
                   </DropdownMenu>
                 </TableCell>
               </TableRow>

@@ -14,8 +14,8 @@ export async function generateAdminOtp(input: AdminEmailInput) {
     },
     body: JSON.stringify(input),
   });
-  console.log("RES:", res);
-  console.log(BASE_URL);
+  // console.log("RES:", res);
+  // console.log(BASE_URL);
   if (!res.ok) {
     const errorData = await res.json();
 

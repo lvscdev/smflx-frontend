@@ -46,7 +46,7 @@ export async function createCategoryAction(values: unknown) {
     })),
   };
 
-  console.log("PAYLOAD", payload);
+  // console.log("PAYLOAD", payload);
 
   const res = await fetch(`${ACCOMODATION_BASE_URL}/category`, {
     method: "POST",
@@ -101,7 +101,7 @@ export async function createFacilityAction(values: unknown) {
 
   const parsed = createFacilitySchema.parse(values);
 
-  console.log("PARSED:", parsed);
+  // console.log("PARSED:", parsed);
 
   const res = await fetch(`${ACCOMODATION_BASE_URL}/facility`, {
     method: "POST",
@@ -127,18 +127,16 @@ export async function getFacilitiesByEvent(eventId: string) {
 
   if (!token) throw new Error("Unauthorized");
 
-  const res = await fetch(
-    `${ACCOMODATION_BASE_URL}/admin/facilities/${eventId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        accept: "application/json",
-      },
-      cache: "no-store",
+  const res = await fetch(`${ACCOMODATION_BASE_URL}/facilities/${eventId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      accept: "application/json",
     },
-  );
+    cache: "no-store",
+  });
 
   const data = await res.json();
+  // console.log(data);
 
   if (!res.ok || data.code !== "00") {
     throw new Error(data.message ?? "Failed to fetch facilities");
@@ -201,50 +199,50 @@ export async function getFacilityDetails(
   }
 
   const facilityDetails = data.data;
-  console.log("FACILITY dETAILS:", facilityDetails);
+  // console.log("FACILITY dETAILS:", facilityDetails);
 
   return facilityDetails;
 }
 
-export async function createRoomAction(
-  facilityId: string,
-  facilityType: FacilityType,
-  values: unknown,
-) {
-  const token = (await cookies()).get("admin_session")?.value;
-  if (!token) throw new Error("Unauthorized");
+// export async function createRoomAction(
+//   facilityId: string,
+//   facilityType: FacilityType,
+//   values: unknown,
+// ) {
+//   const token = (await cookies()).get("admin_session")?.value;
+//   if (!token) throw new Error("Unauthorized");
 
-  const config = roomConfig[facilityType];
+//   const config = roomConfig[facilityType];
 
-  if (!config) {
-    throw new Error("Invalid facility type");
-  }
+//   if (!config) {
+//     throw new Error("Invalid facility type");
+//   }
 
-  const parsed = config.schema.parse(values);
+//   const parsed = config.schema.parse(values);
 
-  const payload = {
-    facilityId,
-    ...parsed,
-  };
+//   const payload = {
+//     facilityId,
+//     ...parsed,
+//   };
 
-  const res = await fetch(`${ACCOMODATION_BASE_URL}${config.endpoint}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      accept: "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+//   const res = await fetch(`${ACCOMODATION_BASE_URL}${config.endpoint}`, {
+//     method: "POST",
+//     headers: {
+//       Authorization: `Bearer ${token}`,
+//       "Content-Type": "application/json",
+//       accept: "application/json",
+//     },
+//     body: JSON.stringify(payload),
+//   });
 
-  const data = await res.json();
+//   const data = await res.json();
 
-  if (!res.ok || data.code !== "00") {
-    throw new Error(data.message ?? "Failed to create room");
-  }
+//   if (!res.ok || data.code !== "00") {
+//     throw new Error(data.message ?? "Failed to create room");
+//   }
 
-  return data;
-}
+//   return data;
+// }
 
 export async function createHostelRoom(payload: CreateHostelRoomPayload) {
   const token = (await cookies()).get("admin_session")?.value;
@@ -289,7 +287,7 @@ export async function createHotelRoom(payload: CreateHotelRoomPayload) {
     body: JSON.stringify(payload),
   });
 
-  console.log("PAYLOAD", payload);
+  // console.log("PAYLOAD", payload);
 
   const data = await res.json();
 

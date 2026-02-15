@@ -15,7 +15,7 @@ const EVENTS_BASE_URL = `${BASE_URL}/events`;
 
 export async function getAllEvents(): Promise<Event[]> {
   const token = (await cookies()).get("admin_session")?.value;
-  console.log("Token:", token);
+  // console.log("Token:", token);
   if (!token) return [];
 
   const res = await fetch(`${EVENTS_BASE_URL}`, {
@@ -38,7 +38,7 @@ export async function getAllEvents(): Promise<Event[]> {
   }
 
   const response = await res.json();
-  console.log("All Events Response:", response.data.data);
+  // console.log("All Events Response:", response.data.data);
 
   // ✅ RETURN ARRAY ONLY
   return response.data.data ?? [];
@@ -49,14 +49,14 @@ export async function createEventAction(formValues: unknown) {
   const values = createEventSchema.parse(formValues);
 
   const payload = mapCreateEventFormToApi(values);
-  console.log(payload);
+  // console.log(payload);
 
   const token = (await cookies()).get("admin_session")?.value;
   if (!token) throw new Error("Unauthorized");
 
   const session = await assertAdminSession();
 
-  console.log("User Session:", session);
+  // console.log("User Session:", session);
   if (!session) throw new Error("Unauthorized");
 
   const res = await fetch(EVENTS_BASE_URL, {
@@ -74,7 +74,7 @@ export async function createEventAction(formValues: unknown) {
   });
 
   const response = await res.json();
-  console.log("CREATE EVENT RESPONSE:", response);
+  // console.log("CREATE EVENT RESPONSE:", response);
 
   if (!res.ok) {
     throw new Error("Failed to create event");

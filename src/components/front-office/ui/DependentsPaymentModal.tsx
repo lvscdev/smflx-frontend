@@ -52,31 +52,14 @@ export function DependentsPaymentModal({
         throw new Error("Missing parentRegId (owner regId). Please refresh your dashboard and try again.");
       }
 
-      const dependentIds = dependents
-        .map((d) => d.id)
-        .filter(Boolean) as string[];
+      const dependentId = dependents?.[0]?.id;
 
-      if (!dependentIds.length || dependentIds.length !== dependents.length) {
-        console.error("❌ Some dependents missing IDs:", {
-          dependents,
-          dependentIds,
-          missing: dependents.filter(d => !d.id)
-        });
-        throw new Error(
-          "One or more dependents are missing an ID. Please register them first and refresh."
-        );
+      if (!dependentId) {
+        throw new Error("Missing dependent ID. Please refresh and try again.");
       }
 
-      const [firstId, ...remainingIds] = dependentIds;
-
-      console.log("🔵 Calling payment API:", {
-        dependantId: firstId,
-        parentRegId: resolvedParentRegId,
-        remaining: remainingIds.length
-      });
-
       const resp = await initiateDependentPayment({
-        dependantId: firstId,
+        dependantId: dependentId,
         parentRegId: resolvedParentRegId,
       });
 
@@ -97,15 +80,13 @@ export function DependentsPaymentModal({
 
       console.log("✅ Redirecting to checkout:", checkoutUrl);
 
-      // Persist context (so dashboard can resume nicely after returning)
       try {
         localStorage.setItem(
           "smflx_pending_payment_ctx",
           JSON.stringify({
             type: "dependents",
             parentRegId: resolvedParentRegId,
-            paidDependentId: firstId,
-            remainingDependentIds: remainingIds,
+            dependentId,
             startedAt: new Date().toISOString(),
           })
         );
@@ -144,7 +125,7 @@ export function DependentsPaymentModal({
           <button
             onClick={onClose}
             disabled={paymentProcessing}
-            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-60"
+            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors shrink-0 disabled:opacity-60"
           >
             <X className="w-5 h-5 text-gray-600" />
           </button>

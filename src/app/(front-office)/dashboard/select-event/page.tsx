@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EventSelector } from "@/components/front-office/ui/EventSelector";
-import { listActiveEvents } from "@/lib/api";
+import { listMyRegistrations } from "@/lib/api";
 import { setActiveEventCookie } from "@/lib/auth/session";
-import { getAuthToken } from "@/lib/api/client";
-import { loadDashboardSnapshot } from "@/lib/storage/dashboardState";
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 
@@ -40,48 +38,22 @@ export default function SelectEventPage() {
       setIsLoading(true);
       setError(null);
 
-      // 0) Auth guard: this page calls authenticated endpoints.
-      // If we don't have a token, route user back to login instead of showing "Unauthorized".
-      const token = getAuthToken();
-      if (!token) {
-        router.replace("/register?view=login");
-        return;
-      }
-
-      // 1) Payment callbacks can land here when the server-side active event cookie is missing.
-      // Recover the last known eventId from local storage (flow state / dashboard snapshot),
-      // set the cookie, then go straight back to /dashboard.
       try {
-        const flow = safeLoadFlowState() || {};
-        const snap = loadDashboardSnapshot();
-
-        const recoveredEventId =
-          (typeof flow?.eventId === "string" && flow.eventId.trim()) ? flow.eventId.trim() :
-          (typeof flow?.activeEventId === "string" && flow.activeEventId.trim()) ? flow.activeEventId.trim() :
-          (typeof snap?.activeEventId === "string" && snap.activeEventId.trim()) ? snap.activeEventId.trim() :
-          null;
-
-        if (recoveredEventId) {
-          setActiveEventCookie(recoveredEventId);
-          // Ensure flow state has the same eventId for future resumes.
-          safeSaveFlowState({ ...flow, eventId: recoveredEventId, activeEventId: recoveredEventId });
-          router.replace("/dashboard");
-          return;
-        }
-      } catch {
-        // ignore; we'll fall back to listing events
-      }
-
-      try {
-        const activeEvents = await listActiveEvents();
-        
+        const regs = await listMyRegistrations();
         type EventItem = { eventId: string; eventName?: string };
-        const list: EventItem[] = (Array.isArray(activeEvents) ? activeEvents : [])
-          .map((event: any): EventItem | null => {
-            const eventId = event?.eventId;
+        const list: EventItem[] = (Array.isArray(regs) ? regs : [])
+          .map((r: any): EventItem | null => {
+            const rawEventId = r?.eventId ?? r?.event?.eventId ?? r?.event ?? "";
+            const eventId = typeof rawEventId === "string" ? rawEventId : String(rawEventId || "");
             if (!eventId) return null;
 
-            const eventName = event?.eventName || undefined;
+            // HARD GUARD: if attendee type is missing for this registration, user cannot proceed.
+            const attendanceRaw =
+              r?.attendeeType ?? r?.attendanceType ?? r?.participationMode ?? r?.participation ?? "";
+            if (!String(attendanceRaw || "").trim()) return null;
+
+            const rawName = r?.eventName ?? r?.event?.eventName ?? r?.eventTitle ?? r?.event?.title;
+            const eventName = typeof rawName === "string" && rawName.trim() ? rawName : undefined;
 
             return { eventId, eventName };
           })
@@ -89,7 +61,12 @@ export default function SelectEventPage() {
 
         if (cancelled) return;
 
-        // If only one event, auto-select and continue.
+        if (list.length === 0) {
+          setError("Registration incomplete: missing attendee type. Please login again to complete registration.");
+          router.replace("/register?view=login");
+          return;
+        }
+
         if (list.length === 1) {
           const eventId = list[0].eventId;
           setActiveEventCookie(eventId);
@@ -118,18 +95,16 @@ export default function SelectEventPage() {
   const onSelect = (eventId: string) => {
     setActiveEventCookie(eventId);
     const saved = safeLoadFlowState() || {};
-    safeSaveFlowState({ ...saved, eventId, activeEventId: eventId });
+    safeSaveFlowState({ ...saved, eventId });
     router.push("/dashboard");
   };
 
   return (
-    <div className="min-h-screen flex">
-      <EventSelector
-        events={events}
-        onSelect={onSelect}
-        isLoading={isLoading}
-        error={error}
-      />
-    </div>
+    <EventSelector
+      events={events}
+      onSelect={onSelect}
+      isLoading={isLoading}
+      error={error}
+    />
   );
 }

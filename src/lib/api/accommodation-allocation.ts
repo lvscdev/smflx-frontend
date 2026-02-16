@@ -4,9 +4,7 @@ export type InitiateHostelAllocationPayload = {
   registrationId: string;
   eventId: string;
   userId: string;
-  // NOTE: Backend expects lowercase 'facilityid' (not camelCase 'facilityId')
-  // This matches the backend schema exactly - do not change to camelCase
-  facilityid: string;
+  facilityid: string; // Note: lowercase 'facilityid' for backend compatibility
 };
 
 export type InitiateHotelAllocationPayload = {
@@ -19,6 +17,18 @@ export type InitiateHotelAllocationPayload = {
 
 export type AllocationResponse = {
   checkoutUrl: string;
+    bookingId?: string;
+    accommodation?: {
+      type: string;
+      facilityId: string;
+      facilityName: string;
+      roomId?: string;
+      roomNumber?: string;
+      roomType?: string;
+      bedSpaceId?: string;
+      bedNumber?: string;
+      price: number;
+  };
 };
 
 export async function initiateHostelAllocation(

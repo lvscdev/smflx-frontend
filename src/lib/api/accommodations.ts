@@ -96,56 +96,61 @@ export type BookAccommodationResponse = {
 export async function getAccommodations(params: {
   eventId: string;
   type: 'HOSTEL' | 'HOTEL';
+  gender?: 'MALE' | 'FEMALE';
+  age?: string;
 }): Promise<GetAccommodationsResponse> {
+
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
 
-  const unwrap = (resp: any) => resp?.data ?? resp?.facilities ?? resp?.categories ?? resp;
-
-  const getCategories = async () => {
-    try {
-      return unwrap(await apiRequest<any>(`/accommodation/categories/${encodeURIComponent(params.eventId)}`, { method: 'GET' }));
-    } catch {
-      return unwrap(await apiRequest<any>('/accommodation/categories', { method: 'GET' }));
-    }
-  };
-
-  const getFacilities = async (categoryId: string) => {
-    try {
-      const qs = new URLSearchParams({ categoryId }).toString();
-      return unwrap(await apiRequest<any>(`/accommodation/facilities?${qs}`, { method: 'GET' }));
-    } catch {
-      return unwrap(await apiRequest<any>(`/accommodation/facility/${encodeURIComponent(categoryId)}`, { method: 'GET' }));
-    }
-  };
-
   try {
-    const categories: AccommodationCategory[] = (await getCategories()) || [];
-    const match = (categories || []).find((c) => normalize(String((c as any)?.name || '')).includes(want));
+    console.log(`🏨 Fetching ${params.type} accommodations...`);
+    
+    const categoriesResp = await apiRequest<any>('/accommodation/categories', { method: 'GET' });
+    const categories: AccommodationCategory[] =
+      categoriesResp?.data || categoriesResp?.categories || categoriesResp || [];
+
+    const match = (categories || []).find((c) => {
+      const name = normalize(String(c?.name || ''));
+      return name.includes(want);
+    });
+
     if (!match?.id) throw new Error('Accommodation categories not available');
 
-    const raw: AccommodationFacilityRecord[] = (await getFacilities(match.id)) || [];
+    const payload = {
+      categoryId: match.id,
+      gender: params.gender || 'MALE',  
+      age: params.age || '20-29',     
+    };
+
+    console.log(`🏨 POST /accommodation/facilities for ${params.type}:`, payload);
+    
+    const facilitiesResp = await apiRequest<any>('/accommodation/facilities', { 
+      method: 'POST',
+      body: payload
+    });
+    
+    const raw: AccommodationFacilityRecord[] = facilitiesResp?.data || facilitiesResp?.facilities || facilitiesResp || [];
 
     const facilities: Facility[] = (raw || [])
       .filter((f) => !f?.eventId || f.eventId === params.eventId)
       .map((f) => {
         const facilityId = String(f?.id || f?.facilityId || f?._id || '');
-        const total = Number((f as any)?.totalCapacity ?? (f as any)?.capacityTotal ?? 0) || 0;
-        const left = Number((f as any)?.capacityLeft ?? (f as any)?.availableSpaces ?? (f as any)?.capacityRemaining ?? 0) || 0;
-
         return {
           facilityId,
-          name: String((f as any)?.facilityName || (f as any)?.name || 'Accommodation Facility'),
+          name: String(f?.facilityName || 'Accommodation Facility'),
           description: undefined,
           location: undefined,
           images: undefined,
-          totalSpaces: total,
-          availableSpaces: left > 0 ? left : total,
+          totalSpaces: Number(f?.totalCapacity ?? 0) || 0,
+          availableSpaces: f?.available === false ? 0 : Number(f?.totalCapacity ?? 0) || 0,
           rooms: [],
           amenities: undefined,
         };
       })
       .filter((f) => f.facilityId);
+
+    console.log(`✅ ${params.type} facilities loaded:`, facilities.length);
 
     return {
       facilities,
@@ -155,16 +160,16 @@ export async function getAccommodations(params: {
         totalAvailable: facilities.reduce((sum, f) => sum + (f.availableSpaces || 0), 0),
       },
     };
-  } catch {
-    const queryParams = new URLSearchParams({
-      eventId: params.eventId,
-      type: params.type,
-    });
-
-    return apiRequest<GetAccommodationsResponse>(
-      `/accommodation?${queryParams.toString()}`,
-      { method: 'GET' }
-    );
+  } catch (error) {
+    console.error(`❌ Failed to fetch ${params.type} accommodations:`, error);
+    return {
+      facilities: [],
+      metadata: {
+        eventId: params.eventId,
+        accommodationType: params.type,
+        totalAvailable: 0,
+      },
+    };
   }
 }
 

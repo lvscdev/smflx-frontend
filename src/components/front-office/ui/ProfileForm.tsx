@@ -4,33 +4,12 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ArrowLeft,
-  Check,
-  User,
-  Users,
-  Briefcase,
-  Home as HomeIcon,
-  Heart,
-  Search,
-  ChevronDown,
-  X,
-} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Check, User, Users, Briefcase, Home as HomeIcon, Heart, Search, ChevronDown, X} from "lucide-react";
 import iso3166_2 from "iso-3166-2.json";
 import { updateMe } from "@/lib/api";
 import { toUserMessage } from "@/lib/errors";
-import {
-  normalizeDialCode,
-  sanitizeLocalPhone,
-  validateProfileBasics,
-} from "@/lib/validation/profile";
+import { normalizeDialCode, sanitizeLocalPhone, validateProfileBasics } from "@/lib/validation/profile";
 
 const dialCodes = [
   { code: "+93", label: "🇦🇫 +93" },
@@ -782,7 +761,21 @@ export function ProfileForm({
       return;
     }
 
-    const payload = {
+    
+    const normalizeEmploymentStatus = (v?: string) => {
+      const x = (v ?? "").toString().trim().toLowerCase();
+      if (!x) return undefined;
+      if (x === "employed") return "EMPLOYED";
+      if (x === "self-employed" || x === "self_employed" || x === "self employed") return "SELF_EMPLOYED";
+      if (x === "unemployed") return "UNEMPLOYED";
+      if (x === "student") return "UNEMPLOYED"; // backend limitation: STUDENT not supported yet
+      // fallback: keep legacy behavior but ensure enum style
+      const up = x.toUpperCase().replace(/[\s-]+/g, "_");
+      if (up === "EMPLOYED" || up === "UNEMPLOYED" || up === "SELF_EMPLOYED") return up;
+      return undefined;
+    };
+
+const payload = {
       email: email.trim(),
       ...(firstName ? { firstName } : {}),
       ...(lastName ? { lastName } : {}),
@@ -796,11 +789,10 @@ export function ProfileForm({
         ? { maritalStatus: profile.maritalStatus.toUpperCase() }
         : {}),
       ...(profile.employmentStatus
-        ? {
-            employmentStatus: profile.employmentStatus
-              .toUpperCase()
-              .replace("-", "_"),
-          }
+        ? (() => {
+            const employmentStatus = normalizeEmploymentStatus(profile.employmentStatus);
+            return employmentStatus ? { employmentStatus } : {};
+          })()
         : {}),
       ...(profile.state ? { stateOfResidence: profile.state } : {}),
     };
@@ -1276,7 +1268,7 @@ export function ProfileForm({
                   setProfile({ ...profile, employmentStatus: "employed" })
                 }
                 icon={<Briefcase className="w-5 h-5" />}
-                label="Employed"
+                label="Employed/Self-Employed"
                 description="Currently working"
               />
               <GridOption

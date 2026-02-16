@@ -1,5 +1,4 @@
 @import url("https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700&display=swap");
-
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -254,4 +253,73 @@ body {
 
 .input-bg-front {
   background-color: var(--input-background);
+}
+
+/* Mobile-first responsive utilities */
+@layer utilities {
+  /* Touch-friendly tap targets (minimum 44x44px) */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent horizontal scroll */
+  .prevent-scroll-x {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  
+  /* Safe area insets for notched devices */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* Mobile-optimized text */
+  .text-mobile-sm {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  .text-mobile-base {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  
+  /* Mobile-friendly card padding */
+  .card-mobile {
+    @apply p-4 md:p-6 lg:p-8;
+  }
+  
+  /* Responsive grid gaps */
+  .gap-mobile {
+    @apply gap-3 md:gap-4 lg:gap-6;
+  }
+}
+
+/* Ensure body doesn't overflow on mobile */
+body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile form inputs */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+  
+  /* Larger touch targets for mobile */
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }

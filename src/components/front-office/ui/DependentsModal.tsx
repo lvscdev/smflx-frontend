@@ -48,7 +48,6 @@ export function DependentsModal({
   const [currentFormError, setCurrentFormError] = useState<string | null>(null);
   const [showingForm, setShowingForm] = useState(existingDependents.length === 0);
 
-  // Sync local list from parent only when the modal opens (not on every existingDependents change)
   useEffect(() => {
     if (isOpen) {
       setDependents(existingDependents);

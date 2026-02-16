@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
 import { AUTH_USER_STORAGE_KEY, getAuthToken, getStoredUser, setAuthToken } from "@/lib/api/client";
-import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie, setActiveEventCookie } from "@/lib/auth/session";
-import { getMe, verifyToken, getUserDashboard, listMyRegistrations, initiateDependentPayment } from "@/lib/api";
+import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie } from "@/lib/auth/session";
+import { getMe, verifyToken, getUserDashboard, listMyRegistrations } from "@/lib/api";
 import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation } from "@/lib/api/dashboardTypes";
 import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
 import { readOtpCookie } from "@/lib/auth/otpCookie";
@@ -39,40 +39,6 @@ function safeSaveFlowState(state: any) {
   } catch {}
 }
 
-const PENDING_CTX_KEY = "smflx_pending_payment_ctx";
-
-function safeLoadPendingCtx() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(PENDING_CTX_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function safeSavePendingCtx(ctx: any) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(PENDING_CTX_KEY, JSON.stringify(ctx));
-  } catch {}
-}
-
-function safeClearPendingCtx() {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.removeItem(PENDING_CTX_KEY);
-  } catch {}
-}
-
-function isDependentPaid(d: any): boolean {
-  if (!d) return false;
-  if (d.isPaid === true) return true;
-
-  const ps = String(d.paymentStatus ?? d.status ?? "").toLowerCase();
-  return ps.includes("paid") || ps.includes("success") || ps === "1" || ps === "true";
-}
-
 function hasAccountFootprint(): boolean {
   try {
     return !!localStorage.getItem(AUTH_USER_STORAGE_KEY);
@@ -85,6 +51,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const didHandleIncompleteRef = useRef(false);
 
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -246,21 +213,16 @@ export default function DashboardPage() {
           const matchForEvent = registrations.find((r: any) => r?.eventId === eventId) ?? mostRecent;
           myRegIdForEvent = matchForEvent?.regId ? String(matchForEvent.regId) : null;
           
-          console.log("🔑 Registration ID (regId) extraction:", {
+          console.log("🔑 Registration ID (regId) for event:", {
             eventId,
             regId: myRegIdForEvent,
-            userId: matchForEvent?.userId,
-            regIdField: matchForEvent?.regId,
-            registrationIdField: matchForEvent?.registrationId,
-            fullRegistrationData: matchForEvent,
-            WARNING: myRegIdForEvent ? "✅ Valid regId found" : "❌ NO regId - will cause errors!"
+            registrationData: matchForEvent,
           });
           
           if (myRegIdForEvent) {
-            setOwnerRegId(myRegIdForEvent);
-            console.log("✅ Set ownerRegId:", myRegIdForEvent);
+            setOwnerRegId(myRegIdForEvent); 
           } else {
-            console.error("❌ CRITICAL: No regId found in registration data! Dependent registration will fail!");
+            console.warn("⚠️ No regId found in registration data!");
             setOwnerRegId(null);
           }
 
@@ -273,14 +235,6 @@ export default function DashboardPage() {
           }
 
           console.log(`✅ Found eventId from registrations: ${eventId}`);
-
-          // Ensure the server-side event cookie is always present.
-          // This prevents middleware from redirecting to /dashboard/select-event after full page reloads (e.g. payment callbacks).
-          try {
-            if (eventId) setActiveEventCookie(eventId);
-          } catch {
-            // ignore
-          }
 
           localSelectedEvent = {
             eventId: eventId,
@@ -317,6 +271,47 @@ export default function DashboardPage() {
             (regForEvent as any)?.participation ??
             "";
 
+          if (!String(regAttendanceRaw || "").trim()) {
+            clearActiveEventCookie();
+
+            try {
+              clearTokenCookie();
+              setAuthToken(null);
+              localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+            } catch {
+              // ignore
+            }
+
+            const onceKey = `smflx_incomplete_attendeeType_${String(eventId || "").trim() || "unknown"}`;
+            let alreadyShown = false;
+            try {
+              alreadyShown = sessionStorage.getItem(onceKey) === "1";
+              if (!alreadyShown) sessionStorage.setItem(onceKey, "1");
+            } catch {
+              // ignore
+            }
+
+            if (!didHandleIncompleteRef.current && !alreadyShown) {
+              didHandleIncompleteRef.current = true;
+              toast.error("Registration incomplete", {
+                description: "Missing attendee type. Please login again to complete your registration.",
+              });
+            }
+
+            const emailForRedirect =
+              (profile as any)?.email ||
+              (dashboardData as any)?.profile?.email ||
+              (getStoredUser() as any)?.email ||
+              "";
+
+            router.replace(
+              emailForRedirect
+                ? `/register?view=login&email=${encodeURIComponent(String(emailForRedirect))}`
+                : `/register?view=login`
+            );
+            return;
+          }
+
           const isCamper = String(regAttendanceRaw).toLowerCase().includes("camp");
 
           const normalizedRegistration = {
@@ -330,17 +325,6 @@ export default function DashboardPage() {
               (regForEvent as any)?.participation ??
               "",
           };
-
-          console.log("📋 Normalized registration for Dashboard:", {
-            regId: normalizedRegistration.regId,
-            eventId: normalizedRegistration.eventId,
-            userId: (normalizedRegistration as any).userId,
-            source: (regForEvent as any)?.regId ? "regForEvent.regId" : 
-                    myRegIdForEvent ? "myRegIdForEvent" :
-                    (regForEvent as any)?.registrationId ? "regForEvent.registrationId" :
-                    (regForEvent as any)?.id ? "regForEvent.id" : "NONE",
-            WARNING: normalizedRegistration.regId ? "✅ Has regId" : "❌ NO regId!"
-          });
 
             // IMPROVED: Better accommodation matching - multiple strategies
             accForEvent = null;
@@ -393,85 +377,6 @@ export default function DashboardPage() {
 
             // Persist multi-event snapshot (7-day resume)
             saveDashboardSnapshot(eventId, mergedProfile as unknown as UserProfile, dashboardData);
-
-            // Resume dependant payments chain if user just returned from checkout
-            try {
-              const pending = safeLoadPendingCtx();
-              if (
-                pending?.type === "dependents" &&
-                typeof pending?.parentRegId === "string" &&
-                typeof pending?.paidDependentId === "string" &&
-                Array.isArray(pending?.remainingDependentIds) &&
-                String(pending.parentRegId) === String(myRegIdForEvent || "")
-              ) {
-                const maxAttempts = 25; // ~75s
-                let attempts = 0;
-                let confirmed = false;
-
-                while (attempts < maxAttempts) {
-                  attempts += 1;
-                  const latest = await getUserDashboard(eventId);
-                  const paidOne = (latest?.dependents || []).find((dd: any) => {
-                    const id = String(dd?.id ?? dd?.dependantId ?? "");
-                    return id && id === String(pending.paidDependentId);
-                  });
-
-                  if (isDependentPaid(paidOne)) {
-                    confirmed = true;
-                    break;
-                  }
-
-                  await new Promise((r) => setTimeout(r, 3000));
-                }
-
-                if (confirmed) {
-                  const remaining: string[] = (pending.remainingDependentIds || [])
-                    .map((x: any) => String(x))
-                    .filter(Boolean);
-
-                  if (remaining.length > 0) {
-                    const [nextId, ...rest] = remaining;
-
-                    const resp = await initiateDependentPayment({
-                      dependantId: nextId,
-                      parentRegId: pending.parentRegId,
-                    });
-
-                    const checkoutUrl =
-                      (resp as any)?.checkoutUrl ||
-                      (resp as any)?.data?.checkoutUrl ||
-                      (resp as any)?.paymentUrl ||
-                      (resp as any)?.data?.paymentUrl;
-
-                    if (checkoutUrl) {
-                      safeSavePendingCtx({
-                        ...pending,
-                        paidDependentId: nextId,
-                        remainingDependentIds: rest,
-                        startedAt: new Date().toISOString(),
-                      });
-
-                      window.location.href = checkoutUrl;
-                      return; // stop boot() here (redirecting)
-                    }
-
-                    safeClearPendingCtx();
-                    toast.error("Couldn’t continue dependant payments", {
-                      description:
-                        "Checkout link wasn’t returned. Please try again from the dashboard.",
-                    });
-                  } else {
-                    safeClearPendingCtx();
-                    toast.success("Dependants payment complete", {
-                      description: "All selected dependants have been paid for successfully.",
-                    });
-                  }
-                }
-              }
-            } catch (e) {
-              console.warn("Pending dependant payment resume skipped:", e);
-            }
-
             
             console.log("✅ Dashboard data loaded successfully");
           } catch (dashErr: any) {
@@ -480,6 +385,7 @@ export default function DashboardPage() {
           }
         }
 
+        // Persist to flow state (do NOT let stale saved state override current event data)
         const saved0 = safeLoadFlowState() || {};
         const sameEvent = (saved0?.activeEventId && eventId) ? String(saved0.activeEventId) === String(eventId) : true;
 

@@ -389,8 +389,19 @@ export default function HomePage() {
             onBack={() => setView("event-registration")}
             onComplete={async (data) => {
               setAccommodation(data);
-              setView("payment");
+              safeSaveFlowState({
+                view: "dashboard",
+                email,
+                profile,
+                selectedEvent,
+                registration,
+                accommodation: data,
+              });
+
+              if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
+              router.push("/dashboard");
             }}
+
           />
         )}
 

@@ -17,6 +17,7 @@ import { UserProfile as UserProfileView } from "./UserProfile";
 import { getUserDashboard, addDependent as apiAddDependent, addDependants as apiAddDependants, removeDependent as apiRemoveDependent, getAccommodations } from "@/lib/api";
 import { toUserMessage } from "@/lib/errors";
 import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation, DashboardDependent } from "@/lib/api/dashboardTypes";
+import { listAccommodationCategories } from "@/lib/api/accommodation";
 
 const eventBgImage = "/assets/images/event-bg.png";
 const badgeImage = "/assets/images/badge.png";
@@ -201,44 +202,22 @@ export function Dashboard({
     return undefined;
   })();
 
-  const resolvedRegId = useMemo(() => {
+  const resolvedRegId = (() => {
     // Priority 1: ownerRegId prop (passed from dashboard page, extracted from /registrations/my-registrations)
-    if (ownerRegId) {
-      return ownerRegId;
-    }
+    if (ownerRegId) return ownerRegId;
     
     // Priority 2: Get from registration object
     const regIdFromRegistration = getRegId(registration);
-    if (regIdFromRegistration) {
-      return regIdFromRegistration;
-    }
+    if (regIdFromRegistration) return regIdFromRegistration;
     
     // Priority 3: Check profile for regId field (some backends might store it here)
     const p: any = profile as any;
-    if (p?.regId) {
-      return String(p.regId);
-    }
+    if (p?.regId) return String(p.regId);
     
     // ❌ DO NOT use userId as regId - they are different!
     // If we reach here, we don't have a valid regId
     return undefined;
-  }, [ownerRegId, registration, profile]);
-
-  // Log regId resolution only when it changes
-  useEffect(() => {
-    if (resolvedRegId) {
-      console.log("✅ Resolved regId:", resolvedRegId);
-    } else {
-      console.error("❌ NO VALID regId FOUND!", {
-        ownerRegId,
-        registrationHasRegId: !!getRegId(registration),
-        registration,
-        profileHasRegId: !!((profile as any)?.regId),
-        profile,
-        WARNING: "This will cause dependent registration to fail!"
-      });
-    }
-  }, [resolvedRegId]);
+  })();
 
 // Avatar dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -374,11 +353,13 @@ export function Dashboard({
     setLocalProfile(profile);
   }, [profile]);
 // Accommodation modal state
-  const [isAccommodationModalOpen, setIsAccommodationModalOpen] =
-    useState(false);
-  const [modalStep, setModalStep] = useState(1); 
-  const [selectedAccommodationType, setSelectedAccommodationType] =
-    useState("");
+  const [isAccommodationModalOpen, setIsAccommodationModalOpen] = useState(false);
+  const [modalStep, setModalStep] = useState(1);
+  const [selectedAccommodationType, setSelectedAccommodationType] = useState("");
+  const [accommodationCategories, setAccommodationCategories] = useState<
+    Array<{ categoryId: string; name: string; type: string }> 
+    >([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   const [availabilitySummary, setAvailabilitySummary] = useState<{
     loading: boolean;
@@ -452,6 +433,50 @@ export function Dashboard({
       cancelled = true;
     };
   }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
+
+      // Fetch accommodation categories when modal opens
+    useEffect(() => {
+      const eventId = registration?.eventId;
+      if (!isAccommodationModalOpen || !eventId) return;
+
+      let cancelled = false;
+      
+      (async () => {
+        setLoadingCategories(true);
+        try {
+          const categories = await listAccommodationCategories({ eventId });
+          
+          if (cancelled) return;
+          
+          // Map categories to include type information
+          const mappedCategories = categories.map(cat => {
+            // Determine type from category name
+            const nameLower = cat.name.toLowerCase();
+            const type = nameLower.includes('hotel') ? 'hotel' : 'hostel';
+            
+            return {
+              categoryId: cat.categoryId,
+              name: cat.name,
+              type,
+            };
+          });
+          
+          setAccommodationCategories(mappedCategories);
+        } catch (error) {
+          console.error('Failed to load accommodation categories:', error);
+          toast.error('Failed to load accommodation options');
+        } finally {
+          if (!cancelled) {
+            setLoadingCategories(false);
+          }
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [isAccommodationModalOpen, registration?.eventId]);
+
 
   // Dependents state
   type Dependent = {
@@ -575,14 +600,14 @@ type AccommodationData = Parameters<
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeEventId]); 
+  }, [activeEventId]); // Only depend on activeEventId, not resolvedEventId
 
   const firstName =
     (localProfile?.firstName ?? "User");
 
   const attendeeType = normalizeAttendeeType(registration);
   const attendeeTypeNorm = (typeof attendeeType === "string" ? attendeeType.toLowerCase() : "");
-  const isCamper = attendeeTypeNorm === "" || attendeeTypeNorm === "camper";
+  const isCamper = attendeeTypeNorm === "camper";
   const normalizedAccommodation = useMemo(
     () => normalizeAccommodation(accommodation),
     [accommodation],
@@ -613,7 +638,7 @@ type AccommodationData = Parameters<
     (accAny?.accommodationImageUrl as string) ||
     (accAny?.imageUrl as string) ||
     "";
-const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online";
+const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online" || attendeeTypeNorm === "";
   const paidForAccommodation = normalizedAccommodation?.paidForAccommodation === true;
 
   // Camper: when accommodation payment is pending, the space is held for 1 hour.
@@ -821,6 +846,11 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         };
 
         onAccommodationUpdate?.(snapshot);
+        // If user was Physical/Online, update their attendee type to Camper
+        if (isNonCamper) {
+          console.log('User upgraded from Physical/Online to Camper by booking accommodation');
+        }
+
         resetModal();
       };
 
@@ -1141,6 +1171,12 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           onManageDependents={() => setIsDependentsModalOpen(true)}
         />
 
+        <DependentsSection
+          dependents={dependents}
+          onRegister={handleRegisterDependent}
+          onPay={handlePayForDependents}
+        />
+
         
         {/* Top grid */}
         <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
@@ -1345,6 +1381,17 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                     <button
                       onClick={() => {
                         setIsAccommodationModalOpen(true);
+
+                        if (!localProfile?.ageRange) {
+                          toast.error("Please update your Age Range in your profile before booking accommodation.");
+                          return;
+                        }
+                        if (!localProfile?.gender) {
+                          toast.error("Please update your Gender in your profile before booking accommodation.");
+                          return;
+                        }
+                        setIsAccommodationModalOpen(true);
+
                         setModalStep(1);
                       }}
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -1422,13 +1469,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
             </div>
           </div>
         )}
-
-        {/* Dependents Section - Shows registered dependents */}
-        <DependentsSection
-          dependents={dependents}
-          onRegister={handleRegisterDependent}
-          onPay={handlePayForDependents}
-        />
 
         {/* Resources */}
         <div className="mb-6">
@@ -1673,9 +1713,35 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   );
                 }
 
+                // Find the categoryId for the selected accommodation type
+                const matchingCategory = accommodationCategories.find(
+                  cat => cat.type === selectedAccommodationType
+                );
+
+                if (loadingCategories) {
+                  return (
+                    <div className="p-8 text-center">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-600">Loading accommodation options...</p>
+                    </div>
+                  );
+                }
+
+                if (!matchingCategory) {
+                  return (
+                    <div className="p-4 rounded-lg border border-red-200 bg-red-50 text-red-900">
+                      <p className="font-semibold mb-2">Accommodation category not found</p>
+                      <p className="text-sm">
+                        Unable to find {selectedAccommodationType} accommodations for this event.
+                        Please go back and try again, or contact support if the issue persists.
+                      </p>
+                    </div>
+                  );
+                }
+
                 return (
                   <AccommodationSelection
-                    categoryId=""
+                    categoryId={matchingCategory.categoryId} 
                     accommodationType={selectedAccommodationType}
                     eventId={eventId}
                     registrationId={
@@ -1689,6 +1755,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                               ? String(registration.registrationId)
                               : undefined
                     }
+                    userId={profile?.userId}
                     profile={localProfile}
                     onComplete={handleAccommodationComplete}
                     onBack={handleModalBack}

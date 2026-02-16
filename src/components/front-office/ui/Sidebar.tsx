@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { getHostelUnoccupiedCapacity } from "@/lib/api/accommodations";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const backgroundImage = "/assets/images/sidebar-bg.png";
 const logo = "/assets/images/sidebar-logo.png";
@@ -22,10 +23,11 @@ interface SidebarProps {
   hostelSpacesLeft?: number;
 }
 
+
+
 export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesLeft }: SidebarProps) {
-  const [hostelSpacesLeftFallback, setHostelSpacesLeftFallback] = useState<
-    number | undefined
-  >(undefined);
+  const [hostelSpacesLeftFallback, setHostelSpacesLeftFallback] = useState< number | undefined  >(undefined);
+    const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (typeof hostelSpacesLeft === "number") return;

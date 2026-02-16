@@ -106,6 +106,7 @@ export type Event = {
   startDate?: string;
   endDate?: string;
   registrationCloseAt?: string;
+  ageRanges?: string[];
 };
 
 export async function listActiveEvents() {

@@ -247,6 +247,20 @@ interface UserProfileProps {
   onUpdateDependents: (updatedDependents: any[]) => void;
 }
 
+
+const displayEmploymentStatus = (v?: string) => {
+  const x = (v ?? "").toString().trim().toUpperCase();
+  if (x === "EMPLOYED" || x === "SELF_EMPLOYED" || x === "EMPLOYED/SELF-EMPLOYED") return "Employed/Self-Employed";
+  if (x === "UNEMPLOYED") return "Unemployed";
+  if (x === "STUDENT") return "Student";
+  // support legacy lower-case values stored in UI state
+  const xl = x.toLowerCase();
+  if (xl === "employed" || xl === "self-employed" || xl === "self_employed") return "Employed/Self-Employed";
+  if (xl === "unemployed") return "Unemployed";
+  if (xl === "student") return "Student";
+  return (v ?? "").toString();
+};
+
 export function UserProfile({ profile, userEmail, userPhone, dependents, onBack, onUpdate, onUpdateDependents }: UserProfileProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'dependents'>('profile');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -889,7 +903,7 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                           }`}
                         >
                           <Briefcase className="w-5 h-5 mx-auto mb-1" />
-                          <span className="block text-sm font-medium">Employed</span>
+                          <span className="block text-sm font-medium">Employed/Self-Employed</span>
                         </button>
                         <button
                           type="button"
@@ -917,9 +931,7 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
                         </button>
                       </div>
                     ) : (
-                      <div className="px-4 py-3 bg-gray-50 rounded-lg text-gray-900 capitalize">
-                        {formData.employmentStatus}
-                      </div>
+                      <div className="px-4 py-3 bg-gray-50 rounded-lg text-gray-900 capitalize">{displayEmploymentStatus(formData.employmentStatus)}</div>
                     )}
                   </div>
 

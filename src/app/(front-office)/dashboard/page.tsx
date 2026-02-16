@@ -51,7 +51,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const didHandleIncompleteRef = useRef(false);
 
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -67,6 +66,9 @@ export default function DashboardPage() {
   const [eventCache, setEventCache] = useState<Record<string, NormalizedDashboardResponse>>(
     {}
   );
+
+  // Prevent toast/redirect loops when registration is incomplete.
+  const didHandleMissingAttendeeTypeRef = useRef(false);
 
   useEffect(() => {
     async function boot() {
@@ -113,7 +115,6 @@ export default function DashboardPage() {
             });
           }
 
-          // Show dashboard immediately only if we have a real eventId; refresh will run below
           if (preferred && String(preferred).trim()) {
             setLoading(false);
           }
@@ -271,48 +272,41 @@ export default function DashboardPage() {
             (regForEvent as any)?.participation ??
             "";
 
-          if (!String(regAttendanceRaw || "").trim()) {
-            clearActiveEventCookie();
+          const savedFlow = safeLoadFlowState() || {};
+          const savedReg = savedFlow?.registration || {};
+          const recoveredAttendanceRaw =
+            savedReg?.attendeeType ??
+            savedReg?.participationMode ??
+            savedReg?.attendanceType ??
+            "";
 
-            try {
-              clearTokenCookie();
-              setAuthToken(null);
-              localStorage.removeItem(AUTH_USER_STORAGE_KEY);
-            } catch {
-              // ignore
+          const effectiveAttendanceRaw = String(regAttendanceRaw || "").trim()
+            ? regAttendanceRaw
+            : recoveredAttendanceRaw;
+
+          if (!String(effectiveAttendanceRaw || "").trim()) {
+            if (!didHandleMissingAttendeeTypeRef.current) {
+              didHandleMissingAttendeeTypeRef.current = true;
+              try {
+                const key = `smflx_missing_attendee_type_warned_${eventId}`;
+                const already = sessionStorage.getItem(key);
+                if (!already) {
+                  sessionStorage.setItem(key, "1");
+                  toast.error("Registration incomplete", {
+                    description:
+                      "Missing attendee type. Please complete your registration to continue.",
+                  });
+                }
+              } catch {
+                // ignore sessionStorage
+              }
             }
 
-            const onceKey = `smflx_incomplete_attendeeType_${String(eventId || "").trim() || "unknown"}`;
-            let alreadyShown = false;
-            try {
-              alreadyShown = sessionStorage.getItem(onceKey) === "1";
-              if (!alreadyShown) sessionStorage.setItem(onceKey, "1");
-            } catch {
-              // ignore
-            }
-
-            if (!didHandleIncompleteRef.current && !alreadyShown) {
-              didHandleIncompleteRef.current = true;
-              toast.error("Registration incomplete", {
-                description: "Missing attendee type. Please login again to complete your registration.",
-              });
-            }
-
-            const emailForRedirect =
-              (profile as any)?.email ||
-              (dashboardData as any)?.profile?.email ||
-              (getStoredUser() as any)?.email ||
-              "";
-
-            router.replace(
-              emailForRedirect
-                ? `/register?view=login&email=${encodeURIComponent(String(emailForRedirect))}`
-                : `/register?view=login`
-            );
+            router.replace("/register?view=event-registration");
             return;
           }
 
-          const isCamper = String(regAttendanceRaw).toLowerCase().includes("camp");
+          const isCamper = String(effectiveAttendanceRaw).toLowerCase().includes("camp");
 
           const normalizedRegistration = {
             ...(regForEvent || {}),
@@ -323,6 +317,7 @@ export default function DashboardPage() {
               (regForEvent as any)?.attendanceType ??
               (regForEvent as any)?.participationMode ??
               (regForEvent as any)?.participation ??
+              recoveredAttendanceRaw ??
               "",
           };
 

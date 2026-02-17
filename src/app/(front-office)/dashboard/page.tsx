@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
 import { AUTH_USER_STORAGE_KEY, getAuthToken, getStoredUser, setAuthToken } from "@/lib/api/client";
-import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie, setActiveEventCookie } from "@/lib/auth/session";
+import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie } from "@/lib/auth/session";
 import { getMe, verifyToken, getUserDashboard, listMyRegistrations } from "@/lib/api";
 import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation } from "@/lib/api/dashboardTypes";
 import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
@@ -67,13 +67,12 @@ export default function DashboardPage() {
     {}
   );
 
+  // Prevent toast/redirect loops when registration is incomplete.
   const didHandleMissingAttendeeTypeRef = useRef(false);
 
   useEffect(() => {
     async function boot() {
       const token = getAuthToken();
-
-      let hasRegistrations = false;
 
       // 0) Fast hydrate from 7-day snapshot (multi-event ready)
       const snap = loadDashboardSnapshot();
@@ -163,7 +162,6 @@ export default function DashboardPage() {
         // Local references to freshly derived items (avoid relying on async React state)
         let regForEvent: any = null;
         let accForEvent: any = null;
-        let normalizedRegForEvent: any = null;
         let localSelectedEvent: { eventId: string; eventName: string } | null = null;
 
         // 3) Fetch fresh profile from backend
@@ -178,12 +176,12 @@ export default function DashboardPage() {
         let eventId: string | null = null;
         let myRegistrations: any[] = [];
         let myRegIdForEvent: string | null = null;
+        let matchForEvent: any = null;
+
 
         try {
           console.log("📋 Fetching user registrations...");
           myRegistrations = await listMyRegistrations();
-
-          hasRegistrations = Array.isArray(myRegistrations) && myRegistrations.length > 0;
 
           const registrations = myRegistrations;
 
@@ -210,12 +208,19 @@ export default function DashboardPage() {
             return;
           }
 
+          // ✅ Use the most recent registration
           const mostRecent = registrations[0];
           eventId = mostRecent.eventId;
 
-          // Persist the owner regId for this event (used for dependents payment & registration)
-          const matchForEvent = registrations.find((r: any) => r?.eventId === eventId) ?? mostRecent;
+          matchForEvent = registrations.find((r: any) => r?.eventId === eventId) ?? mostRecent;
           myRegIdForEvent = matchForEvent?.regId ? String(matchForEvent.regId) : null;
+          const regDataForEvent = (matchForEvent as any)?.registrationData ?? (matchForEvent as any) ?? null;
+          const registrationsAttendanceRaw =
+            regDataForEvent?.attendeeType ??
+            regDataForEvent?.attendanceType ??
+            regDataForEvent?.participationMode ??
+            regDataForEvent?.participation ??
+            "";
           
           console.log("🔑 Registration ID (regId) for event:", {
             eventId,
@@ -283,24 +288,14 @@ export default function DashboardPage() {
             savedReg?.attendanceType ??
             "";
 
-          // Recover attendee type from listMyRegistrations() payload (often nested under registrationData)
-          const registrationsAttendanceRaw = (() => {
-            try {
-              const list = Array.isArray(myRegistrations) ? myRegistrations : [];
-              const match = list.find((r: any) => String(r?.eventId ?? "") === String(eventId ?? "")) ?? list[0];
-              const src = (match as any)?.registrationData ?? match;
-              return (
-                (src as any)?.attendeeType ??
-                (src as any)?.participationMode ??
-                (src as any)?.attendanceType ??
-                (src as any)?.participation ??
-                ""
-              );
-            } catch {
-              return "";
-            }
-          })();
+          const registrationsAttendanceRaw =
+            (matchForEvent as any)?.registrationData?.attendeeType ??
+            (matchForEvent as any)?.registrationData?.participationMode ??
+            (matchForEvent as any)?.attendeeType ??
+            (matchForEvent as any)?.participationMode ??
+            "";
 
+          // Optional safer helper (recommended replacement for nested ternary logic)
           const pickFirstNonEmpty = (...vals: unknown[]) => {
             for (const v of vals) {
               const s = String(v ?? "").trim();
@@ -309,11 +304,11 @@ export default function DashboardPage() {
             return "";
           };
 
-          const effectiveAttendanceRaw = pickFirstNonEmpty(
-            regAttendanceRaw,
-            registrationsAttendanceRaw,
-            recoveredAttendanceRaw
-          );
+            const effectiveAttendanceRaw = pickFirstNonEmpty(
+              regAttendanceRaw,
+              registrationsAttendanceRaw,
+              recoveredAttendanceRaw
+            );
 
           if (!String(effectiveAttendanceRaw || "").trim()) {
             if (!didHandleMissingAttendeeTypeRef.current) {
@@ -343,13 +338,15 @@ export default function DashboardPage() {
             ...(regForEvent || {}),
             // Ensure regId is present (backend requires it for dependents flows)
             regId: (regForEvent as any)?.regId ?? myRegIdForEvent ?? (regForEvent as any)?.registrationId ?? (regForEvent as any)?.id,
-            attendeeType:
-              (regForEvent as any)?.attendeeType ??
-              (regForEvent as any)?.attendanceType ??
-              (regForEvent as any)?.participationMode ??
-              (regForEvent as any)?.participation ??
-              recoveredAttendanceRaw ??
-              "",
+            attendeeType: pickFirstNonEmpty(
+              (regForEvent as any)?.attendeeType,
+              (regForEvent as any)?.attendanceType,
+              (regForEvent as any)?.participationMode,
+              (regForEvent as any)?.participation,
+              registrationsAttendanceRaw,
+              recoveredAttendanceRaw,
+              effectiveAttendanceRaw,
+            ),
           };
 
             // IMPROVED: Better accommodation matching - multiple strategies
@@ -377,7 +374,6 @@ export default function DashboardPage() {
             }
 
             setRegistration(normalizedRegistration);
-            normalizedRegForEvent = normalizedRegistration;
             setAccommodation(accForEvent);
 
             // Debug logging for campers without accommodation
@@ -412,13 +408,6 @@ export default function DashboardPage() {
           }
         }
 
-        // ✅ FIX: Ensure active event cookie is set for returning users (middleware guard)
-        // Without this, middleware bounces /dashboard → /dashboard/select-event in a loop
-        if (eventId) {
-          setActiveEventCookie(eventId);
-          setActiveEventId(eventId);
-        }
-
         // Persist to flow state (do NOT let stale saved state override current event data)
         const saved0 = safeLoadFlowState() || {};
         const sameEvent = (saved0?.activeEventId && eventId) ? String(saved0.activeEventId) === String(eventId) : true;
@@ -428,9 +417,9 @@ export default function DashboardPage() {
           view: "dashboard",
           email: apiEmail || (storedUser?.email ?? saved0?.email ?? ""),
           profile: mergedProfile,
-          ownerRegId: myRegIdForEvent || ownerRegId || saved0?.ownerRegId || (mergedProfile as any)?.userId || null,
+          ownerRegId: ownerRegId || myRegIdForEvent || saved0?.ownerRegId || (mergedProfile as any)?.userId || null,
           selectedEvent: localSelectedEvent || selectedEvent || saved0?.selectedEvent,
-          registration: (normalizedRegForEvent ?? regForEvent) || (sameEvent ? saved0?.registration : null),
+          registration: regForEvent || (sameEvent ? saved0?.registration : null),
           accommodation: accForEvent || (sameEvent ? saved0?.accommodation : null),
           activeEventId: eventId || activeEventId || saved0?.activeEventId,
         });
@@ -451,22 +440,20 @@ export default function DashboardPage() {
         setError(err?.message || "Failed to verify your session. Please try again.");
       }
 
-      // 3) Token valid: only resume a saved non-dashboard flow if the user has NO registrations yet.
-      // Returning users often have stale local flow state which would otherwise cause a redirect loop.
+      // 3) Token valid: if there's a saved flow state that isn't dashboard, resume it
       const saved = safeLoadFlowState();
-      if (!hasRegistrations && saved?.view && saved.view !== "dashboard") {
+      if (saved?.view && saved.view !== "dashboard") {
         router.replace("/register");
         return;
       }
 
-      // 4) Otherwise hydrate from saved dashboard context (if any) WITHOUT overwriting fresh state.
+      // 4) Otherwise load saved dashboard context (if any)
       if (saved) {
-        setEmail((prev) => prev || saved.email || "");
-        setProfile((prev) => prev ?? (saved.profile ?? null));
-        setRegistration((prev) => prev ?? (saved.registration ?? null));
-        setAccommodation((prev) => prev ?? (saved.accommodation ?? null));
-        setSelectedEvent((prev) => prev ?? (saved.selectedEvent ?? null));
-        if (!activeEventId && saved.activeEventId) setActiveEventId(saved.activeEventId);
+        setEmail(saved.email || "");
+        setProfile(saved.profile ?? null);
+        setRegistration(saved.registration ?? null);
+        setAccommodation(saved.accommodation ?? null);
+        setSelectedEvent(saved.selectedEvent ?? null);
       }
 
   setLoading(false);

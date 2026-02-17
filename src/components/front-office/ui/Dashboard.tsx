@@ -210,12 +210,10 @@ export function Dashboard({
     const regIdFromRegistration = getRegId(registration);
     if (regIdFromRegistration) return regIdFromRegistration;
     
-    // Priority 3: Check profile for regId field (some backends might store it here)
+    // Priority 3: Check profile for regId field 
     const p: any = profile as any;
     if (p?.regId) return String(p.regId);
     
-    // ❌ DO NOT use userId as regId - they are different!
-    // If we reach here, we don't have a valid regId
     return undefined;
   })();
 
@@ -623,12 +621,16 @@ type AccommodationData = Parameters<
 
   const attendeeType = normalizeAttendeeType(registration);
   const attendeeTypeNorm = (typeof attendeeType === "string" ? attendeeType.toLowerCase() : "");
-  const isCamper = attendeeTypeNorm === "camper";
   const normalizedAccommodation = useMemo(
     () => normalizeAccommodation(accommodation),
     [accommodation],
   );
-  
+
+  // Camper inference:
+  // - Primary source: registration attendeeType/participationMode
+  // - Fallback: if accommodation exists, user is effectively a camper (only campers get accommodation payloads)
+  const isCamper = attendeeTypeNorm === "camper" || (!!normalizedAccommodation && attendeeTypeNorm !== "online" && attendeeTypeNorm !== "physical");
+
   const accAny = normalizedAccommodation as any;
 
   const accommodationFacilityName: string =
@@ -654,7 +656,8 @@ type AccommodationData = Parameters<
     (accAny?.accommodationImageUrl as string) ||
     (accAny?.imageUrl as string) ||
     "";
-const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online" || attendeeTypeNorm === "";
+  const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online";
+  const isUnknownAttendeeType = !attendeeTypeNorm;
   const paidForAccommodation = normalizedAccommodation?.paidForAccommodation === true;
 
   // Camper: when accommodation payment is pending, the space is held for 1 hour.
@@ -1187,12 +1190,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           onManageDependents={() => setIsDependentsModalOpen(true)}
         />
 
-        <DependentsSection
-          dependents={dependents}
-          onRegister={handleRegisterDependent}
-          onPay={handlePayForDependents}
-        />
-
         
         {/* Top grid */}
         <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
@@ -1382,6 +1379,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                       </div>
                     </div>
                   )}
+
+
                 </div>
 
                 <div className="flex gap-2">
@@ -1442,6 +1441,12 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 </div>
   )
 )}
+
+        <DependentsSection
+          dependents={dependents}
+          onRegister={handleRegisterDependent}
+          onPay={handlePayForDependents}
+        />
 
         {/* Non-camper upgrade CTA (re-using your existing promo card) */}
         {showAccommodationPromo && (

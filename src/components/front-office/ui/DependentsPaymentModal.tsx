@@ -4,7 +4,7 @@ import type { Dependent } from "./DependentsModal";
 import { useState } from 'react';
 import { X, CreditCard } from 'lucide-react';
 import { InlineAlert } from './InlineAlert';
-import { initiateDependentPayment } from '@/lib/api';
+import { initiateDependentPayment, payForAllDependants } from '@/lib/api';
 import { toUserMessage } from '@/lib/errors';
 
 interface DependentsPaymentModalProps {
@@ -52,16 +52,27 @@ export function DependentsPaymentModal({
         throw new Error("Missing parentRegId (owner regId). Please refresh your dashboard and try again.");
       }
 
-      const dependentId = dependents?.[0]?.id;
+      const isPayingForAll = dependents.length > 1;
+      let resp: any = null;
+      let dependentId: string | null = null;
 
-      if (!dependentId) {
-        throw new Error("Missing dependent ID. Please refresh and try again.");
+      if (isPayingForAll) {
+        resp = await payForAllDependants({
+          parentRegId: resolvedParentRegId,
+          eventId,
+        });
+      } else {
+        dependentId = dependents?.[0]?.id ?? null;
+
+        if (!dependentId) {
+          throw new Error("Missing dependent ID. Please refresh and try again.");
+        }
+
+        resp = await initiateDependentPayment({
+          dependantId: dependentId,
+          parentRegId: resolvedParentRegId,
+        });
       }
-
-      const resp = await initiateDependentPayment({
-        dependantId: dependentId,
-        parentRegId: resolvedParentRegId,
-      });
 
       console.log("🟢 Payment API response:", resp);
 
@@ -86,7 +97,7 @@ export function DependentsPaymentModal({
           JSON.stringify({
             type: "dependents",
             parentRegId: resolvedParentRegId,
-            dependentId,
+            dependentId: dependentId || undefined,
             startedAt: new Date().toISOString(),
           })
         );

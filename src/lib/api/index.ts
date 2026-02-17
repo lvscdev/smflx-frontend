@@ -270,6 +270,31 @@ export async function initiateDependentPayment(payload: {
   return response?.data || response;
 }
 
+
+export async function payForAllDependants(payload: {
+  parentRegId: string;
+  eventId?: string;
+}) {
+  const body: Record<string, any> = {
+    parentRegId: payload.parentRegId,
+  };
+
+  if (payload.eventId) body.eventId = payload.eventId;
+
+  console.log("🔵 API Request - payForAllDependants:", {
+    endpoint: "/user-dashboard/pay-for-all-dependants",
+    body,
+  });
+
+  const response = await apiRequest<any>("/user-dashboard/pay-for-all-dependants", {
+    method: "POST",
+    body,
+  });
+
+  console.log("🟢 API Response - payForAllDependants:", response);
+  return response?.data || response;
+}
+
 // Dashboard types
 export type DashboardRegistration = {
   registrationId: string;

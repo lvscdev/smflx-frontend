@@ -5,27 +5,8 @@ import { validateEventRegistration } from "@/lib/validation/eventRegistration";
 import { toUserMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  MapPin,
-  Wifi,
-  ArrowLeft,
-  Tent,
-  Users,
-  Monitor,
-  Building2,
-  Home,
-  Check,
-  Radio,
-  Youtube,
-  Facebook,
-} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MapPin, Wifi, ArrowLeft, Tent, Users, Monitor, Building2, Home, Check, Radio, Youtube, Facebook } from "lucide-react";
 import { listAccommodationCategories } from "@/lib/api/accommodation";
 import { AccommodationCategories } from "@/lib/api/accommodation/types";
 

@@ -90,11 +90,17 @@ export default function HomePage() {
     const token = getAuthToken();
     if (!token) return;
 
+    const viewParam = searchParams.get("view");
+    if (viewParam === "login") return;
+
     const saved = safeLoadFlowState();
     if (!saved) return;
 
     if (saved.view === "dashboard") {
-      if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
+
+      const eventId = saved.activeEventId || saved.selectedEvent?.eventId || selectedEvent?.eventId;
+      if (eventId) setActiveEventCookie(eventId);
+      else if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
       router.push("/dashboard");
       return;
     }
@@ -105,7 +111,8 @@ export default function HomePage() {
     setAccommodation(saved.accommodation ?? null);
 
     const nextView: View = saved.view || "verify";
-  }, [router, selectedEvent?.eventId]);
+    if (nextView !== "verify") setView(nextView);
+  }, [router, selectedEvent?.eventId, searchParams]);
 
   useEffect(() => {
     async function fetchHostelAvailability() {

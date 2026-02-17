@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
 import { AUTH_USER_STORAGE_KEY, getAuthToken, getStoredUser, setAuthToken } from "@/lib/api/client";
-import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie } from "@/lib/auth/session";
+import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie, setActiveEventCookie } from "@/lib/auth/session";
 import { getMe, verifyToken, getUserDashboard, listMyRegistrations } from "@/lib/api";
 import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation } from "@/lib/api/dashboardTypes";
 import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
@@ -384,6 +384,11 @@ export default function DashboardPage() {
           }
         }
 
+        if (eventId) {
+          setActiveEventCookie(eventId);
+          setActiveEventId(eventId);
+        }
+
         // Persist to flow state (do NOT let stale saved state override current event data)
         const saved0 = safeLoadFlowState() || {};
         const sameEvent = (saved0?.activeEventId && eventId) ? String(saved0.activeEventId) === String(eventId) : true;
@@ -393,7 +398,7 @@ export default function DashboardPage() {
           view: "dashboard",
           email: apiEmail || (storedUser?.email ?? saved0?.email ?? ""),
           profile: mergedProfile,
-          ownerRegId: ownerRegId || myRegIdForEvent || saved0?.ownerRegId || (mergedProfile as any)?.userId || null,
+          ownerRegId: myRegIdForEvent || ownerRegId || saved0?.ownerRegId || (mergedProfile as any)?.userId || null,
           selectedEvent: localSelectedEvent || selectedEvent || saved0?.selectedEvent,
           registration: (normalizedRegForEvent ?? regForEvent) || (sameEvent ? saved0?.registration : null),
           accommodation: accForEvent || (sameEvent ? saved0?.accommodation : null),
@@ -435,7 +440,6 @@ export default function DashboardPage() {
       }
 
   setLoading(false);
-(false);
 }
 
 boot();

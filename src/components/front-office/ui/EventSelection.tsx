@@ -95,7 +95,8 @@ export function EventSelection({
 
   useEffect(() => {
     void loadEvents();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.ageRange]);
 
   const userRange = normRange(userProfile?.ageRange);
   const isYAT = !!userProfile?.isYAT;

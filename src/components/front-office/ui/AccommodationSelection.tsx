@@ -146,7 +146,12 @@ export function AccommodationSelection({
 
       if (!profileGender || !profileAgeRange) {
         setFacilities([]);
-        setError("Please update your profile (Age Range) to view accommodation options.");
+        const missing = !profileGender && !profileAgeRange
+          ? "Gender and Age Range"
+          : !profileGender
+            ? "Gender"
+            : "Age Range";
+        setError(`Please update your profile (${missing}) to view accommodation options.`);
         return;
       }
 
@@ -657,4 +662,3 @@ export function AccommodationSelection({
     </div>
   );
 }
-

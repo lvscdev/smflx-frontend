@@ -219,6 +219,22 @@ export function Dashboard({
     return undefined;
   })();
 
+  const badgeHref = (() => {
+    const p: any = profile as any;
+    const firstName = (p?.firstName ?? p?.firstname ?? "").toString().trim();
+    const lastName = (p?.lastName ?? p?.lastname ?? "").toString().trim();
+
+    const qs = new URLSearchParams();
+    if (firstName) qs.set("firstName", firstName);
+    if (lastName) qs.set("lastName", lastName);
+
+    const suffix = qs.toString();
+    return suffix
+      ? `https://livelybadge.vercel.app/badge?${suffix}`
+      : "https://livelybadge.vercel.app/badge";
+  })();
+
+
 // Avatar dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -1259,9 +1275,14 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
             </div>
 
             <div className="flex items-center gap-3">
-              <button className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
+              <a
+                href={badgeHref}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors inline-flex items-center justify-center"
+              >
                 Download Badge
-              </button>
+              </a>
               <button className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">
                 Meal Ticket
               </button>

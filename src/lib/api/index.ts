@@ -109,11 +109,13 @@ export type Event = {
   ageRanges?: string[];
 };
 
-export async function listActiveEvents() {
-  const response = await apiRequest<any>("/events/user/active", {
+export async function listActiveEvents(options?: { teens?: boolean }) {
+  const query = options?.teens ? "?teens=true" : "";
+
+  const response = await apiRequest<any>(`/events/user/active${query}`, {
     method: "GET",
   });
-  
+
   const data = response?.data || response;
   return data?.activeEvents || [];
 }

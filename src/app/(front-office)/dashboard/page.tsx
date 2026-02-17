@@ -67,12 +67,13 @@ export default function DashboardPage() {
     {}
   );
 
-  // Prevent toast/redirect loops when registration is incomplete.
   const didHandleMissingAttendeeTypeRef = useRef(false);
 
   useEffect(() => {
     async function boot() {
       const token = getAuthToken();
+
+      let hasRegistrations = false;
 
       // 0) Fast hydrate from 7-day snapshot (multi-event ready)
       const snap = loadDashboardSnapshot();
@@ -162,6 +163,7 @@ export default function DashboardPage() {
         // Local references to freshly derived items (avoid relying on async React state)
         let regForEvent: any = null;
         let accForEvent: any = null;
+        let normalizedRegForEvent: any = null;
         let localSelectedEvent: { eventId: string; eventName: string } | null = null;
 
         // 3) Fetch fresh profile from backend
@@ -180,6 +182,8 @@ export default function DashboardPage() {
         try {
           console.log("📋 Fetching user registrations...");
           myRegistrations = await listMyRegistrations();
+
+          hasRegistrations = Array.isArray(myRegistrations) && myRegistrations.length > 0;
 
           const registrations = myRegistrations;
 
@@ -206,7 +210,6 @@ export default function DashboardPage() {
             return;
           }
 
-          // ✅ Use the most recent registration
           const mostRecent = registrations[0];
           eventId = mostRecent.eventId;
 
@@ -346,6 +349,7 @@ export default function DashboardPage() {
             }
 
             setRegistration(normalizedRegistration);
+            normalizedRegForEvent = normalizedRegistration;
             setAccommodation(accForEvent);
 
             // Debug logging for campers without accommodation
@@ -391,7 +395,7 @@ export default function DashboardPage() {
           profile: mergedProfile,
           ownerRegId: ownerRegId || myRegIdForEvent || saved0?.ownerRegId || (mergedProfile as any)?.userId || null,
           selectedEvent: localSelectedEvent || selectedEvent || saved0?.selectedEvent,
-          registration: regForEvent || (sameEvent ? saved0?.registration : null),
+          registration: (normalizedRegForEvent ?? regForEvent) || (sameEvent ? saved0?.registration : null),
           accommodation: accForEvent || (sameEvent ? saved0?.accommodation : null),
           activeEventId: eventId || activeEventId || saved0?.activeEventId,
         });
@@ -412,23 +416,26 @@ export default function DashboardPage() {
         setError(err?.message || "Failed to verify your session. Please try again.");
       }
 
-      // 3) Token valid: if there's a saved flow state that isn't dashboard, resume it
+      // 3) Token valid: only resume a saved non-dashboard flow if the user has NO registrations yet.
+      // Returning users often have stale local flow state which would otherwise cause a redirect loop.
       const saved = safeLoadFlowState();
-      if (saved?.view && saved.view !== "dashboard") {
+      if (!hasRegistrations && saved?.view && saved.view !== "dashboard") {
         router.replace("/register");
         return;
       }
 
-      // 4) Otherwise load saved dashboard context (if any)
+      // 4) Otherwise hydrate from saved dashboard context (if any) WITHOUT overwriting fresh state.
       if (saved) {
-        setEmail(saved.email || "");
-        setProfile(saved.profile ?? null);
-        setRegistration(saved.registration ?? null);
-        setAccommodation(saved.accommodation ?? null);
-        setSelectedEvent(saved.selectedEvent ?? null);
+        setEmail((prev) => prev || saved.email || "");
+        setProfile((prev) => prev ?? (saved.profile ?? null));
+        setRegistration((prev) => prev ?? (saved.registration ?? null));
+        setAccommodation((prev) => prev ?? (saved.accommodation ?? null));
+        setSelectedEvent((prev) => prev ?? (saved.selectedEvent ?? null));
+        if (!activeEventId && saved.activeEventId) setActiveEventId(saved.activeEventId);
       }
 
   setLoading(false);
+(false);
 }
 
 boot();

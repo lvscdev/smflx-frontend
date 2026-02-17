@@ -68,8 +68,19 @@ export function EventSelection({
   const loadEvents = async () => {
     setLoading(true);
     setLoadError("");
+
     try {
-      const apiEvents = await listActiveEvents();
+      const userRange = (userProfile?.ageRange ?? "")
+        .toString()
+        .replace(/[–—]/g, "-")
+        .trim();
+
+      const isYAT = !!userProfile?.isYAT;
+      const shouldFetchTeens =
+        userRange === "13-19" || (userRange === "20-22" && isYAT);
+
+      const apiEvents = await listActiveEvents({ teens: shouldFetchTeens });
+
       const mapped = (apiEvents || []).map(mapApiEvent);
       setEvents(mapped);
       setIsEmpty(mapped.length === 0);

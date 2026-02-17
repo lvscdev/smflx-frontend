@@ -60,12 +60,21 @@ export default function HomePage() {
   const searchParams = useSearchParams();
   const [view, setView] = useState<View>("verify");
 
-  // Allow deep-linking into login view (used by /returning-user redirect)
   useEffect(() => {
     const v = searchParams.get("view");
     const e = searchParams.get("email");
     if (e) setEmail(e);
-    if (v === "login") setView("login");
+    if (
+      v === "verify" ||
+      v === "login" ||
+      v === "profile" ||
+      v === "event-selection" ||
+      v === "event-registration" ||
+      v === "accommodation" ||
+      v === "payment"
+    ) {
+      setView(v);
+    }
   }, [searchParams]);
 
   const [email, setEmail] = useState("");
@@ -91,13 +100,22 @@ export default function HomePage() {
     if (!token) return;
 
     const viewParam = searchParams.get("view");
-    if (viewParam === "login") return;
+    if (
+      viewParam === "verify" ||
+      viewParam === "login" ||
+      viewParam === "profile" ||
+      viewParam === "event-selection" ||
+      viewParam === "event-registration" ||
+      viewParam === "accommodation" ||
+      viewParam === "payment"
+    ) {
+      return;
+    }
 
     const saved = safeLoadFlowState();
     if (!saved) return;
 
     if (saved.view === "dashboard") {
-
       const eventId = saved.activeEventId || saved.selectedEvent?.eventId || selectedEvent?.eventId;
       if (eventId) setActiveEventCookie(eventId);
       else if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);

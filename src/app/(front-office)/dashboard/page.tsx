@@ -283,9 +283,37 @@ export default function DashboardPage() {
             savedReg?.attendanceType ??
             "";
 
-          const effectiveAttendanceRaw = String(regAttendanceRaw || "").trim()
-            ? regAttendanceRaw
-            : recoveredAttendanceRaw;
+          // Recover attendee type from listMyRegistrations() payload (often nested under registrationData)
+          const registrationsAttendanceRaw = (() => {
+            try {
+              const list = Array.isArray(myRegistrations) ? myRegistrations : [];
+              const match = list.find((r: any) => String(r?.eventId ?? "") === String(eventId ?? "")) ?? list[0];
+              const src = (match as any)?.registrationData ?? match;
+              return (
+                (src as any)?.attendeeType ??
+                (src as any)?.participationMode ??
+                (src as any)?.attendanceType ??
+                (src as any)?.participation ??
+                ""
+              );
+            } catch {
+              return "";
+            }
+          })();
+
+          const pickFirstNonEmpty = (...vals: unknown[]) => {
+            for (const v of vals) {
+              const s = String(v ?? "").trim();
+              if (s) return s;
+            }
+            return "";
+          };
+
+          const effectiveAttendanceRaw = pickFirstNonEmpty(
+            regAttendanceRaw,
+            registrationsAttendanceRaw,
+            recoveredAttendanceRaw
+          );
 
           if (!String(effectiveAttendanceRaw || "").trim()) {
             if (!didHandleMissingAttendeeTypeRef.current) {
@@ -384,6 +412,8 @@ export default function DashboardPage() {
           }
         }
 
+        // ✅ FIX: Ensure active event cookie is set for returning users (middleware guard)
+        // Without this, middleware bounces /dashboard → /dashboard/select-event in a loop
         if (eventId) {
           setActiveEventCookie(eventId);
           setActiveEventId(eventId);

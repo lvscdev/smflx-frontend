@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
 import { AUTH_USER_STORAGE_KEY, getAuthToken, getStoredUser, setAuthToken } from "@/lib/api/client";
-import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie } from "@/lib/auth/session";
+import { clearTokenCookie, getActiveEventCookie, clearActiveEventCookie, setActiveEventCookie } from "@/lib/auth/session";
 import { getMe, verifyToken, getUserDashboard, listMyRegistrations } from "@/lib/api";
 import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation } from "@/lib/api/dashboardTypes";
 import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } from "@/lib/storage/dashboardState";
@@ -69,18 +69,22 @@ export default function DashboardPage() {
 
   // Prevent toast/redirect loops when registration is incomplete.
   const didHandleMissingAttendeeTypeRef = useRef(false);
+  const bootRanRef = useRef(false);
 
   useEffect(() => {
+    if (bootRanRef.current) return;
+    bootRanRef.current = true;
+
     async function boot() {
       const token = getAuthToken();
 
       // 0) Fast hydrate from 7-day snapshot (multi-event ready)
       const snap = loadDashboardSnapshot();
       if (snap?.profile) {
-        setProfile(snap.profile);
+        setProfile((prev) => prev ?? snap.profile);
 
         const snapEmail = (snap.profile.email ?? "") as string;
-        if (snapEmail) setEmail(snapEmail);
+        if (snapEmail) setEmail((prev) => prev || snapEmail);
       }
       if (snap?.events && typeof snap.events === "object") {
         const entries = Object.entries(snap.events);
@@ -152,7 +156,7 @@ export default function DashboardPage() {
           storedUser?.email || storedUser?.user?.email || storedUser?.data?.email || "";
 
         if (storedEmail) setEmail(storedEmail);
-        setProfile(storedUser);
+        setProfile((prev) => prev ?? storedUser);
       }
 
 
@@ -163,10 +167,13 @@ export default function DashboardPage() {
         let regForEvent: any = null;
         let accForEvent: any = null;
         let localSelectedEvent: { eventId: string; eventName: string } | null = null;
+        let matchForEvent: any = null;
+        let ownerRegIdLocal: string | null = null;
 
         // 3) Fetch fresh profile from backend
+        const flow0 = safeLoadFlowState() || {};
         const me = await getMe();
-        const mergedProfile = { ...(storedUser || {}), ...(me || {}) };
+        const mergedProfile = { ...(flow0?.profile || {}), ...(storedUser || {}), ...(me || {}) };
         setProfile(mergedProfile);
 
         const apiEmail = (me as any)?.email || "";
@@ -176,8 +183,6 @@ export default function DashboardPage() {
         let eventId: string | null = null;
         let myRegistrations: any[] = [];
         let myRegIdForEvent: string | null = null;
-        let matchForEvent: any = null;
-
 
         try {
           console.log("📋 Fetching user registrations...");
@@ -212,9 +217,12 @@ export default function DashboardPage() {
           const mostRecent = registrations[0];
           eventId = mostRecent.eventId;
 
+          // Persist the owner regId for this event (used for dependents payment & registration)
           matchForEvent = registrations.find((r: any) => r?.eventId === eventId) ?? mostRecent;
           myRegIdForEvent = matchForEvent?.regId ? String(matchForEvent.regId) : null;
-          const regDataForEvent = (matchForEvent as any)?.registrationData ?? (matchForEvent as any) ?? null;
+          // Extra recovery: listMyRegistrations often contains richer registrationData than dashboard payload
+          const regDataForEvent =
+            (matchForEvent as any)?.registrationData ?? (matchForEvent as any) ?? null;
           const registrationsAttendanceRaw =
             regDataForEvent?.attendeeType ??
             regDataForEvent?.attendanceType ??
@@ -228,8 +236,9 @@ export default function DashboardPage() {
             registrationData: matchForEvent,
           });
           
-          if (myRegIdForEvent) {
-            setOwnerRegId(myRegIdForEvent); 
+          ownerRegIdLocal = myRegIdForEvent ? String(myRegIdForEvent) : null;
+          if (ownerRegIdLocal) {
+            setOwnerRegId(ownerRegIdLocal);
           } else {
             console.warn("⚠️ No regId found in registration data!");
             setOwnerRegId(null);
@@ -266,6 +275,11 @@ export default function DashboardPage() {
 
             setEventCache((prev) => ({ ...prev, [eventId!]: dashboardData }));
             setActiveEventId(eventId);
+            try {
+              setActiveEventCookie(String(eventId));
+            } catch {
+              // ignore cookie set errors
+            }
 
             // Pick the most relevant items for this event
             regForEvent =
@@ -295,7 +309,6 @@ export default function DashboardPage() {
             (matchForEvent as any)?.participationMode ??
             "";
 
-          // Optional safer helper (recommended replacement for nested ternary logic)
           const pickFirstNonEmpty = (...vals: unknown[]) => {
             for (const v of vals) {
               const s = String(v ?? "").trim();
@@ -336,17 +349,15 @@ export default function DashboardPage() {
 
           const normalizedRegistration = {
             ...(regForEvent || {}),
-            // Ensure regId is present (backend requires it for dependents flows)
             regId: (regForEvent as any)?.regId ?? myRegIdForEvent ?? (regForEvent as any)?.registrationId ?? (regForEvent as any)?.id,
-            attendeeType: pickFirstNonEmpty(
-              (regForEvent as any)?.attendeeType,
-              (regForEvent as any)?.attendanceType,
-              (regForEvent as any)?.participationMode,
-              (regForEvent as any)?.participation,
-              registrationsAttendanceRaw,
-              recoveredAttendanceRaw,
-              effectiveAttendanceRaw,
-            ),
+            attendeeType:
+              (regForEvent as any)?.attendeeType ??
+              (regForEvent as any)?.attendanceType ??
+              (regForEvent as any)?.participationMode ??
+              (regForEvent as any)?.participation ??
+              registrationsAttendanceRaw ??
+              recoveredAttendanceRaw ??
+              "",
           };
 
             // IMPROVED: Better accommodation matching - multiple strategies
@@ -417,7 +428,7 @@ export default function DashboardPage() {
           view: "dashboard",
           email: apiEmail || (storedUser?.email ?? saved0?.email ?? ""),
           profile: mergedProfile,
-          ownerRegId: ownerRegId || myRegIdForEvent || saved0?.ownerRegId || (mergedProfile as any)?.userId || null,
+          ownerRegId: myRegIdForEvent || ownerRegIdLocal || saved0?.ownerRegId || (mergedProfile as any)?.userId || null,
           selectedEvent: localSelectedEvent || selectedEvent || saved0?.selectedEvent,
           registration: regForEvent || (sameEvent ? saved0?.registration : null),
           accommodation: accForEvent || (sameEvent ? saved0?.accommodation : null),
@@ -447,23 +458,21 @@ export default function DashboardPage() {
         return;
       }
 
-      // 4) Otherwise load saved dashboard context (if any)
+      // 4) Otherwise load saved dashboard context (if any) - fill gaps only
       if (saved) {
-        setEmail(saved.email || "");
-        setProfile(saved.profile ?? null);
-        setRegistration(saved.registration ?? null);
-        setAccommodation(saved.accommodation ?? null);
-        setSelectedEvent(saved.selectedEvent ?? null);
+        setEmail((prev) => prev || saved.email || "");
+        setProfile((prev) => prev ?? saved.profile ?? null);
+        setRegistration((prev) => prev ?? saved.registration ?? null);
+        setAccommodation((prev) => prev ?? saved.accommodation ?? null);
+        setSelectedEvent((prev) => prev ?? saved.selectedEvent ?? null);
       }
 
   setLoading(false);
 }
 
 boot();
-}, [router]);
-
-
-    const handleLogout = () => {
+}, []);
+const handleLogout = () => {
       const id = toast.loading("Logging out...");
 
       setAuthToken(null);

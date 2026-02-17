@@ -270,31 +270,6 @@ export async function initiateDependentPayment(payload: {
   return response?.data || response;
 }
 
-
-export async function payForAllDependants(payload: {
-  parentRegId: string;
-  eventId?: string;
-}) {
-  const body: Record<string, any> = {
-    parentRegId: payload.parentRegId,
-  };
-
-  if (payload.eventId) body.eventId = payload.eventId;
-
-  console.log("🔵 API Request - payForAllDependants:", {
-    endpoint: "/user-dashboard/pay-for-all-dependants",
-    body,
-  });
-
-  const response = await apiRequest<any>("/user-dashboard/pay-for-all-dependants", {
-    method: "POST",
-    body,
-  });
-
-  console.log("🟢 API Response - payForAllDependants:", response);
-  return response?.data || response;
-}
-
 // Dashboard types
 export type DashboardRegistration = {
   registrationId: string;
@@ -413,6 +388,7 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       regObj.eventId = eventId;
     }
   
+  });
 
   if (registrations.length === 0) {
     const flatRegId =
@@ -448,7 +424,6 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       registrations.push(regObj as DashboardReg);
     }
   }
-});
 
   const accUnknown =
     (obj["accommodations"] as unknown) ??
@@ -586,4 +561,16 @@ export async function verifyPayment(params: {
   const url = qs.toString() ? `${path}?${qs.toString()}` : path;
   const response = await apiRequest<any>(url, { method: "GET" });
   return response?.data || response;
+}
+
+export type PayForAllDependantsPayload = {
+  parentRegId: string;
+  eventId?: string;
+};
+
+export async function payForAllDependants(payload: PayForAllDependantsPayload) {
+  return apiRequest(`/user-dashboard/pay-for-all-dependants`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

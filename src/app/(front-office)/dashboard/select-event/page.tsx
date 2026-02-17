@@ -52,7 +52,14 @@ export default function SelectEventPage() {
               r?.attendeeType ?? r?.attendanceType ?? r?.participationMode ?? r?.participation ?? "";
             if (!String(attendanceRaw || "").trim()) return null;
 
-            const rawName = r?.eventName ?? r?.event?.eventName ?? r?.eventTitle ?? r?.event?.title;
+            const rawName =
+              r?.eventName ??
+              r?.event?.eventName ??
+              r?.eventTitle ??
+              r?.event?.title ??
+              r?.event?.name ??
+              r?.name ??
+              r?.title;
             const eventName = typeof rawName === "string" && rawName.trim() ? rawName : undefined;
 
             return { eventId, eventName };
@@ -71,7 +78,7 @@ export default function SelectEventPage() {
           const eventId = list[0].eventId;
           setActiveEventCookie(eventId);
           const saved = safeLoadFlowState() || {};
-          safeSaveFlowState({ ...saved, eventId });
+          safeSaveFlowState({ ...saved, eventId, activeEventId: eventId });
           router.replace("/dashboard");
           return;
         }
@@ -95,7 +102,7 @@ export default function SelectEventPage() {
   const onSelect = (eventId: string) => {
     setActiveEventCookie(eventId);
     const saved = safeLoadFlowState() || {};
-    safeSaveFlowState({ ...saved, eventId });
+          safeSaveFlowState({ ...saved, eventId, activeEventId: eventId });
     router.push("/dashboard");
   };
 

@@ -78,7 +78,7 @@ const toDependent = (d: DashboardDependent): Dependent => {
   const genderVal = rec.gender ?? rec.dependantGender ?? rec.dependentGender;
   const gender = typeof genderVal === "string" ? genderVal : "";
   
-  const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : true; // Assume registered if from API
+  const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : true; 
 
   const isPaid =
     typeof rec.isPaid === "boolean" ? rec.isPaid :
@@ -210,10 +210,12 @@ export function Dashboard({
     const regIdFromRegistration = getRegId(registration);
     if (regIdFromRegistration) return regIdFromRegistration;
     
-    // Priority 3: Check profile for regId field 
+    // Priority 3: Check profile for regId field
     const p: any = profile as any;
     if (p?.regId) return String(p.regId);
     
+    // ❌ DO NOT use userId as regId - they are different!
+    // If we reach here, we don't have a valid regId
     return undefined;
   })();
 

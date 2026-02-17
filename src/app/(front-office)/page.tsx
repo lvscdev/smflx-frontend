@@ -157,6 +157,7 @@ export default function HomePage() {
       email,
       profile,
       selectedEvent,
+      activeEventId: selectedEvent?.eventId ?? null,
       registration,
       accommodation,
     });
@@ -232,7 +233,6 @@ export default function HomePage() {
   }, [view]);
 
   const showSidebar = true;
-  console.log("current view, ", view);
 
   return (
     <div className="flex flex-col lg:flex-row min-h-svh lg:h-screen w-full">
@@ -281,6 +281,7 @@ export default function HomePage() {
                 email: nextEmail || email,
                 profile: nextProfile ?? profile,
                 selectedEvent,
+                activeEventId: selectedEvent?.eventId ?? null,
                 registration,
                 accommodation,
               });
@@ -384,6 +385,7 @@ export default function HomePage() {
                   email,
                   profile,
                   selectedEvent,
+      activeEventId: selectedEvent?.eventId ?? null,
                   registration: next,
                   accommodation,
                 });
@@ -419,6 +421,7 @@ export default function HomePage() {
                 email,
                 profile,
                 selectedEvent,
+      activeEventId: selectedEvent?.eventId ?? null,
                 registration,
                 accommodation: data,
               });
@@ -447,6 +450,7 @@ export default function HomePage() {
                 email,
                 profile,
                 selectedEvent,
+      activeEventId: selectedEvent?.eventId ?? null,
                 registration,
                 accommodation,
               });

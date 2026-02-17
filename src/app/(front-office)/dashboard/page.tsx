@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dashboard } from "@/components/front-office/ui/Dashboard";
 import { AUTH_USER_STORAGE_KEY, getAuthToken, getStoredUser, setAuthToken } from "@/lib/api/client";
@@ -11,6 +11,7 @@ import { loadDashboardSnapshot, saveDashboardSnapshot, clearDashboardSnapshot } 
 import { readOtpCookie } from "@/lib/auth/otpCookie";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 
@@ -53,6 +54,7 @@ export default function DashboardPage() {
 
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [ownerRegId, setOwnerRegId] = useState<string | null>(null);
   const [registration, setRegistration] = useState<DashboardRegistration | null>(null);
   const [accommodation, setAccommodation] = useState<DashboardAccommodation | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<{
@@ -65,6 +67,9 @@ export default function DashboardPage() {
     {}
   );
 
+  // Prevent toast/redirect loops when registration is incomplete.
+  const didHandleMissingAttendeeTypeRef = useRef(false);
+
   useEffect(() => {
     async function boot() {
       const token = getAuthToken();
@@ -73,6 +78,7 @@ export default function DashboardPage() {
       const snap = loadDashboardSnapshot();
       if (snap?.profile) {
         setProfile(snap.profile);
+
         const snapEmail = (snap.profile.email ?? "") as string;
         if (snapEmail) setEmail(snapEmail);
       }
@@ -109,7 +115,6 @@ export default function DashboardPage() {
             });
           }
 
-          // Show dashboard immediately only if we have a real eventId; refresh will run below
           if (preferred && String(preferred).trim()) {
             setLoading(false);
           }
@@ -150,6 +155,7 @@ export default function DashboardPage() {
         setProfile(storedUser);
       }
 
+
       try {
         await verifyToken();
 
@@ -168,10 +174,16 @@ export default function DashboardPage() {
 
         // 4) ✅ CRITICAL FIX: Fetch registrations FIRST to get valid eventId
         let eventId: string | null = null;
+        let myRegistrations: any[] = [];
+        let myRegIdForEvent: string | null = null;
+        let matchForEvent: any = null;
+
 
         try {
           console.log("📋 Fetching user registrations...");
-          const registrations = await listMyRegistrations();
+          myRegistrations = await listMyRegistrations();
+
+          const registrations = myRegistrations;
 
           if (!Array.isArray(registrations) || registrations.length === 0) {
             console.warn("⚠️ User has no event registrations");
@@ -199,6 +211,30 @@ export default function DashboardPage() {
           // ✅ Use the most recent registration
           const mostRecent = registrations[0];
           eventId = mostRecent.eventId;
+
+          matchForEvent = registrations.find((r: any) => r?.eventId === eventId) ?? mostRecent;
+          myRegIdForEvent = matchForEvent?.regId ? String(matchForEvent.regId) : null;
+          const regDataForEvent = (matchForEvent as any)?.registrationData ?? (matchForEvent as any) ?? null;
+          const registrationsAttendanceRaw =
+            regDataForEvent?.attendeeType ??
+            regDataForEvent?.attendanceType ??
+            regDataForEvent?.participationMode ??
+            regDataForEvent?.participation ??
+            "";
+          
+          console.log("🔑 Registration ID (regId) for event:", {
+            eventId,
+            regId: myRegIdForEvent,
+            registrationData: matchForEvent,
+          });
+          
+          if (myRegIdForEvent) {
+            setOwnerRegId(myRegIdForEvent); 
+          } else {
+            console.warn("⚠️ No regId found in registration data!");
+            setOwnerRegId(null);
+          }
+
 
           if (!eventId) {
             console.error("❌ Registration exists but has no eventId:", mostRecent);
@@ -235,30 +271,85 @@ export default function DashboardPage() {
             regForEvent =
               dashboardData.registrations.find((r) => r.eventId === eventId) ??
               dashboardData.registrations[0] ??
-              null;
+              null;      
 
-            
+          const regAttendanceRaw =
+            (regForEvent as any)?.attendeeType ??
+            (regForEvent as any)?.attendanceType ??
+            (regForEvent as any)?.participationMode ??
+            (regForEvent as any)?.participation ??
+            "";
 
-const regAttendanceRaw =
-  (regForEvent as any)?.attendeeType ??
-  (regForEvent as any)?.attendanceType ??
-  (regForEvent as any)?.participationMode ??
-  (regForEvent as any)?.participation ??
-  "";
+          const savedFlow = safeLoadFlowState() || {};
+          const savedReg = savedFlow?.registration || {};
+          const recoveredAttendanceRaw =
+            savedReg?.attendeeType ??
+            savedReg?.participationMode ??
+            savedReg?.attendanceType ??
+            "";
 
-const isCamper = String(regAttendanceRaw).toLowerCase().includes("camp");
+          const registrationsAttendanceRaw =
+            (matchForEvent as any)?.registrationData?.attendeeType ??
+            (matchForEvent as any)?.registrationData?.participationMode ??
+            (matchForEvent as any)?.attendeeType ??
+            (matchForEvent as any)?.participationMode ??
+            "";
 
-const normalizedRegistration = {
-  ...(regForEvent || {}),
-  attendeeType:
-    (regForEvent as any)?.attendeeType ??
-    (regForEvent as any)?.attendanceType ??
-    (regForEvent as any)?.participationMode ??
-    (regForEvent as any)?.participation ??
-    "",
-};
+          // Optional safer helper (recommended replacement for nested ternary logic)
+          const pickFirstNonEmpty = (...vals: unknown[]) => {
+            for (const v of vals) {
+              const s = String(v ?? "").trim();
+              if (s) return s;
+            }
+            return "";
+          };
 
-// IMPROVED: Better accommodation matching - multiple strategies
+            const effectiveAttendanceRaw = pickFirstNonEmpty(
+              regAttendanceRaw,
+              registrationsAttendanceRaw,
+              recoveredAttendanceRaw
+            );
+
+          if (!String(effectiveAttendanceRaw || "").trim()) {
+            if (!didHandleMissingAttendeeTypeRef.current) {
+              didHandleMissingAttendeeTypeRef.current = true;
+              try {
+                const key = `smflx_missing_attendee_type_warned_${eventId}`;
+                const already = sessionStorage.getItem(key);
+                if (!already) {
+                  sessionStorage.setItem(key, "1");
+                  toast.error("Registration incomplete", {
+                    description:
+                      "Missing attendee type. Please complete your registration to continue.",
+                  });
+                }
+              } catch {
+                // ignore sessionStorage
+              }
+            }
+
+            router.replace("/register?view=event-registration");
+            return;
+          }
+
+          const isCamper = String(effectiveAttendanceRaw).toLowerCase().includes("camp");
+
+          const normalizedRegistration = {
+            ...(regForEvent || {}),
+            // Ensure regId is present (backend requires it for dependents flows)
+            regId: (regForEvent as any)?.regId ?? myRegIdForEvent ?? (regForEvent as any)?.registrationId ?? (regForEvent as any)?.id,
+            attendeeType: pickFirstNonEmpty(
+              (regForEvent as any)?.attendeeType,
+              (regForEvent as any)?.attendanceType,
+              (regForEvent as any)?.participationMode,
+              (regForEvent as any)?.participation,
+              registrationsAttendanceRaw,
+              recoveredAttendanceRaw,
+              effectiveAttendanceRaw,
+            ),
+          };
+
+            // IMPROVED: Better accommodation matching - multiple strategies
             accForEvent = null;
 
             // Strategy 1: Match by eventId
@@ -314,20 +405,22 @@ const normalizedRegistration = {
           } catch (dashErr: any) {
             console.error("❌ Failed to fetch dashboard data:", dashErr);
             setError(dashErr?.message || "Failed to load dashboard. Please try again.");
-            // Continue without dashboard data - user can still see profile
           }
         }
 
-        // Persist to flow state
+        // Persist to flow state (do NOT let stale saved state override current event data)
         const saved0 = safeLoadFlowState() || {};
+        const sameEvent = (saved0?.activeEventId && eventId) ? String(saved0.activeEventId) === String(eventId) : true;
+
         safeSaveFlowState({
           ...saved0,
           view: "dashboard",
           email: apiEmail || (storedUser?.email ?? saved0?.email ?? ""),
           profile: mergedProfile,
+          ownerRegId: ownerRegId || myRegIdForEvent || saved0?.ownerRegId || (mergedProfile as any)?.userId || null,
           selectedEvent: localSelectedEvent || selectedEvent || saved0?.selectedEvent,
-          registration: regForEvent || saved0?.registration,
-          accommodation: accForEvent || saved0?.accommodation,
+          registration: regForEvent || (sameEvent ? saved0?.registration : null),
+          accommodation: accForEvent || (sameEvent ? saved0?.accommodation : null),
           activeEventId: eventId || activeEventId || saved0?.activeEventId,
         });
 
@@ -363,34 +456,37 @@ const normalizedRegistration = {
         setSelectedEvent(saved.selectedEvent ?? null);
       }
 
-      setLoading(false);
+  setLoading(false);
+}
+
+boot();
+}, [router]);
+
+
+    const handleLogout = () => {
+      const id = toast.loading("Logging out...");
+
+      setAuthToken(null);
+      clearTokenCookie();
+      clearActiveEventCookie();
+      safeClearFlowState();
+      clearDashboardSnapshot();
+      
+      toast.success("Logged out", { id, duration: 900 });
+      router.push("/");
+    };
+
+    if (loading) {
+      return (
+        <div className="flex min-h-svh items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
     }
 
-    boot();
-  }, [router]);
-
-  const handleLogout = () => {
-    toast.loading("Logging out...");
-
-    setAuthToken(null);
-    clearTokenCookie();
-    clearActiveEventCookie();
-    safeClearFlowState();
-    clearDashboardSnapshot();
-    router.push("/");
-  };
-
-  if (loading) {
+    if (error) {
     return (
-      <div className="flex min-h-[100svh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex min-h-[100svh] items-center justify-center p-6">
+      <div className="flex min-h-svh items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
           <div className="mb-4">
             <svg
@@ -435,6 +531,7 @@ const normalizedRegistration = {
       registration={registration}
       accommodation={accommodation}
       activeEventId={activeEventId}
+      ownerRegId={ownerRegId}
       onLogout={handleLogout}
       onProfileUpdate={(p) => {
         setProfile(p);
@@ -474,4 +571,4 @@ const normalizedRegistration = {
       }}
     />
   );
-}
+  }

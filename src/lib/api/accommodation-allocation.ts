@@ -1,12 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { apiRequest } from "./client";
 
 export type InitiateHostelAllocationPayload = {
   registrationId: string;
   eventId: string;
   userId: string;
-  facilityid: string;
+  facilityid: string; // Note: lowercase 'facilityid' for backend compatibility
 };
 
 export type InitiateHotelAllocationPayload = {
@@ -19,6 +17,18 @@ export type InitiateHotelAllocationPayload = {
 
 export type AllocationResponse = {
   checkoutUrl: string;
+    bookingId?: string;
+    accommodation?: {
+      type: string;
+      facilityId: string;
+      facilityName: string;
+      roomId?: string;
+      roomNumber?: string;
+      roomType?: string;
+      bedSpaceId?: string;
+      bedNumber?: string;
+      price: number;
+  };
 };
 
 export async function initiateHostelAllocation(

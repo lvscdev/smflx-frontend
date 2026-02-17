@@ -13,6 +13,7 @@ interface Event {
   endDate: string;
   registrationDeadline: string;
   isActive: boolean;
+  ageRanges?: string[];
 }
 
 interface EventSelectionProps {
@@ -23,9 +24,24 @@ interface EventSelectionProps {
   userProfile?: any;
 }
 
+function normRange(v?: string) {
+  return (v ?? "")
+    .toString()
+    .replace(/[–—]/g, "-")
+    .trim()
+    .toLowerCase();
+}
+
+function hasRange(eventRanges: string[] | undefined, wanted: string) {
+  if (!Array.isArray(eventRanges) || eventRanges.length === 0) return true;
+  const w = normRange(wanted);
+  return eventRanges.some((r) => normRange(r) === w);
+}
+
 function mapApiEvent(e: ApiEvent): Event {
   const startDate = e.startDate || new Date().toISOString();
   const endDate = e.endDate || startDate;
+
   return {
     id: e.eventId,
     name: e.eventName,
@@ -33,6 +49,7 @@ function mapApiEvent(e: ApiEvent): Event {
     endDate,
     registrationDeadline: e.registrationCloseAt || endDate,
     isActive: (e.eventStatus || "ACTIVE").toUpperCase() === "ACTIVE",
+    ageRanges: Array.isArray((e as any).ageRanges) ? (e as any).ageRanges : undefined,
   };
 }
 
@@ -51,8 +68,19 @@ export function EventSelection({
   const loadEvents = async () => {
     setLoading(true);
     setLoadError("");
+
     try {
-      const apiEvents = await listActiveEvents();
+      const userRange = (userProfile?.ageRange ?? "")
+        .toString()
+        .replace(/[–—]/g, "-")
+        .trim();
+
+      const isYAT = !!userProfile?.isYAT;
+      const shouldFetchTeens =
+        userRange === "13-19" || (userRange === "20-22" && isYAT);
+
+      const apiEvents = await listActiveEvents({ teens: shouldFetchTeens });
+
       const mapped = (apiEvents || []).map(mapApiEvent);
       setEvents(mapped);
       setIsEmpty(mapped.length === 0);
@@ -67,24 +95,29 @@ export function EventSelection({
 
   useEffect(() => {
     void loadEvents();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.ageRange]);
 
-  // Filter events based on user's age range and YAT preference
-  const isYATEligible =
-    userProfile?.ageRange === "13-19" ||
-    (userProfile?.ageRange === "20-22" && userProfile?.isYAT);
+  const userRange = normRange(userProfile?.ageRange);
+  const isYAT = !!userProfile?.isYAT;
 
-  const filteredEvents = isYATEligible
-    ? events.filter((event) => event.name.toLowerCase().includes("yat"))
-    : events.filter((event) => !event.name.toLowerCase().includes("yat"));
+  const filteredEvents = events.filter((ev) => {
+    if (userRange === "13-19") return hasRange(ev.ageRanges, "13-19");
+
+    if (userRange === "20-22") {
+      return isYAT
+        ? hasRange(ev.ageRanges, "13-19")
+        : hasRange(ev.ageRanges, "20-22");
+    }
+
+    return true;
+  });
 
   return (
     <div className="w-full pt-8 lg:pt-37.5 px-4 lg:pr-8 lg:pb-8 lg:pl-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 lg:mb-8">
-          <h1 className="text-2xl lg:text-3xl mb-2 text-center">
-            Select Event
-          </h1>
+          <h1 className="text-2xl lg:text-3xl mb-2 text-center">Select Event</h1>
           <p className="text-gray-600 text-sm text-center">
             Choose the SMFLX event you would like to attend
           </p>
@@ -120,12 +153,9 @@ export function EventSelection({
 
         {!loading && !loadError && isEmpty && (
           <div className="mb-6 p-6 rounded-2xl border border-gray-200 bg-gray-50 text-center">
-            <div className="text-base text-gray-900 mb-1">
-              No events available
-            </div>
+            <div className="text-base text-gray-900 mb-1">No events available</div>
             <div className="text-sm text-gray-600 mb-4">
-              There are currently no events open for registration. Please check
-              back later.
+              There are currently no events open for registration. Please check back later.
             </div>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
@@ -150,12 +180,9 @@ export function EventSelection({
 
         {!loading && !loadError && !isEmpty && filteredEvents.length === 0 && (
           <div className="mb-6 p-6 rounded-2xl border border-gray-200 bg-white text-center">
-            <div className="text-base text-gray-900 mb-1">
-              No matching events
-            </div>
+            <div className="text-base text-gray-900 mb-1">No matching events</div>
             <div className="text-sm text-gray-600 mb-4">
-              Based on your profile, there are no events available right now.
-              You can refresh to try again.
+              Based on your profile, there are no events available right now. You can refresh to try again.
             </div>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
@@ -184,17 +211,15 @@ export function EventSelection({
               key={event.id}
               className={`p-6 rounded-2xl border-2 transition-all duration-300 ${
                 event.isActive
-                  ? "border-gray-300 bg-gradient-to-br from-white to-gray-50 shadow-sm hover:shadow-md"
-                  : "border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 opacity-60"
+                  ? "border-gray-300 bg-linear-to-br from-white to-gray-50 shadow-sm hover:shadow-md"
+                  : "border-gray-200 bg-linear-to-br from-gray-50 to-gray-100 opacity-60"
               }`}
             >
               <div className="flex items-start justify-between mb-4">
                 <h3 className="text-xl">{event.name}</h3>
                 <span
                   className={`px-3 py-1 rounded-full text-xs ${
-                    event.isActive
-                      ? "bg-green-600 text-white"
-                      : "bg-gray-300 text-gray-700"
+                    event.isActive ? "bg-green-600 text-white" : "bg-gray-300 text-gray-700"
                   }`}
                 >
                   {event.isActive ? "Active" : "Inactive"}
@@ -218,18 +243,16 @@ export function EventSelection({
                     })}
                   </span>
                 </div>
+
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Clock className="w-4 h-4" />
                   <span>
                     Registration closes:{" "}
-                    {new Date(event.registrationDeadline).toLocaleDateString(
-                      "en-US",
-                      {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      },
-                    )}
+                    {new Date(event.registrationDeadline).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
                   </span>
                 </div>
               </div>

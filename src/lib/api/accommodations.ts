@@ -46,8 +46,6 @@ export type GetAccommodationsResponse = {
   };
 };
 
-// Newer facility schema (from the current swagger) is much flatter and does not include
-// room/bed-space breakdown for users.
 type AccommodationCategory = { id: string; name: string };
 type AccommodationFacilityRecord = {
   id?: string;
@@ -98,12 +96,16 @@ export type BookAccommodationResponse = {
 export async function getAccommodations(params: {
   eventId: string;
   type: 'HOSTEL' | 'HOTEL';
+  gender?: 'MALE' | 'FEMALE';
+  age?: string;
 }): Promise<GetAccommodationsResponse> {
 
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
 
   try {
+    console.log(`🏨 Fetching ${params.type} accommodations...`);
+    
     const categoriesResp = await apiRequest<any>('/accommodation/categories', { method: 'GET' });
     const categories: AccommodationCategory[] =
       categoriesResp?.data || categoriesResp?.categories || categoriesResp || [];
@@ -115,7 +117,19 @@ export async function getAccommodations(params: {
 
     if (!match?.id) throw new Error('Accommodation categories not available');
 
-    const facilitiesResp = await apiRequest<any>(`/accommodation/facility/${match.id}`, { method: 'GET' });
+    const payload = {
+      categoryId: match.id,
+      gender: params.gender || 'MALE',  
+      age: params.age || '20-29',     
+    };
+
+    console.log(`🏨 POST /accommodation/facilities for ${params.type}:`, payload);
+    
+    const facilitiesResp = await apiRequest<any>('/accommodation/facilities', { 
+      method: 'POST',
+      body: payload
+    });
+    
     const raw: AccommodationFacilityRecord[] = facilitiesResp?.data || facilitiesResp?.facilities || facilitiesResp || [];
 
     const facilities: Facility[] = (raw || [])
@@ -136,6 +150,8 @@ export async function getAccommodations(params: {
       })
       .filter((f) => f.facilityId);
 
+    console.log(`✅ ${params.type} facilities loaded:`, facilities.length);
+
     return {
       facilities,
       metadata: {
@@ -144,16 +160,16 @@ export async function getAccommodations(params: {
         totalAvailable: facilities.reduce((sum, f) => sum + (f.availableSpaces || 0), 0),
       },
     };
-  } catch {
-    const queryParams = new URLSearchParams({
-      eventId: params.eventId,
-      type: params.type,
-    });
-
-    return apiRequest<GetAccommodationsResponse>(
-      `/accommodation?${queryParams.toString()}`,
-      { method: 'GET' }
-    );
+  } catch (error) {
+    console.error(`❌ Failed to fetch ${params.type} accommodations:`, error);
+    return {
+      facilities: [],
+      metadata: {
+        eventId: params.eventId,
+        accommodationType: params.type,
+        totalAvailable: 0,
+      },
+    };
   }
 }
 

@@ -4,7 +4,7 @@ import type { Dependent } from "./DependentsModal";
 import { useState } from 'react';
 import { X, CreditCard } from 'lucide-react';
 import { InlineAlert } from './InlineAlert';
-import { initiateDependentsPayment } from '@/lib/api';
+import { initiateDependentPayment, payForAllDependants } from '@/lib/api';
 import { toUserMessage } from '@/lib/errors';
 
 interface DependentsPaymentModalProps {
@@ -13,6 +13,7 @@ interface DependentsPaymentModalProps {
   dependents: Dependent[];
   onPaymentComplete: () => void;
   eventId?: string;
+  parentRegId?: string;
 }
 
 export function DependentsPaymentModal({
@@ -20,6 +21,7 @@ export function DependentsPaymentModal({
   onClose,
   dependents,
   eventId,
+  parentRegId,
   onPaymentComplete,
 }: DependentsPaymentModalProps) {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
@@ -37,55 +39,65 @@ export function DependentsPaymentModal({
     setPaymentProcessing(true);
 
     try {
-      const raw =
-        typeof window !== "undefined" ? localStorage.getItem("smflx_user") : null;
-      const user = raw ? JSON.parse(raw) : null;
-      const userId = user?.userId;
+      const resolvedParentRegId = parentRegId;
 
-      const resolvedEventId = eventId;
-
-      if (!userId || !resolvedEventId) {
-        throw new Error("Missing user/event context for payment checkout.");
-      }
-
-      const dependentIds = dependents
-        .map((d) => d.id)
-        .filter(Boolean) as string[];
-
-      if (!dependentIds.length || dependentIds.length !== dependents.length) {
-        throw new Error(
-          "One or more dependents are missing an ID. Please register them first and refresh."
-        );
-      }
-
-      // Initiate ONCE for all dependents (API supports multiple dependentIds)
-      const resp = await initiateDependentsPayment({
-        userId,
-        eventId: resolvedEventId,
-        dependentIds,
-        amount: totalAmount,
-        currency: "NGN",
-        metadata: {
-          reason: "dependents_registration",
-          dependentCount: dependents.length,
-        },
+      console.log("💳 Starting dependent payment:", {
+        parentRegId: resolvedParentRegId,
+        dependents: dependents.map(d => ({ id: d.id, name: d.name })),
+        totalAmount
       });
 
-      const checkoutUrl = resp?.checkoutUrl;
+      if (!resolvedParentRegId) {
+        console.error("❌ Missing parentRegId for payment!");
+        throw new Error("Missing parentRegId (owner regId). Please refresh your dashboard and try again.");
+      }
+
+      const isPayingForAll = dependents.length > 1;
+      let resp: any = null;
+      let dependentId: string | null = null;
+
+      if (isPayingForAll) {
+        resp = await payForAllDependants({
+          parentRegId: resolvedParentRegId,
+          eventId,
+        });
+      } else {
+        dependentId = dependents?.[0]?.id ?? null;
+
+        if (!dependentId) {
+          throw new Error("Missing dependent ID. Please refresh and try again.");
+        }
+
+        resp = await initiateDependentPayment({
+          dependantId: dependentId,
+          parentRegId: resolvedParentRegId,
+        });
+      }
+
+      console.log("🟢 Payment API response:", resp);
+
+      const checkoutUrl =
+        resp?.checkoutUrl ||
+        resp?.data?.checkoutUrl ||
+        resp?.paymentUrl ||
+        resp?.data?.paymentUrl;
+
       if (!checkoutUrl) {
+        console.error("❌ No checkout URL in response:", resp);
         throw new Error(
           "Payment initiation succeeded but checkoutUrl was not returned."
         );
       }
 
-      // Persist context (so dashboard can resume nicely after returning)
+      console.log("✅ Redirecting to checkout:", checkoutUrl);
+
       try {
         localStorage.setItem(
           "smflx_pending_payment_ctx",
           JSON.stringify({
             type: "dependents",
-            dependentIds,
-            amount: totalAmount,
+            parentRegId: resolvedParentRegId,
+            dependentId: dependentId || undefined,
             startedAt: new Date().toISOString(),
           })
         );
@@ -95,6 +107,7 @@ export function DependentsPaymentModal({
 
       window.location.href = checkoutUrl;
     } catch (err: unknown) {
+      console.error("❌ Payment error:", err);
       setError(toUserMessage(err, { feature: "payment", action: "init" }));
     } finally {
       setPaymentProcessing(false);
@@ -123,7 +136,7 @@ export function DependentsPaymentModal({
           <button
             onClick={onClose}
             disabled={paymentProcessing}
-            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-60"
+            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors shrink-0 disabled:opacity-60"
           >
             <X className="w-5 h-5 text-gray-600" />
           </button>

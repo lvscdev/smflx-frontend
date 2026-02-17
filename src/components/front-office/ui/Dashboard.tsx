@@ -14,9 +14,10 @@ import { DependentsPaymentModal } from "./DependentsPaymentModal";
 import { DependentsSection } from "./DependentsSection";
 import { DependentRegistrationSuccess } from "./DependentRegistrationSuccess";
 import { UserProfile as UserProfileView } from "./UserProfile";
-import { getUserDashboard, addDependent as apiAddDependent, removeDependent as apiRemoveDependent, getAccommodations } from "@/lib/api";
+import { getUserDashboard, addDependent as apiAddDependent, addDependants as apiAddDependants, removeDependent as apiRemoveDependent, getAccommodations } from "@/lib/api";
 import { toUserMessage } from "@/lib/errors";
 import type { NormalizedDashboardResponse, UserProfile, DashboardRegistration, DashboardAccommodation, DashboardDependent } from "@/lib/api/dashboardTypes";
+import { listAccommodationCategories } from "@/lib/api/accommodation";
 
 const eventBgImage = "/assets/images/event-bg.png";
 const badgeImage = "/assets/images/badge.png";
@@ -27,25 +28,25 @@ const getEventId = (registration: unknown): string | undefined => {
 
   const reg = registration as Record<string, unknown>;
 
-  // Common shapes
   if ("eventId" in reg && reg.eventId != null) return String(reg.eventId);
-  if ("eventID" in reg && (reg as any).eventID != null) return String((reg as any).eventID);
-  if ("event_id" in reg && (reg as any).event_id != null) return String((reg as any).event_id);
 
-  // Some APIs return { event: { id / eventId } }
   const evt = reg.event;
   if (typeof evt === "object" && evt !== null) {
     const e = evt as Record<string, unknown>;
     if ("eventId" in e && e.eventId != null) return String(e.eventId);
-    if ("id" in e && e.id != null) return String(e.id);
-    if ("eventID" in e && (e as any).eventID != null) return String((e as any).eventID);
   }
 
-  // Some payloads return { id: <registrationId>, eventId: ... } – already handled above.
   return undefined;
 };
 
-type Dependent = DashboardDependent;
+type Dependent = {
+  id: string;
+  name: string;
+  age: string;
+  gender: string;
+  isRegistered: boolean;
+  isPaid: boolean;
+};
 
 const toDependent = (d: DashboardDependent): Dependent => {
   const rec = d as unknown as Record<string, unknown>;
@@ -68,14 +69,16 @@ const toDependent = (d: DashboardDependent): Dependent => {
 
   const name = rawName.trim() ? rawName.trim() : "Dependent";
 
-  const ageVal = rec.age;
+  const ageVal = rec.age ?? rec.dependantAge ?? rec.dependentAge;
   const age =
     typeof ageVal === "number" ? String(ageVal) :
     typeof ageVal === "string" ? ageVal.trim() :
     "";
 
-  const gender = typeof rec.gender === "string" ? rec.gender : "";
-  const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : false;
+  const genderVal = rec.gender ?? rec.dependantGender ?? rec.dependentGender;
+  const gender = typeof genderVal === "string" ? genderVal : "";
+  
+  const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : true; // Assume registered if from API
 
   const isPaid =
     typeof rec.isPaid === "boolean" ? rec.isPaid :
@@ -84,6 +87,30 @@ const toDependent = (d: DashboardDependent): Dependent => {
   return { id, name, age, gender, isRegistered, isPaid };
 };
 
+const getRegId = (registration: unknown): string | undefined => {
+  if (typeof registration !== "object" || registration === null) return undefined;
+
+  const reg = registration as Record<string, unknown>;
+
+  // Most common on dashboard payload
+  if ("regId" in reg && reg.regId != null) return String(reg.regId);
+
+  // Some backends might use id / registrationId
+  if ("registrationId" in reg && reg.registrationId != null) return String(reg.registrationId);
+  if ("id" in reg && reg.id != null) return String(reg.id);
+
+  return undefined;
+};
+
+const getOwnerRegId = (profile: unknown): string | undefined => {
+  if (typeof profile !== "object" || profile === null) return undefined;
+  const p = profile as Record<string, unknown>;
+
+  if ("regId" in p && p.regId != null) return String(p.regId);
+  if ("registrationId" in p && p.registrationId != null) return String(p.registrationId);
+
+  return undefined;
+};
 
 function normalizeAttendeeType(reg: any): "camper" | "physical" | "online" | undefined {
   const raw = reg?.attendeeType ?? reg?.attendanceType ?? reg?.participationMode;
@@ -117,6 +144,7 @@ interface DashboardProps {
   registration: DashboardRegistration | null;
   accommodation: DashboardAccommodation | null;
   activeEventId?: string | null;
+  ownerRegId?: string | null;
   onLogout: () => void;
   onAccommodationUpdate?: (data: DashboardAccommodation | null) => void;
   onRegistrationUpdate?: (data: DashboardRegistration | null) => void;
@@ -129,12 +157,82 @@ export function Dashboard({
   registration,
   accommodation,
   activeEventId,
-
+  ownerRegId,
   onLogout,
   onAccommodationUpdate,
   onRegistrationUpdate,
   onProfileUpdate,
 }: DashboardProps) {
+
+  const resolvedEventId = (() => {
+    if (activeEventId) return activeEventId;
+
+    if (registration?.eventId) return registration.eventId;
+
+    try {
+      const flowRaw =
+        localStorage.getItem("smflx_flow_state_v1") ||
+        localStorage.getItem("smflx_flow_state") ||
+        localStorage.getItem("flowState");
+
+      if (flowRaw) {
+        const flow = JSON.parse(flowRaw);
+        const fromFlow =
+          flow?.selectedEvent?.eventId ||
+          flow?.event?.eventId ||
+          flow?.eventId;
+
+        if (fromFlow) return fromFlow;
+      }
+    } catch {
+      // ignore corrupted storage
+    }
+
+    // Legacy fallback
+    try {
+      const legacy = localStorage.getItem("smflx_selected_event");
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (parsed?.eventId) return parsed.eventId;
+      }
+    } catch {
+      // ignore
+    }
+
+    return undefined;
+  })();
+
+  const resolvedRegId = (() => {
+    // Priority 1: ownerRegId prop (passed from dashboard page, extracted from /registrations/my-registrations)
+    if (ownerRegId) return ownerRegId;
+    
+    // Priority 2: Get from registration object
+    const regIdFromRegistration = getRegId(registration);
+    if (regIdFromRegistration) return regIdFromRegistration;
+    
+    // Priority 3: Check profile for regId field 
+    const p: any = profile as any;
+    if (p?.regId) return String(p.regId);
+    
+    return undefined;
+  })();
+
+  const badgeHref = (() => {
+    const p: any = profile as any;
+    const firstName = (p?.firstName ?? p?.firstname ?? "").toString().trim();
+    const lastName = (p?.lastName ?? p?.lastname ?? "").toString().trim();
+
+    const qs = new URLSearchParams();
+    if (firstName) qs.set("firstName", firstName);
+    if (lastName) qs.set("lastName", lastName);
+
+    const suffix = qs.toString();
+    return suffix
+      ? `https://livelybadge.vercel.app/badge?${suffix}`
+      : "https://livelybadge.vercel.app/badge";
+  })();
+
+
 // Avatar dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -155,7 +253,7 @@ export function Dashboard({
     setDashboardLoadError(null);
 
     // Resolve eventId (registration → flow state → legacy)
-    const resolvedEventIdLocal: string | undefined = (() => {
+    const resolvedEventId: string | undefined = (() => {
       if (registration?.eventId) return registration.eventId;
       if (typeof window === "undefined") return undefined;
 
@@ -199,7 +297,7 @@ export function Dashboard({
       return undefined;
     })();
 
-    if (!resolvedEventIdLocal) {
+    if (!resolvedEventId) {
       setDashboardLoadError(
         "We couldn’t determine the active event. Please refresh or reselect your event."
       );
@@ -208,27 +306,31 @@ export function Dashboard({
     }
 
     try {
-      const data = await getUserDashboard(resolvedEventIdLocal);
+      const data = await getUserDashboard(resolvedEventId);
 
-      // Dependents (already normalized by API)
       const nextDependents: ModalDependent[] = data.dependents.map((d: DashboardDependent) => {
         const id = (typeof d.id === "string" && d.id) ? d.id :
                    (typeof d.dependantId === "string" && d.dependantId) ? d.dependantId :
+                   (typeof d.dependentId === "string" && d.dependentId) ? d.dependentId :
                    crypto.randomUUID();
+        
+        const ageRaw = d.age ?? (d as any).dependantAge ?? (d as any).dependentAge;
         const ageNum =
-          typeof d.age === "number" ? d.age :
-          typeof d.age === "string" ? Number(d.age) :
+          typeof ageRaw === "number" ? ageRaw :
+          typeof ageRaw === "string" ? Number(ageRaw) :
           undefined;
 
-        const gender =
-          typeof d.gender === "string" ? d.gender : "";
+        const genderRaw = d.gender ?? (d as any).dependantGender ?? (d as any).dependentGender;
+        const gender = typeof genderRaw === "string" ? genderRaw : "";
+        
+        const nameRaw = d.name ?? (d as any).dependantName ?? (d as any).dependentName;
 
         return {
           id,
-          name: typeof d.name === "string" && d.name.trim() ? d.name.trim() : "Dependent",
+          name: typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : "Dependent",
           age: Number.isFinite(ageNum as number) ? String(ageNum as number) : "",
           gender,
-          isRegistered: typeof d.isRegistered === "boolean" ? d.isRegistered : false,
+          isRegistered: typeof d.isRegistered === "boolean" ? d.isRegistered : true, // Assume registered if from API
           isPaid: typeof d.isPaid === "boolean" ? d.isPaid : (d.paymentStatus === "PAID"),
         };
       });
@@ -264,61 +366,15 @@ export function Dashboard({
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
-
-  // Prefer the dashboard page’s activeEventId when available (returning users may have registration without eventId).
-  const resolvedEventId = useMemo(() => {
-    const fromProp = activeEventId ? String(activeEventId).trim() : "";
-    if (fromProp) return fromProp;
-
-    const fromReg = getEventId(registration);
-    if (fromReg && String(fromReg).trim()) return String(fromReg).trim();
-
-    // Fallback: some accommodation payloads carry eventId
-    const accAny = accommodation as any;
-    const fromAcc =
-      accAny?.eventId ??
-      accAny?.eventID ??
-      accAny?.event_id ??
-      accAny?.event?.eventId ??
-      accAny?.event?.id;
-    if (fromAcc && String(fromAcc).trim()) return String(fromAcc).trim();
-
-    // Last-ditch fallback: try persisted flow state (useful when returning users land here without registration.eventId yet)
-    if (typeof window !== "undefined") {
-      try {
-        const flowRaw =
-          localStorage.getItem("smflx_flow_state_v1") ||
-          localStorage.getItem("smflx_flow_state") ||
-          localStorage.getItem("flowState");
-        if (flowRaw) {
-          const flow = JSON.parse(flowRaw);
-          const fromFlow =
-            flow?.activeEventId ??
-            flow?.selectedEvent?.eventId ??
-            flow?.selectedEvent?.id ??
-            flow?.registration?.eventId ??
-            flow?.registration?.event?.eventId ??
-            flow?.registration?.event?.id;
-          if (fromFlow && String(fromFlow).trim()) return String(fromFlow).trim();
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    return "";
-  }, [activeEventId, registration, accommodation]);
-
 // Accommodation modal state
-  const [isAccommodationModalOpen, setIsAccommodationModalOpen] =
-    useState(false);
-  const [modalStep, setModalStep] = useState(1); // 1: Type selection, 2: Facility selection, 3: Payment
-  const [selectedAccommodationType, setSelectedAccommodationType] =
-    useState("");
+  const [isAccommodationModalOpen, setIsAccommodationModalOpen] = useState(false);
+  const [modalStep, setModalStep] = useState(1);
+  const [selectedAccommodationType, setSelectedAccommodationType] = useState("");
+  const [accommodationCategories, setAccommodationCategories] = useState<
+    Array<{ categoryId: string; name: string; type: string }> 
+    >([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
-  // Availability summary (best-effort) for the accommodation type picker.
-  // Note: the current API docs expose facility `totalCapacity` + `available` but do not expose
-  // real-time remaining spaces/rooms, so we avoid showing misleading "X left" numbers.
   const [availabilitySummary, setAvailabilitySummary] = useState<{
     loading: boolean;
     hostel?: { availableFacilities: number; totalCapacity: number };
@@ -327,7 +383,7 @@ export function Dashboard({
   }>({ loading: false, error: null });
 
   useEffect(() => {
-    const eventId = resolvedEventId;
+    const eventId = registration?.eventId;
     if (!isAccommodationModalOpen || modalStep !== 1 || !eventId) return;
 
     let cancelled = false;
@@ -390,7 +446,51 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [isAccommodationModalOpen, modalStep, resolvedEventId]);
+  }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
+
+      // Fetch accommodation categories when modal opens
+    useEffect(() => {
+      const eventId = registration?.eventId;
+      if (!isAccommodationModalOpen || !eventId) return;
+
+      let cancelled = false;
+      
+      (async () => {
+        setLoadingCategories(true);
+        try {
+          const categories = await listAccommodationCategories({ eventId });
+          
+          if (cancelled) return;
+          
+          // Map categories to include type information
+          const mappedCategories = categories.map(cat => {
+            // Determine type from category name
+            const nameLower = cat.name.toLowerCase();
+            const type = nameLower.includes('hotel') ? 'hotel' : 'hostel';
+            
+            return {
+              categoryId: cat.categoryId,
+              name: cat.name,
+              type,
+            };
+          });
+          
+          setAccommodationCategories(mappedCategories);
+        } catch (error) {
+          console.error('Failed to load accommodation categories:', error);
+          toast.error('Failed to load accommodation options');
+        } finally {
+          if (!cancelled) {
+            setLoadingCategories(false);
+          }
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [isAccommodationModalOpen, registration?.eventId]);
+
 
   // Dependents state
   type Dependent = {
@@ -487,18 +587,50 @@ type AccommodationData = Parameters<
     };
   }, [isDropdownOpen]);
 
+  // Load dependents on mount and when event changes
+  useEffect(() => {
+    let cancelled = false;
+    
+    const loadInitialDependents = async () => {
+      const eventId = activeEventId ?? resolvedEventId;
+      if (!eventId) return;
+
+      try {
+        const data = await getUserDashboard(eventId);
+        if (!cancelled) {
+          const deps = (data.dependents || []).map((d) => toDependent(d));
+          setDependents(deps);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load dependents:", err);
+        }
+      }
+    };
+
+    void loadInitialDependents();
+    
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEventId]); // Only depend on activeEventId, not resolvedEventId
+
   const firstName =
     (localProfile?.firstName ?? "User");
 
   const attendeeType = normalizeAttendeeType(registration);
   const attendeeTypeNorm = (typeof attendeeType === "string" ? attendeeType.toLowerCase() : "");
-  const isCamper = attendeeTypeNorm === "" || attendeeTypeNorm === "camper";
-  // Memoize to avoid creating a new object every render (which would retrigger effects).
   const normalizedAccommodation = useMemo(
     () => normalizeAccommodation(accommodation),
     [accommodation],
   );
-  
+
+  // Camper inference:
+  // - Primary source: registration attendeeType/participationMode
+  // - Fallback: if accommodation exists, user is effectively a camper (only campers get accommodation payloads)
+  const isCamper = attendeeTypeNorm === "camper" || (!!normalizedAccommodation && attendeeTypeNorm !== "online" && attendeeTypeNorm !== "physical");
+
   const accAny = normalizedAccommodation as any;
 
   const accommodationFacilityName: string =
@@ -524,8 +656,8 @@ type AccommodationData = Parameters<
     (accAny?.accommodationImageUrl as string) ||
     (accAny?.imageUrl as string) ||
     "";
-const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online";
-  // Camper accommodation payment state (from dashboard API)
+  const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online";
+  const isUnknownAttendeeType = !attendeeTypeNorm;
   const paidForAccommodation = normalizedAccommodation?.paidForAccommodation === true;
 
   // Camper: when accommodation payment is pending, the space is held for 1 hour.
@@ -725,18 +857,19 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         // Save selection snapshot for UI, then close modal.
         const snapshot: DashboardAccommodation = {
           accommodationType: data.type,
-
-          // AccommodationData uses IDs in this zip
           facility: data.facilityId ?? "",
           room: data.roomId ?? "",
           bedspace: data.bedSpaceId ?? "",
-
-          // keep stable UI flags (actual "paid" flips after verification/poll)
           requiresAccommodation: true,
           paidForAccommodation: false,
         };
 
         onAccommodationUpdate?.(snapshot);
+        // If user was Physical/Online, update their attendee type to Camper
+        if (isNonCamper) {
+          console.log('User upgraded from Physical/Online to Camper by booking accommodation');
+        }
+
         resetModal();
       };
 
@@ -767,27 +900,64 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
         // Stage 2: persist newly added dependents (no demo fallbacks)
         try {
-          const eventId = resolvedEventId || getEventId(registration);
-          if (!eventId) {
+          const eventId = activeEventId ?? resolvedEventId;
+          const regId = resolvedRegId;
+        if (!eventId) {
             throw new Error("Missing eventId: cannot save dependents.");
+          }
+          if (!regId) {
+            console.error("❌ Missing regId. Available data:", {
+              ownerRegId,
+              registration,
+              profile,
+              resolvedRegId
+            });
+            throw new Error(
+              "Missing registration ID (regId). This is different from your user ID. " +
+              "Please ensure you have completed event registration first. " +
+              "If you see this error, try refreshing the page or contact support."
+            );
           }
 
           const prevIds = new Set(prev.map((d) => d.id));
           const toCreate = updatedDependents.filter((d) => !prevIds.has(d.id));
 
-          for (const d of toCreate) {
-            const gender = (d?.gender || "male").toString().toUpperCase();
-            const normalizedGender = gender === "FEMALE" ? "FEMALE" : "MALE";
-            await apiAddDependent({
+          const payloads = toCreate.map((d) => {
+            const genderRaw = String(d?.gender ?? "MALE").toUpperCase();
+
+            const normalizedGender: "MALE" | "FEMALE" =
+              genderRaw === "FEMALE" ? "FEMALE" : "MALE";
+
+            return {
+              regId,
               eventId,
               name: d?.name,
               age: Number(d?.age || 0),
               gender: normalizedGender,
-            });
+            };
+          });
+
+          console.log("📤 Saving dependents:", {
+            count: payloads.length,
+            payloads,
+            eventId,
+            regId
+          });
+
+          if (payloads.length === 1) {
+            await apiAddDependent(payloads[0]);
+          } else if (payloads.length > 1) {
+            await apiAddDependants(payloads);
           }
+          
+          console.log("✅ Dependents saved successfully");
+          
+          // Reload dashboard to get fresh data
+          await reloadDashboard();
         } catch (err: unknown) {
           // revert optimistic update and surface error
           setDependents(prev);
+          console.error("❌ Failed to save dependents:", err);
           setDashboardLoadError(
             getErrorMessage(err, "Failed to save dependents. Please try again."),
           );
@@ -849,12 +1019,17 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
       setDependents(updatedDependents);
 
       try {
-        const eventId = resolvedEventId || getEventId(registration);
+        const eventId = activeEventId ?? resolvedEventId;
+        const regId = resolvedRegId;
         if (!eventId) {
           throw new Error("Missing eventId");
         }
+        if (!regId) {
+          throw new Error("Missing regId");
+        }
 
         await apiAddDependent({
+          regId,
           eventId,
           name: dependent.name,
           age: Number(dependent.age) || 0,
@@ -882,7 +1057,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
       const handleRegisterAndPayDependents = (selected: ModalDependent[]) => {
         setSelectedDependentsForPayment(selected);
-        // mark them registered before payment
         const updatedDependents = dependents.map((d) =>
           selected.find((sd) => sd.id === d.id)
             ? { ...d, isRegistered: true }
@@ -1016,12 +1190,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           onManageDependents={() => setIsDependentsModalOpen(true)}
         />
 
-        <DependentsSection
-          dependents={dependents}
-          onRegister={handleRegisterDependent}
-          onPay={handlePayForDependents}
-        />
-
         
         {/* Top grid */}
         <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
@@ -1084,10 +1252,10 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
                 <div className="flex items-center gap-2">
                   <span className="text-base font-medium">
-                    {isCamper && "Camper"}
+                    {attendeeType === "camper" && "Camper"}
                     {attendeeType === "physical" && "Physical Attendance"}
                     {attendeeType === "online" && "Online Participant"}
-                    {!attendeeType && "Camper"}
+                    {!attendeeType && "Registered"}
                   </span>
                   <Tent className="w-5 h-5 text-gray-700" />
                 </div>
@@ -1105,9 +1273,14 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
             </div>
 
             <div className="flex items-center gap-3">
-              <button className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
+              <a
+                href={badgeHref}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors inline-flex items-center justify-center"
+              >
                 Download Badge
-              </button>
+              </a>
               <button className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">
                 Meal Ticket
               </button>
@@ -1206,6 +1379,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                       </div>
                     </div>
                   )}
+
+
                 </div>
 
                 <div className="flex gap-2">
@@ -1226,11 +1401,19 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   {!paidForAccommodation && (
                     <button
                       onClick={() => {
-                        const rawType = String((accommodation as any)?.accommodationType ?? (accommodation as any)?.type ?? "").toLowerCase();
-                        const nextType = rawType.includes("hotel") ? "hotel" : "hostel";
-                        setSelectedAccommodationType(nextType);
                         setIsAccommodationModalOpen(true);
-                        setModalStep(2);
+
+                        if (!localProfile?.ageRange) {
+                          toast.error("Please update your Age Range in your profile before booking accommodation.");
+                          return;
+                        }
+                        if (!localProfile?.gender) {
+                          toast.error("Please update your Gender in your profile before booking accommodation.");
+                          return;
+                        }
+                        setIsAccommodationModalOpen(true);
+
+                        setModalStep(1);
                       }}
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
                     >
@@ -1258,6 +1441,12 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 </div>
   )
 )}
+
+        <DependentsSection
+          dependents={dependents}
+          onRegister={handleRegisterDependent}
+          onPay={handlePayForDependents}
+        />
 
         {/* Non-camper upgrade CTA (re-using your existing promo card) */}
         {showAccommodationPromo && (
@@ -1322,7 +1511,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
             <div className="bg-linear-to-br from-amber-900 via-orange-900 to-red-900 rounded-2xl p-6 text-white cursor-pointer hover:opacity-90 transition-opacity min-h-30 flex items-end">
               <div>
                 <h4 className="font-semibold text-lg">WOTH 2025 Teens</h4>
-                <p className="text-base opacity-90">an YA Messages</p>
+                <p className="text-base opacity-90">and YA Messages</p>
               </div>
             </div>
 
@@ -1348,7 +1537,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
             <div className="grid grid-cols-2 gap-3">
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/wothsmflx/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-blue-600 to-blue-700 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1360,7 +1549,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://instagram.com"
+                href="https://www.instagram.com/smflxofficial"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-pink-600 via-purple-600 to-orange-500 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1372,7 +1561,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://x.com"
+                href="https://x.com/smflxofficial"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-gray-800 to-black rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1384,7 +1573,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://youtube.com"
+                href="https://youtube.com/@smflxofficial"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-red-600 to-red-700 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1408,7 +1597,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
             <div className="grid grid-cols-2 gap-3">
               <a
-                href="https://mixlr.com"
+                href="https://wothsmflx.mixlr.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-orange-500 to-orange-600 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1420,7 +1609,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://youtube.com"
+                href="https://youtube.com/@smflxofficial"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-red-600 to-red-700 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1432,7 +1621,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://waystream.com"
+                href="https://app.waystream.io/wothsmflx"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-teal-600 to-cyan-600 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1444,7 +1633,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </a>
 
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/wothsmflx/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-4 bg-linear-to-br from-blue-600 to-blue-700 rounded-xl hover:shadow-lg transition-all group cursor-pointer"
@@ -1458,6 +1647,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           </div>
         </div>
       </div>
+
 
       {/* Accommodation Modal */}
       {isAccommodationModalOpen && (
@@ -1532,7 +1722,15 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               )}
 
               {modalStep === 2 && (() => {
-                const eventId = resolvedEventId;
+                const eventId =
+                  registration?.eventId ??
+                  (registration?.event &&
+                  typeof registration.event === "object" &&
+                  "eventId" in registration.event
+                    ? String(
+                        (registration.event as { eventId?: unknown }).eventId || ""
+                      )
+                    : "");
 
                 if (!eventId) {
                   return (
@@ -1542,10 +1740,36 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   );
                 }
 
+                // Find the categoryId for the selected accommodation type
+                const matchingCategory = accommodationCategories.find(
+                  cat => cat.type === selectedAccommodationType
+                );
+
+                if (loadingCategories) {
+                  return (
+                    <div className="p-8 text-center">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-600">Loading accommodation options...</p>
+                    </div>
+                  );
+                }
+
+                if (!matchingCategory) {
+                  return (
+                    <div className="p-4 rounded-lg border border-red-200 bg-red-50 text-red-900">
+                      <p className="font-semibold mb-2">Accommodation category not found</p>
+                      <p className="text-sm">
+                        Unable to find {selectedAccommodationType} accommodations for this event.
+                        Please go back and try again, or contact support if the issue persists.
+                      </p>
+                    </div>
+                  );
+                }
+
                 return (
                   <AccommodationSelection
-                    categoryId=""
-                    accommodationType={selectedAccommodationType || (String((accommodation as any)?.accommodationType ?? "").toLowerCase().includes("hotel") ? "hotel" : "hostel")}
+                    categoryId={matchingCategory.categoryId} 
+                    accommodationType={selectedAccommodationType}
                     eventId={eventId}
                     registrationId={
                       typeof registration?.id === "string"
@@ -1558,6 +1782,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                               ? String(registration.registrationId)
                               : undefined
                     }
+                    userId={profile?.userId}
                     profile={localProfile}
                     onComplete={handleAccommodationComplete}
                     onBack={handleModalBack}
@@ -1584,7 +1809,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         isOpen={isDependentsPaymentModalOpen}
         onClose={() => setIsDependentsPaymentModalOpen(false)}
         dependents={selectedDependentsForPayment}
-        eventId={resolvedEventId}
+        eventId={getEventId(registration)}
+        parentRegId={resolvedRegId}
         onPaymentComplete={handleDependentsPaymentComplete}
       />
 

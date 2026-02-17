@@ -40,14 +40,33 @@ export default function SelectEventPage() {
 
       try {
         const regs = await listMyRegistrations();
-        const list = (Array.isArray(regs) ? regs : []).map((r: any) => ({
-          eventId: r?.eventId || r?.event?.eventId || r?.event || "",
-          eventName: r?.eventName || r?.event?.eventName || r?.eventTitle || r?.event?.title || undefined,
-        })).filter((x) => !!x.eventId);
+        type EventItem = { eventId: string; eventName?: string };
+        const list: EventItem[] = (Array.isArray(regs) ? regs : [])
+          .map((r: any): EventItem | null => {
+            const rawEventId = r?.eventId ?? r?.event?.eventId ?? r?.event ?? "";
+            const eventId = typeof rawEventId === "string" ? rawEventId : String(rawEventId || "");
+            if (!eventId) return null;
+
+            // HARD GUARD: if attendee type is missing for this registration, user cannot proceed.
+            const attendanceRaw =
+              r?.attendeeType ?? r?.attendanceType ?? r?.participationMode ?? r?.participation ?? "";
+            if (!String(attendanceRaw || "").trim()) return null;
+
+            const rawName = r?.eventName ?? r?.event?.eventName ?? r?.eventTitle ?? r?.event?.title;
+            const eventName = typeof rawName === "string" && rawName.trim() ? rawName : undefined;
+
+            return { eventId, eventName };
+          })
+          .filter((x): x is EventItem => x !== null);
 
         if (cancelled) return;
 
-        // If only one event, auto-select and continue.
+        if (list.length === 0) {
+          setError("Registration incomplete: missing attendee type. Please login again to complete registration.");
+          router.replace("/register?view=login");
+          return;
+        }
+
         if (list.length === 1) {
           const eventId = list[0].eventId;
           setActiveEventCookie(eventId);

@@ -5,28 +5,9 @@ import { validateEventRegistration } from "@/lib/validation/eventRegistration";
 import { toUserMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  MapPin,
-  Wifi,
-  ArrowLeft,
-  Tent,
-  Users,
-  Monitor,
-  Building2,
-  Home,
-  Check,
-  Radio,
-  Youtube,
-  Facebook,
-} from "lucide-react";
-import { listAccomodationCategories } from "@/lib/api/accommodation";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MapPin, Wifi, ArrowLeft, Tent, Users, Monitor, Building2, Home, Check, Radio, Youtube, Facebook } from "lucide-react";
+import { listAccommodationCategories } from "@/lib/api/accommodation";
 import { AccommodationCategories } from "@/lib/api/accommodation/types";
 
 interface RegistrationData {
@@ -134,7 +115,7 @@ export function EventRegistration({
       if (!eventId) {
           throw new Error("Missing eventId for accommodation categories");
         }
-        const data = await listAccomodationCategories({ eventId });
+        const data = await listAccommodationCategories({ eventId });
 
       setAccommodationCategories(data);
     } catch (error) {

@@ -22,8 +22,19 @@ export type PaymentProps = {
 
 
 function safeLoadFlowState(): Record<string, any> | null {
+
   try {
     const raw = localStorage.getItem(FLOW_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+
+function safeLoadPendingCtx(): Record<string, any> | null {
+  try {
+    const raw = localStorage.getItem(PENDING_CTX_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -71,7 +82,10 @@ function PaymentCallbackInner() {
         // it is now fulfilled — clear it.
         safeSaveFlowState(flow);
       }
-      clearPendingCtx();
+      const pending = safeLoadPendingCtx();
+      if (pending?.type !== "dependents") {
+        clearPendingCtx();
+      }
       setStatus("success");
 
       // Auto-navigate after a brief moment so the user sees the tick.
@@ -93,7 +107,10 @@ function PaymentCallbackInner() {
       flow.view = "dashboard";
       safeSaveFlowState(flow);
     }
-    clearPendingCtx();
+      const pending = safeLoadPendingCtx();
+      if (pending?.type !== "dependents") {
+        clearPendingCtx();
+      }
     setStatus("success"); // optimistic — webhook is the source of truth
     const timer = setTimeout(() => router.replace("/"), 1800);
     return () => clearTimeout(timer);

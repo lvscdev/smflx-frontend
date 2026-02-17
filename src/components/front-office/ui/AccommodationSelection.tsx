@@ -9,10 +9,7 @@ import { ArrowLeft, Check, AlertCircle, Loader2, MapPin } from "lucide-react";
 import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
 import { initiateHostelAllocation, initiateHotelAllocation } from "@/lib/api";
 import { ApiError } from "@/lib/api/client";
-import {
-  getAccommodationCategoryFacilities,
-  getHotelRooms,
-} from "@/lib/api/accommodation";
+import { getHotelRooms, listFacilitiesByDemographics } from "@/lib/api/accommodation";
 import { Facility, HotelRoom } from "@/lib/api/accommodation/types";
 
 
@@ -36,6 +33,34 @@ function safeSaveFlowState(state: unknown) {
     // ignore
   }
 }
+
+function normalizeAgeRange(input?: string) { const v = (input ?? "").toString().trim().replace(/[–—]/g, "-");
+
+  if (!v) return "";
+
+  const allowed = new Set(["0-12", "13-19", "20-22", "23-29", "30-39", "40+"]);
+  if (allowed.has(v)) return v;
+
+  const lower = v.toLowerCase();
+
+  if (lower.includes("40")) return "40+";
+
+  if (v === "20-29") return "23-29";
+  if (v === "20 - 29") return "23-29";
+
+  const asNum = Number(v);
+  if (!Number.isNaN(asNum) && asNum > 0) {
+    if (asNum <= 12) return "0-12";
+    if (asNum <= 19) return "13-19";
+    if (asNum <= 22) return "20-22";
+    if (asNum <= 29) return "23-29";
+    if (asNum <= 39) return "30-39";
+    return "40+";
+  }
+
+  return "";
+}
+
 interface AccommodationData {
   type: string;
   facilityId?: string;
@@ -114,21 +139,41 @@ export function AccommodationSelection({
       setLoading(true);
       setError(null);
 
-      const response = await getAccommodationCategoryFacilities({
+      const profileGenderRaw = (profile?.gender ?? "").toString().toUpperCase();
+      const profileGender = profileGenderRaw === "FEMALE" ? "FEMALE" : profileGenderRaw === "MALE" ? "MALE" : "";
+      const profileAgeRangeRaw = (profile?.ageRange ?? "").toString();
+      const profileAgeRange = normalizeAgeRange(profileAgeRangeRaw);
+
+      if (!profileGender || !profileAgeRange) {
+        setFacilities([]);
+        const missing = !profileGender && !profileAgeRange
+          ? "Gender and Age Range"
+          : !profileGender
+            ? "Gender"
+            : "Age Range";
+        setError(`Please update your profile (${missing}) to view accommodation options.`);
+        return;
+      }
+
+      const response = await listFacilitiesByDemographics({
         categoryId,
+        gender: profileGender,
+        ageRange: profileAgeRange,
       });
 
       setFacilities(response);
 
       if (!response || response.length === 0) {
-        setError("No accommodations available for this event at the moment.");
+        setError("No accommodations available for your age range/gender at the moment.");
       }
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to load accommodations. Please try again.",
-      );
+      const raw = err instanceof ApiError ? String(err.message || "") : "";
+
+      if (/secured accommodation/i.test(raw)) {
+        setError("You already have accommodation secured for this event.");
+      } else {
+        setError(err instanceof ApiError ? err.message : "Failed to load accommodations. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -138,7 +183,7 @@ export function AccommodationSelection({
     if (categoryId) {
       loadAccommodations();
     }
-  }, [categoryId]);
+  }, [categoryId, isHostel, profile?.gender, profile?.ageRange]);
 
   const loadHotelRooms = async (facilityId: string) => {
     try {
@@ -251,9 +296,12 @@ export function AccommodationSelection({
             requiresAccommodation: true,
             paidForAccommodation: false,
             accommodationType: accommodationType,
-            facility: selectedFacility?.facilityName || selectedFacility?.facilityId || "",
-            // Hotel rooms use `roomType` (not `roomTypeName`). Hostels don't select rooms/bedspaces in this UI.
-            room: selectedRoom?.roomType || selectedRoom?.roomTypeId || "",
+            facilityId: (selectedFacility as any)?.facilityId || "",
+            facilityName: (selectedFacility as any)?.facilityName || "",
+            roomTypeId: (selectedRoom as any)?.roomTypeId || "",
+            roomTypeName: (selectedRoom as any)?.roomType || "",
+            facility: (selectedFacility as any)?.facilityName || (selectedFacility as any)?.facilityId || "",
+            room: (selectedRoom as any)?.roomType || (selectedRoom as any)?.roomTypeId || "",
           };
           safeSaveFlowState({ ...saved, accommodation: snapshot });
         } catch {
@@ -273,11 +321,16 @@ export function AccommodationSelection({
 
       await onComplete(accommodationData);
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? `${err.message}: ${err?.details?.data}`
-          : "Failed to book accommodation. Please try again.",
-      );
+      const raw = err instanceof ApiError ? String(err.message || "") : "";
+
+      if (/secured accommodation/i.test(raw)) {
+        setError("You already have accommodation secured for this event.");
+      } else if (/bad request/i.test(raw) && /accommodation/i.test(raw)) {
+        setError("We couldn’t complete your accommodation request. Please try again.");
+      } else {
+        setError(err instanceof ApiError ? err.message : "Failed to book accommodation. Please try again.");
+      }
+
       setSubmitting(false);
     }
   };
@@ -329,7 +382,7 @@ export function AccommodationSelection({
           <h2 className="text-xl font-semibold">Select Facility</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {facilities &&
             facilities.length > 0 &&
             facilities.map((facility) => (
@@ -450,7 +503,7 @@ export function AccommodationSelection({
             </div>
 
             {loadingRooms ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div
                     key={i}
@@ -577,13 +630,13 @@ export function AccommodationSelection({
         <form onSubmit={handleSubmit} className="space-y-8">
           {isHostel ? renderHostelAccommodation() : renderHotelAccommodation()}
 
-          <div className="flex gap-4 sticky bottom-0 bg-white pt-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] border-t">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 sticky bottom-0 bg-white pt-4 pb-4 md:pb-[calc(env(safe-area-inset-bottom)+0.5rem)] border-t">
             <Button
               type="button"
               variant="outline"
               onClick={onBack}
               disabled={isProcessing}
-              className="flex-shrink-0"
+              className="shrink-0"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
@@ -592,7 +645,7 @@ export function AccommodationSelection({
             <Button
               type="submit"
               disabled={!isSelectionComplete || isProcessing}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               {isProcessing ? (
                 <>
@@ -609,4 +662,3 @@ export function AccommodationSelection({
     </div>
   );
 }
-

@@ -106,14 +106,16 @@ export type Event = {
   startDate?: string;
   endDate?: string;
   registrationCloseAt?: string;
+  ageRanges?: string[];
 };
 
-export async function listActiveEvents() {
-  const response = await apiRequest<any>("/events/user/active", {
+export async function listActiveEvents(options?: { teens?: boolean }) {
+  const query = options?.teens ? "?teens=true" : "";
+
+  const response = await apiRequest<any>(`/events/user/active${query}`, {
     method: "GET",
   });
-  
-  // Backend returns { data: { activeEvents: [...] } }
+
   const data = response?.data || response;
   return data?.activeEvents || [];
 }
@@ -151,7 +153,6 @@ export async function listMyRegistrations(): Promise<EventRegistration[]> {
   const response = await apiRequest<any>("/registrations/my-registrations", {
     method: "GET",
   });
-  // Backend wraps in { code, message, data }
   return response?.data || response || [];
 }
 
@@ -159,23 +160,83 @@ export async function listMyRegistrations(): Promise<EventRegistration[]> {
 
 export type AddDependentPayload = {
   eventId: string;
+  regId: string;
   name: string;
-  age: number;
+  age?: number;
   gender: "MALE" | "FEMALE";
 };
 
 export async function addDependent(payload: AddDependentPayload) {
-  const response = await apiRequest<any>("/user-dashboard/add-dependent", {
-    method: "POST",
-    body: payload,
+  const body: Record<string, any> = {
+    eventId: payload.eventId,
+    regId: payload.regId,
+    name: payload.name,
+    gender: payload.gender,
+  };
+  
+  // Only include age if it's a valid number
+  if (payload.age != null) {
+    body.age = Number(payload.age);
+  }
+  
+  console.log("🔵 API Request - addDependent:", {
+    endpoint: "/user-dashboard/add-dependant",
+    body
   });
+  
+  const response = await apiRequest<any>("/user-dashboard/add-dependant", {
+    method: "POST",
+    body,
+  });
+  
+  console.log("🟢 API Response - addDependent:", response);
+  return response?.data || response;
+}
+
+export async function addDependants(payloads: AddDependentPayload[]) {
+  const body = payloads.map((p) => {
+    const item: Record<string, any> = {
+      eventId: p.eventId,
+      regId: p.regId,
+      name: p.name,
+      gender: p.gender,
+    };
+    
+    if (p.age != null) {
+      item.age = Number(p.age);
+    }
+    
+    return item;
+  });
+  
+  console.log("🔵 API Request - addDependants:", {
+    endpoint: "/user-dashboard/add-dependants",
+    count: body.length,
+    body
+  });
+  
+  const response = await apiRequest<any>("/user-dashboard/add-dependants", {
+    method: "POST",
+    body,
+  });
+  
+  console.log("🟢 API Response - addDependants:", response);
   return response?.data || response;
 }
 
 export async function removeDependent(dependentId: string) {
-  const response = await apiRequest<any>(`/user-dashboard/remove-dependent/${dependentId}`, {
+  const endpoint = `/user-dashboard/remove-dependant/${dependentId}`;
+  console.log("🗑️ DELETE Request - removeDependent:", {
+    endpoint,
+    dependentId,
+    note: "Using British spelling: 'dependant' not 'dependent'"
+  });
+  
+  const response = await apiRequest<any>(endpoint, {
     method: "DELETE",
   });
+  
+  console.log("✅ DELETE Response - removeDependent:", response);
   return response?.data || response;
 }
 
@@ -194,12 +255,43 @@ export async function initiateDependentPayment(payload: {
   dependantId: string;
   parentRegId: string;
 }) {
+  console.log("🔵 API Request - initiateDependentPayment:", {
+    endpoint: "/user-dashboard/pay-for-dependants",
+    payload
+  });
+  
   const response = await apiRequest<any>("/user-dashboard/pay-for-dependants", {
     method: "POST",
     body: payload,
   });
   
-  // The response should contain checkoutUrl
+  console.log("🟢 API Response - initiateDependentPayment:", response);
+  
+  return response?.data || response;
+}
+
+
+export async function payForAllDependants(payload: {
+  parentRegId: string;
+  eventId?: string;
+}) {
+  const body: Record<string, any> = {
+    parentRegId: payload.parentRegId,
+  };
+
+  if (payload.eventId) body.eventId = payload.eventId;
+
+  console.log("🔵 API Request - payForAllDependants:", {
+    endpoint: "/user-dashboard/pay-for-all-dependants",
+    body,
+  });
+
+  const response = await apiRequest<any>("/user-dashboard/pay-for-all-dependants", {
+    method: "POST",
+    body,
+  });
+
+  console.log("🟢 API Response - payForAllDependants:", response);
   return response?.data || response;
 }
 
@@ -249,10 +341,7 @@ export type UserDashboardData = {
   paymentSummary?: PaymentSummary;
 };
 
-/**
- * CRITICAL FIX: Maps participationMode to attendeeType
- * Backend returns participationMode, but Dashboard expects attendeeType
- */
+
 function mapParticipationModeToAttendeeType(mode: string | undefined): string | undefined {
   if (!mode) return undefined;
   
@@ -266,7 +355,6 @@ function mapParticipationModeToAttendeeType(mode: string | undefined): string | 
     case "ONLINE":
       return "online";
     default:
-      // If already lowercase, return as-is
       return mode.toLowerCase();
   }
 }
@@ -274,8 +362,6 @@ function mapParticipationModeToAttendeeType(mode: string | undefined): string | 
 export async function getUserDashboard(eventId: string): Promise<NormalizedDashboardResponse> {
   const response = await apiRequest<unknown>(`/user-dashboard/${eventId}`, { method: "GET" });
 
-  // Backend often wraps responses in { code, message, data }.
-  // We normalize once here so UI code stays typed and stable.
   const root: unknown =
     (response && typeof response === "object" && "data" in (response as Record<string, unknown>))
       ? (response as Record<string, unknown>)["data"]
@@ -315,7 +401,6 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       ? [regsUnknown as DashboardReg]
       : [];
 
-  // CRITICAL FIX: Map participationMode to attendeeType for each registration
   registrations.forEach((reg) => {
     const regObj = reg as Record<string, unknown>;
     
@@ -324,14 +409,11 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       regObj.attendeeType = mapParticipationModeToAttendeeType(regObj.participationMode as string);
     }
     
-    // Also ensure eventId is present (some backends might omit it)
     if (!regObj.eventId && eventId) {
       regObj.eventId = eventId;
     }
   
 
-  // If backend returns a "flat" dashboard shape (e.g. regId, attendanceType, eventData)
-  // synthesize a single registration so UI logic stays consistent.
   if (registrations.length === 0) {
     const flatRegId =
       (obj["registrationId"] as string | undefined) ??
@@ -378,7 +460,6 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       ? [accUnknown as DashboardAcc]
       : [];
 
-  // CRITICAL FIX: Ensure accommodations have eventId
   accommodations.forEach((acc) => {
     const accObj = acc as Record<string, unknown>;
     if (!accObj.eventId && eventId) {
@@ -388,12 +469,12 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
 
   const depsUnknown =
     (obj["dependents"] as unknown) ??
-    (obj["dependants"] as unknown) ??
     (obj["dependentRegistrations"] as unknown) ??
     (obj["dependantsData"] as unknown) ??
     (obj["dependants"] && typeof obj["dependants"] === "object"
       ? (obj["dependants"] as Record<string, unknown>)["dependantsData"]
-      : undefined);
+      : undefined) ??
+    (obj["dependants"] as unknown);
 
   const dependents: DashboardDep[] = Array.isArray(depsUnknown)
     ? (depsUnknown as unknown[]).filter((d): d is Record<string, unknown> => !!d && typeof d === "object").map((d) => d as DashboardDep)
@@ -415,7 +496,6 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
   };
 }
 
-// Re-export accommodation functions
 export {
   getAccommodations,
   bookAccommodation,
@@ -429,7 +509,6 @@ export {
   type BookAccommodationResponse,
 } from "./accommodations";
 
-// Re-export accommodation allocation functions
 export {
   initiateHostelAllocation,
   initiateHotelAllocation,

@@ -147,6 +147,14 @@ export async function apiRequest<T>(
 
   if (!res.ok) {
     const msg = json?.message || json?.error || `Request failed (${res.status})`;
+    console.error("🔴 API Error:", {
+      url: res.url,
+      status: res.status,
+      statusText: res.statusText,
+      code: json?.code,
+      message: msg,
+      details: json
+    });
     throw new ApiError(msg, { status: res.status, code: json?.code, details: json });
   }
 

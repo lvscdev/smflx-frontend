@@ -27,6 +27,7 @@ export function DependentsPaymentModal({
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  
 
 
   if (!isOpen) return null;
@@ -48,7 +49,7 @@ const reference =
 
 const origin = window.location.origin;
 const notification_url = `${origin}/api/billing/verify`;
-const redirect_url = `${origin}/payment`; 
+const redirect_url = `${origin}/payment`; // Correct route - no /callback
 
 
       console.log("💳 Starting dependent payment:", {

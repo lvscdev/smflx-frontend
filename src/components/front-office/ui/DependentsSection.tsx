@@ -43,7 +43,7 @@ export function DependentsSection({ dependents, onRegister, onPay }: DependentsS
   }
 
 
-  const unpaidRegistered = dependents.filter(d => d.isRegistered && !d.isPaid);
+  const unpaidRegistered = dependents.filter(d => d.isRegistered && !d.isPaid && !d.isProcessing);
   const DEPENDENT_PRICE = Number(process.env.NEXT_PUBLIC_DEPENDENT_PRICE) || 7000;
   const totalUnpaidAmount = unpaidRegistered.length * DEPENDENT_PRICE;
 
@@ -152,10 +152,8 @@ export function DependentsSection({ dependents, onRegister, onPay }: DependentsS
                       ? 'text-orange-600'
                       : 'text-gray-500'
                   }`}>
-                    {dependent.isPaid
-                      ? 'Paid'
-                      : dependent.isProcessing
-                      ? 'Processing'
+                    {dependent.isPaid 
+                      ? 'Paid' 
                       : dependent.isRegistered
                       ? 'Pending'
                       : 'Register First'
@@ -178,10 +176,22 @@ export function DependentsSection({ dependents, onRegister, onPay }: DependentsS
                   <button
                     onClick={() => onPay([dependent.id])}
                     disabled={Boolean(dependent.isProcessing)}
-                    className="w-full lg:w-auto px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className={
+                      "w-full lg:w-auto px-5 py-2.5 rounded-lg transition-colors font-medium text-sm whitespace-nowrap flex items-center justify-center gap-2 " +
+                      (dependent.isProcessing ? "bg-gray-200 text-gray-600 cursor-not-allowed" : "bg-red-600 text-white hover:bg-red-700")
+                    }
                   >
-                    <Wallet className="w-4 h-4" />
-                    Pay ₦7,000
+                    {dependent.isProcessing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Processing…
+                      </>
+                    ) : (
+                      <>
+                        <Wallet className="w-4 h-4" />
+                        Pay ₦7,000
+                      </>
+                    )}
                   </button>
                 ) : (
                   <div className="w-full lg:w-auto px-5 py-2.5 bg-green-100 text-green-700 rounded-lg font-medium text-sm whitespace-nowrap flex items-center justify-center gap-2">

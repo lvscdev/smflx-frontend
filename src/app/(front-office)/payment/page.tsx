@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { markDependentsPaymentReturned } from "@/lib/storage/pendingDependentsPayments";
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 const PENDING_CTX_KEY = "smflx_pending_payment_ctx";
@@ -71,13 +72,8 @@ function PaymentCallbackInner() {
       ""
     ).toLowerCase();
 
-    const reference = params.get("reference") || "";
-
-    if (process.env.NODE_ENV !== "production") {
-      console.log("💳 Payment callback received:", { rawStatus, reference });
-    }
-
     if (rawStatus === "success") {
+      // Payment succeeded — mark in flow state
       const flow = safeLoadFlowState();
       if (flow) {
         flow.view = "dashboard";
@@ -85,9 +81,21 @@ function PaymentCallbackInner() {
         safeSaveFlowState(flow);
       }
       clearPendingCtx();
+
+      try {
+        const ref =
+          params.get("reference") ||
+          params.get("ref") ||
+          params.get("transaction_reference") ||
+          params.get("transactionReference") ||
+          "";
+        if (ref) markDependentsPaymentReturned(String(ref));
+      } catch {
+        // ignore
+      }
       setStatus("success");
 
-      // Redirect to dashboard after brief success message
+      // Redirect to dashboard after success message
       const timer = setTimeout(() => router.replace("/dashboard"), 2000);
       return () => clearTimeout(timer);
     }
@@ -98,8 +106,7 @@ function PaymentCallbackInner() {
       return;
     }
 
-    // If status is missing or unknown, redirect to dashboard with pending state
-    // The webhook will update the backend; dashboard will show current status
+    // Unknown status — redirect to dashboard, let webhook determine truth
     if (process.env.NODE_ENV !== "production") {
       console.warn("⚠️ Payment callback with unknown status, redirecting to dashboard");
     }
@@ -109,8 +116,8 @@ function PaymentCallbackInner() {
       flow.view = "dashboard";
       safeSaveFlowState(flow);
     }
-    
-    // Don't clear pending context yet — let dashboard show pending state
+
+    // Don't assume success for unknown status
     setStatus("loading");
     const timer = setTimeout(() => router.replace("/dashboard"), 1500);
     return () => clearTimeout(timer);
@@ -141,7 +148,7 @@ function PaymentCallbackInner() {
             Payment successful
           </h2>
           <p className="text-sm text-gray-500">
-            You will be taken to your dashboard in a moment…
+            You will be redirected to your dashboard in a moment…
           </p>
         </div>
       </div>

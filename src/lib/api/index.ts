@@ -89,12 +89,16 @@ export type UserProfile = {
 
 export async function getMe() {
   const response = await apiRequest<any>("/user", { method: "GET" });
-  const profile = (response as any)?.profileInfo ?? (response as any)?.data?.profileInfo ?? response;
-  return profile;
+  // Backend returns { profileInfo: {...} } after apiRequest unwraps outer data
+  const data = response?.data || response;
+  return data?.profileInfo || data;
 }
+
 export async function updateMe(payload: Partial<DashboardUserProfile>) {
   const response = await apiRequest<any>("/user", { method: "PUT", body: payload });
-  return response?.data || response;
+  // Backend returns { profileInfo: {...} } after apiRequest unwraps outer data
+  const data = response?.data || response;
+  return data?.profileInfo || data;
 }
 
 // --- Events ---
@@ -262,7 +266,6 @@ export async function initiateDependentPayment(payload: {
     method: "POST",
     body: payload,
   });
-
   return response?.data || response;
 }
 
@@ -276,71 +279,28 @@ export async function payForAllDependants(payload: {
     method: "POST",
     body: payload,
   });
-
   return response?.data || response;
 }
 
-// Dashboard types
-export type DashboardRegistration = {
-  registrationId: string;
-  eventId: string;
-  eventName?: string;
-  participationMode: string;
-  accommodationType: string;
-  registrationStatus: string;
-  paymentStatus?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type DashboardAccommodation = {
-  facilityId?: string;
-  facilityName?: string;
-  roomNumber?: string;
-  bedNumber?: string;
-  checkInDate?: string;
-  checkOutDate?: string;
-  price?: number;
-};
-
-export type DashboardDependent = {
-  dependentId: string;
-  name: string;
-  age: number;
-  gender: string;
-  registrationStatus?: string;
-  paymentStatus?: string;
-};
-
-export type PaymentSummary = {
-  totalPaid?: number;
-  totalPending?: number;
-  lastPaymentDate?: string;
-};
-
-export type UserDashboardData = {
-  user?: UserProfile;
-  registrations?: DashboardRegistration[];
-  accommodations?: DashboardAccommodation[];
-  dependents?: DashboardDependent[];
-  paymentSummary?: PaymentSummary;
-};
-
-
-function mapParticipationModeToAttendeeType(mode: string | undefined): string | undefined {
+function mapParticipationModeToAttendeeType(
+  mode: string | undefined
+): string | undefined {
   if (!mode) return undefined;
-  
-  const modeUpper = mode.toUpperCase();
-  
-  switch (modeUpper) {
+
+  const m = String(mode).toUpperCase();
+
+  switch (m) {
     case "CAMPER":
       return "camper";
     case "ATTENDEE":
+    case "PHYSICAL":
+    case "PHYSICAL_ATTENDEE":
       return "physical";
     case "ONLINE":
+    case "ONLINE_ATTENDEE":
       return "online";
     default:
-      return mode.toLowerCase();
+      return String(mode).toLowerCase();
   }
 }
 
@@ -388,19 +348,17 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
 
   registrations.forEach((reg) => {
     const regObj = reg as Record<string, unknown>;
-
+    
     // If attendeeType is missing but participationMode exists, map it
     if (!regObj.attendeeType && regObj.participationMode) {
       regObj.attendeeType = mapParticipationModeToAttendeeType(regObj.participationMode as string);
     }
-
+    
     if (!regObj.eventId && eventId) {
       regObj.eventId = eventId;
     }
-  });
+  
 
-  // Fallback: if the API returned a flat object instead of a registrations array,
-  // synthesize a single registration entry from the root-level fields.
   if (registrations.length === 0) {
     const flatRegId =
       (obj["registrationId"] as string | undefined) ??
@@ -418,7 +376,7 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
         : null;
 
     if (flatRegId || participationMode || eventData) {
-      const flatReg: Record<string, unknown> = {
+      const regObj: Record<string, unknown> = {
         registrationId: flatRegId,
         regId: flatRegId,
         eventId: (eventData?.["eventId"] as string | undefined) ?? eventId,
@@ -432,9 +390,10 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
           (eventData?.["eventName"] as string | undefined),
       };
 
-      registrations.push(flatReg as DashboardReg);
+      registrations.push(regObj as DashboardReg);
     }
   }
+});
 
   const accUnknown =
     (obj["accommodations"] as unknown) ??

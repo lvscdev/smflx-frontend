@@ -10,6 +10,7 @@ interface Dependent {
   gender: string;
   isRegistered: boolean;
   isPaid: boolean;
+  isProcessing?: boolean;
 }
 
 interface DependentsSectionProps {
@@ -151,8 +152,10 @@ export function DependentsSection({ dependents, onRegister, onPay }: DependentsS
                       ? 'text-orange-600'
                       : 'text-gray-500'
                   }`}>
-                    {dependent.isPaid 
-                      ? 'Paid' 
+                    {dependent.isPaid
+                      ? 'Paid'
+                      : dependent.isProcessing
+                      ? 'Processing'
                       : dependent.isRegistered
                       ? 'Pending'
                       : 'Register First'
@@ -174,7 +177,8 @@ export function DependentsSection({ dependents, onRegister, onPay }: DependentsS
                 ) : !dependent.isPaid ? (
                   <button
                     onClick={() => onPay([dependent.id])}
-                    className="w-full lg:w-auto px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center justify-center gap-2"
+                    disabled={Boolean(dependent.isProcessing)}
+                    className="w-full lg:w-auto px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Wallet className="w-4 h-4" />
                     Pay ₦7,000

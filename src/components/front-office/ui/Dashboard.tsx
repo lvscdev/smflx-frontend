@@ -46,6 +46,7 @@ type Dependent = {
   gender: string;
   isRegistered: boolean;
   isPaid: boolean;
+  isProcessing?: boolean;
 };
 
 const toDependent = (d: DashboardDependent): Dependent => {
@@ -78,21 +79,53 @@ const toDependent = (d: DashboardDependent): Dependent => {
   const genderVal = rec.gender ?? rec.dependantGender ?? rec.dependentGender;
   const gender = typeof genderVal === "string" ? genderVal : "";
   
-  const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : true; 
+  const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : true; // Assume registered if from API
+
+  const paymentStatusRaw =
+    (rec as any).paymentStatus ?? (rec as any).payment_state ?? (rec as any).paymentState ?? (rec as any).payment;
+
+  const paymentStatus =
+    typeof paymentStatusRaw === "string" ? paymentStatusRaw.toUpperCase() : "";
 
   const isPaid =
-    typeof rec.isPaid === "boolean" ? rec.isPaid :
-    rec.paymentStatus === "PAID";
+    typeof (rec as any).isPaid === "boolean"
+      ? Boolean((rec as any).isPaid)
+      : typeof (rec as any).paid === "boolean"
+        ? Boolean((rec as any).paid)
+        : ["PAID", "SUCCESS", "COMPLETED", "CONFIRMED"].includes(paymentStatus);
 
-  return { id, name, age, gender, isRegistered, isPaid };
+  let isProcessing = ["PENDING", "INITIATED", "PROCESSING"].includes(paymentStatus);
+  try {
+    const raw = localStorage.getItem("smflx_pending_payment_ctx");
+    if (raw) {
+      const ctx = JSON.parse(raw);
+      if (ctx?.type === "dependents") {
+        const ids: string[] = Array.isArray(ctx?.dependentIds) ? ctx.dependentIds : [];
+        const startedAt = Number(ctx?.startedAtMs ?? Date.parse(ctx?.startedAt ?? ""));
+        const completedAt = Number(ctx?.completedAtMs ?? Date.parse(ctx?.completedAt ?? ""));
+        const now = Date.now();
+        if (ids.includes(id)) {
+          if (Number.isFinite(completedAt) && completedAt > 0) {
+            if (now - completedAt < 10 * 60 * 1000) isProcessing = true;
+          } else if (Number.isFinite(startedAt) && startedAt > 0) {
+            if (now - startedAt < 15 * 60 * 1000) isProcessing = true;
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return { id, name, age, gender, isRegistered, isPaid, isProcessing };
 };
 
 const getRegId = (registration: unknown): string | undefined => {
   if (typeof registration !== "object" || registration === null) return undefined;
 
   const reg = registration as Record<string, unknown>;
-  if ("regId" in reg && reg.regId != null) return String(reg.regId);
 
+  if ("regId" in reg && reg.regId != null) return String(reg.regId);
   if ("registrationId" in reg && reg.registrationId != null) return String(reg.registrationId);
   if ("id" in reg && reg.id != null) return String(reg.id);
 
@@ -207,12 +240,10 @@ export function Dashboard({
     const regIdFromRegistration = getRegId(registration);
     if (regIdFromRegistration) return regIdFromRegistration;
     
-    // Priority 3: Check profile for regId field
+    // Priority 3: Check profile for regId field (some backends might store it here)
     const p: any = profile as any;
     if (p?.regId) return String(p.regId);
     
-    // ❌ DO NOT use userId as regId - they are different!
-    // If we reach here, we don't have a valid regId
     return undefined;
   })();
 
@@ -364,7 +395,6 @@ export function Dashboard({
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
-
 // Accommodation modal state
   const [isAccommodationModalOpen, setIsAccommodationModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState(1);
@@ -376,8 +406,8 @@ export function Dashboard({
 
   const [availabilitySummary, setAvailabilitySummary] = useState<{
     loading: boolean;
-    hostel?: { availableFacilities: number; totalAvailableSpaces: number; totalCapacity: number };
-    hotel?: { availableFacilities: number; totalAvailableSpaces: number; totalCapacity: number };
+    hostel?: { availableFacilities: number; totalCapacity: number };
+    hotel?: { availableFacilities: number; totalCapacity: number };
     error?: string | null;
   }>({ loading: false, error: null });
 
@@ -416,11 +446,6 @@ export function Dashboard({
           return avail > 0;
         }).length;
 
-        const totalAvailableSpaces = items.reduce((sum, i) => {
-          const avail = Number(i?.availableSpaces ?? 0) || 0;
-          return sum + avail;
-        }, 0);
-
         const totalCapacity = items.reduce((sum, i) => {
           const cap =
             Number(i?.totalSpaces ?? i?.totalCapacity ?? i?.availableSpaces ?? 0) ||
@@ -428,7 +453,7 @@ export function Dashboard({
           return sum + cap;
         }, 0);
 
-        return { availableFacilities, totalAvailableSpaces, totalCapacity };
+        return { availableFacilities, totalCapacity };
       };
 
         setAvailabilitySummary({
@@ -503,6 +528,7 @@ export function Dashboard({
   gender: string;
   isRegistered: boolean;
   isPaid: boolean;
+  isProcessing?: boolean;
 };
 
 const getErrorMessage = (err: unknown, fallback: string) =>
@@ -624,16 +650,12 @@ type AccommodationData = Parameters<
 
   const attendeeType = normalizeAttendeeType(registration);
   const attendeeTypeNorm = (typeof attendeeType === "string" ? attendeeType.toLowerCase() : "");
+  const isCamper = attendeeTypeNorm === "camper";
   const normalizedAccommodation = useMemo(
     () => normalizeAccommodation(accommodation),
     [accommodation],
   );
-
-  // Camper inference:
-  // - Primary source: registration attendeeType/participationMode
-  // - Fallback: if accommodation exists, user is effectively a camper (only campers get accommodation payloads)
-  const isCamper = attendeeTypeNorm === "camper" || (!!normalizedAccommodation && attendeeTypeNorm !== "online" && attendeeTypeNorm !== "physical");
-
+  
   const accAny = normalizedAccommodation as any;
 
   const accommodationFacilityName: string =
@@ -659,8 +681,7 @@ type AccommodationData = Parameters<
     (accAny?.accommodationImageUrl as string) ||
     (accAny?.imageUrl as string) ||
     "";
-  const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online";
-  const isUnknownAttendeeType = !attendeeTypeNorm;
+const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "online" || attendeeTypeNorm === "";
   const paidForAccommodation = normalizedAccommodation?.paidForAccommodation === true;
 
   // Camper: when accommodation payment is pending, the space is held for 1 hour.
@@ -1193,6 +1214,12 @@ type AccommodationData = Parameters<
           onManageDependents={() => setIsDependentsModalOpen(true)}
         />
 
+        <DependentsSection
+          dependents={dependents}
+          onRegister={handleRegisterDependent}
+          onPay={handlePayForDependents}
+        />
+
         
         {/* Top grid */}
         <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
@@ -1382,8 +1409,6 @@ type AccommodationData = Parameters<
                       </div>
                     </div>
                   )}
-
-
                 </div>
 
                 <div className="flex gap-2">
@@ -1444,12 +1469,6 @@ type AccommodationData = Parameters<
 </div>
   )
 )}
-
-        <DependentsSection
-          dependents={dependents}
-          onRegister={handleRegisterDependent}
-          onPay={handlePayForDependents}
-        />
 
         {/* Non-camper upgrade CTA (re-using your existing promo card) */}
         {showAccommodationPromo && (
@@ -1690,7 +1709,7 @@ type AccommodationData = Parameters<
                           {availabilitySummary.loading
                             ? "Loading availability…"
                             : availabilitySummary.hostel
-                              ? `${availabilitySummary.hostel.availableFacilities} facilities available · ${availabilitySummary.hostel.totalAvailableSpaces} spaces available`
+                              ? `${availabilitySummary.hostel.availableFacilities} facilities available · capacity ${availabilitySummary.hostel.totalCapacity}`
                               : "View available facilities"}
                         </p>
                       </div>
@@ -1709,7 +1728,7 @@ type AccommodationData = Parameters<
                           {availabilitySummary.loading
                             ? "Loading availability…"
                             : availabilitySummary.hotel
-                              ? `${availabilitySummary.hotel.availableFacilities} facilities available · ${availabilitySummary.hotel.totalAvailableSpaces} spaces available`
+                              ? `${availabilitySummary.hotel.availableFacilities} facilities available · capacity ${availabilitySummary.hotel.totalCapacity}`
                               : "View available facilities"}
                         </p>
                       </div>

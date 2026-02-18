@@ -49,38 +49,60 @@ type Dependent = {
 };
 
 const toDependent = (d: DashboardDependent): Dependent => {
-const rec = d as unknown as Record<string, unknown>;
-  const id = typeof rec.id === "string" && rec.id ? rec.id : typeof rec.dependantId === "string" && rec.dependantId ? rec.dependantId : typeof rec.dependentId === "string" && rec.dependentId ? rec.dependentId : crypto.randomUUID();
+  const rec = d as unknown as Record<string, unknown>;
+
+  const id =
+    typeof rec.id === "string" && rec.id
+      ? rec.id
+      : typeof rec.dependantId === "string" && rec.dependantId
+        ? rec.dependantId
+        : typeof rec.dependentId === "string" && rec.dependentId
+          ? rec.dependentId
+          : crypto.randomUUID();
+
   const rawName =
     typeof rec.name === "string" && rec.name ? rec.name :
     typeof rec.fullName === "string" ? rec.fullName :
     typeof rec.dependentName === "string" ? rec.dependentName :
     typeof rec.dependantName === "string" ? rec.dependantName :
     "Dependent";
+
   const name = rawName.trim() ? rawName.trim() : "Dependent";
+
   const ageVal = rec.age ?? rec.dependantAge ?? rec.dependentAge;
-  const age = typeof ageVal === "number" ? String(ageVal) : typeof ageVal === "string" ? ageVal.trim() : "";
+  const age =
+    typeof ageVal === "number" ? String(ageVal) :
+    typeof ageVal === "string" ? ageVal.trim() :
+    "";
+
   const genderVal = rec.gender ?? rec.dependantGender ?? rec.dependentGender;
   const gender = typeof genderVal === "string" ? genderVal : "";
+  
   const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : true; 
-  const paymentStatusRaw = (rec as any).paymentStatus ?? (rec as any).payment_state ?? (rec as any).paymentState ?? (rec as any).payment;
-  const paymentStatus = typeof paymentStatusRaw === "string" ? paymentStatusRaw.toUpperCase() : "";
-  const isPaid = typeof rec.isPaid === "boolean" ? rec.isPaid : typeof (rec as any).paid === "boolean" ? Boolean((rec as any).paid) : ["PAID", "SUCCESS", "COMPLETED", "CONFIRMED"].includes(paymentStatus);
+
+  const isPaid =
+    typeof rec.isPaid === "boolean" ? rec.isPaid :
+    rec.paymentStatus === "PAID";
+
   return { id, name, age, gender, isRegistered, isPaid };
 };
 
 const getRegId = (registration: unknown): string | undefined => {
   if (typeof registration !== "object" || registration === null) return undefined;
+
   const reg = registration as Record<string, unknown>;
   if ("regId" in reg && reg.regId != null) return String(reg.regId);
+
   if ("registrationId" in reg && reg.registrationId != null) return String(reg.registrationId);
   if ("id" in reg && reg.id != null) return String(reg.id);
+
   return undefined;
 };
 
 const getOwnerRegId = (profile: unknown): string | undefined => {
   if (typeof profile !== "object" || profile === null) return undefined;
   const p = profile as Record<string, unknown>;
+
   if ("regId" in p && p.regId != null) return String(p.regId);
   if ("registrationId" in p && p.registrationId != null) return String(p.registrationId);
 
@@ -354,8 +376,8 @@ export function Dashboard({
 
   const [availabilitySummary, setAvailabilitySummary] = useState<{
     loading: boolean;
-    hostel?: { availableFacilities: number; totalCapacity: number };
-    hotel?: { availableFacilities: number; totalCapacity: number };
+    hostel?: { availableFacilities: number; totalAvailableSpaces: number; totalCapacity: number };
+    hotel?: { availableFacilities: number; totalAvailableSpaces: number; totalCapacity: number };
     error?: string | null;
   }>({ loading: false, error: null });
 
@@ -394,6 +416,11 @@ export function Dashboard({
           return avail > 0;
         }).length;
 
+        const totalAvailableSpaces = items.reduce((sum, i) => {
+          const avail = Number(i?.availableSpaces ?? 0) || 0;
+          return sum + avail;
+        }, 0);
+
         const totalCapacity = items.reduce((sum, i) => {
           const cap =
             Number(i?.totalSpaces ?? i?.totalCapacity ?? i?.availableSpaces ?? 0) ||
@@ -401,7 +428,7 @@ export function Dashboard({
           return sum + cap;
         }, 0);
 
-        return { availableFacilities, totalCapacity };
+        return { availableFacilities, totalAvailableSpaces, totalCapacity };
       };
 
         setAvailabilitySummary({
@@ -1663,7 +1690,7 @@ type AccommodationData = Parameters<
                           {availabilitySummary.loading
                             ? "Loading availability…"
                             : availabilitySummary.hostel
-                              ? `${availabilitySummary.hostel.availableFacilities} facilities available · capacity ${availabilitySummary.hostel.totalCapacity}`
+                              ? `${availabilitySummary.hostel.availableFacilities} facilities available · ${availabilitySummary.hostel.totalAvailableSpaces} spaces available`
                               : "View available facilities"}
                         </p>
                       </div>
@@ -1682,7 +1709,7 @@ type AccommodationData = Parameters<
                           {availabilitySummary.loading
                             ? "Loading availability…"
                             : availabilitySummary.hotel
-                              ? `${availabilitySummary.hotel.availableFacilities} facilities available · capacity ${availabilitySummary.hotel.totalCapacity}`
+                              ? `${availabilitySummary.hotel.availableFacilities} facilities available · ${availabilitySummary.hotel.totalAvailableSpaces} spaces available`
                               : "View available facilities"}
                         </p>
                       </div>

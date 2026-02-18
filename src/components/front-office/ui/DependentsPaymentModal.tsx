@@ -48,7 +48,7 @@ const reference =
 
 const origin = window.location.origin;
 const notification_url = `${origin}/api/billing/verify`;
-const redirect_url = `${origin}/payment/callback`;
+const redirect_url = `${origin}/payment`;
 
 
       console.log("💳 Starting dependent payment:", {

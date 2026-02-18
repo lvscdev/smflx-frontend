@@ -71,6 +71,12 @@ function PaymentCallbackInner() {
       ""
     ).toLowerCase();
 
+    const reference = params.get("reference") || "";
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("💳 Payment callback received:", { rawStatus, reference });
+    }
+
     if (rawStatus === "success") {
       const flow = safeLoadFlowState();
       if (flow) {
@@ -78,50 +84,31 @@ function PaymentCallbackInner() {
         flow.paymentStatus = "success";
         safeSaveFlowState(flow);
       }
-      const pending = safeLoadPendingCtx();
-      if (pending?.type === "dependents") {
-        try {
-          pending.status = "returned_success";
-          pending.completedAtMs = Date.now();
-          localStorage.setItem(PENDING_CTX_KEY, JSON.stringify(pending));
-        } catch {
-          // ignore
-        }
-      } else {
-        clearPendingCtx();
-      }
+      clearPendingCtx();
       setStatus("success");
 
-      // Auto-navigate after a brief moment so the user sees the tick.
-      const timer = setTimeout(() => router.replace("/"), 1800);
+      const timer = setTimeout(() => router.replace("/dashboard"), 2000);
       return () => clearTimeout(timer);
     }
 
-    if (rawStatus === "failed") {
+    if (rawStatus === "failed" || rawStatus === "error" || rawStatus === "cancelled") {
       setStatus("failed");
-      // Do NOT clear pending ctx — user may retry.
       return;
     }
 
+
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("⚠️ Payment callback with unknown status, redirecting to dashboard");
+    }
+    
     const flow = safeLoadFlowState();
     if (flow) {
       flow.view = "dashboard";
       safeSaveFlowState(flow);
     }
-      const pending = safeLoadPendingCtx();
-      if (pending?.type === "dependents") {
-        try {
-          pending.status = "returned_success";
-          pending.completedAtMs = Date.now();
-          localStorage.setItem(PENDING_CTX_KEY, JSON.stringify(pending));
-        } catch {
-          // ignore
-        }
-      } else {
-        clearPendingCtx();
-      }
-    setStatus("success");
-    const timer = setTimeout(() => router.replace("/"), 1800);
+    
+=    setStatus("loading");
+    const timer = setTimeout(() => router.replace("/dashboard"), 1500);
     return () => clearTimeout(timer);
   }, [params, router]);
 
@@ -150,7 +137,7 @@ function PaymentCallbackInner() {
             Payment successful
           </h2>
           <p className="text-sm text-gray-500">
-            You'll be taken to your dashboard in a moment…
+            You will be taken to your dashboard in a moment…
           </p>
         </div>
       </div>

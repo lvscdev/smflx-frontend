@@ -157,6 +157,7 @@ export default function HomePage() {
       email,
       profile,
       selectedEvent,
+      activeEventId: selectedEvent?.eventId ?? null,
       registration,
       accommodation,
     });
@@ -232,7 +233,6 @@ export default function HomePage() {
   }, [view]);
 
   const showSidebar = true;
-  console.log("current view, ", view);
 
   return (
     <div className="flex flex-col lg:flex-row min-h-svh lg:h-screen w-full">
@@ -281,13 +281,20 @@ export default function HomePage() {
                 email: nextEmail || email,
                 profile: nextProfile ?? profile,
                 selectedEvent,
+                activeEventId: selectedEvent?.eventId ?? null,
                 registration,
                 accommodation,
               });
 
-              if (selectedEvent?.eventId)
+              // Returning users may not have selectedEvent in memory — let the
+              // dashboard boot() or /dashboard/select-event handle event selection
+              if (selectedEvent?.eventId) {
                 setActiveEventCookie(selectedEvent.eventId);
-              router.push("/dashboard");
+                router.push("/dashboard");
+              } else {
+                // No event context — route through select-event first
+                router.push("/dashboard/select-event");
+              }
             }}
             onCancel={() => setView("verify")}
           />
@@ -326,9 +333,6 @@ export default function HomePage() {
             isSubmitting={registrationSubmitting}
             serverError={registrationPersistError}
             onComplete={async (data) => {
-              if (process.env.NODE_ENV !== "production") {
-                console.log("Event registration data:", data);
-              }
               setRegistrationPersistError(null);
               setRegistrationSubmitting(true);
 
@@ -384,6 +388,7 @@ export default function HomePage() {
                   email,
                   profile,
                   selectedEvent,
+      activeEventId: selectedEvent?.eventId ?? null,
                   registration: next,
                   accommodation,
                 });
@@ -419,6 +424,7 @@ export default function HomePage() {
                 email,
                 profile,
                 selectedEvent,
+      activeEventId: selectedEvent?.eventId ?? null,
                 registration,
                 accommodation: data,
               });
@@ -447,6 +453,7 @@ export default function HomePage() {
                 email,
                 profile,
                 selectedEvent,
+      activeEventId: selectedEvent?.eventId ?? null,
                 registration,
                 accommodation,
               });

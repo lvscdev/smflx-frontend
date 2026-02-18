@@ -65,7 +65,6 @@ function PaymentCallbackInner() {
   const [status, setStatus] = useState<CallbackStatus>("loading");
 
   useEffect(() => {
-    // Korapay may use "status" or "payment_status"; normalise.
     const rawStatus = (
       params.get("status") ||
       params.get("payment_status") ||
@@ -73,17 +72,22 @@ function PaymentCallbackInner() {
     ).toLowerCase();
 
     if (rawStatus === "success") {
-      // --- mark payment successful in flow state ---
       const flow = safeLoadFlowState();
       if (flow) {
         flow.view = "dashboard";
         flow.paymentStatus = "success";
-        // If there was a pending payment context (accommodation or dependents)
-        // it is now fulfilled — clear it.
         safeSaveFlowState(flow);
       }
       const pending = safeLoadPendingCtx();
-      if (pending?.type !== "dependents") {
+      if (pending?.type === "dependents") {
+        try {
+          pending.status = "returned_success";
+          pending.completedAtMs = Date.now();
+          localStorage.setItem(PENDING_CTX_KEY, JSON.stringify(pending));
+        } catch {
+          // ignore
+        }
+      } else {
         clearPendingCtx();
       }
       setStatus("success");
@@ -99,19 +103,24 @@ function PaymentCallbackInner() {
       return;
     }
 
-    // Unknown / missing status — treat as pending/ambiguous.
-    // The webhook will sort things out server-side; just send the user
-    // to the dashboard where they can see their actual state.
     const flow = safeLoadFlowState();
     if (flow) {
       flow.view = "dashboard";
       safeSaveFlowState(flow);
     }
       const pending = safeLoadPendingCtx();
-      if (pending?.type !== "dependents") {
+      if (pending?.type === "dependents") {
+        try {
+          pending.status = "returned_success";
+          pending.completedAtMs = Date.now();
+          localStorage.setItem(PENDING_CTX_KEY, JSON.stringify(pending));
+        } catch {
+          // ignore
+        }
+      } else {
         clearPendingCtx();
       }
-    setStatus("success"); // optimistic — webhook is the source of truth
+    setStatus("success");
     const timer = setTimeout(() => router.replace("/"), 1800);
     return () => clearTimeout(timer);
   }, [params, router]);

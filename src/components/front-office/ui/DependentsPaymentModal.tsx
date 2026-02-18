@@ -41,6 +41,16 @@ export function DependentsPaymentModal({
     try {
       const resolvedParentRegId = parentRegId;
 
+const reference =
+  (typeof crypto !== "undefined" && "randomUUID" in crypto)
+    ? (crypto as any).randomUUID()
+    : `smflx_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+const origin = window.location.origin;
+const notification_url = `${origin}/api/billing/verify`;
+const redirect_url = `${origin}/payment/callback`;
+
+
       console.log("💳 Starting dependent payment:", {
         parentRegId: resolvedParentRegId,
         dependents: dependents.map(d => ({ id: d.id, name: d.name })),
@@ -52,27 +62,27 @@ export function DependentsPaymentModal({
         throw new Error("Missing parentRegId (owner regId). Please refresh your dashboard and try again.");
       }
 
-      const isPayingForAll = dependents.length > 1;
-      let resp: any = null;
-      let dependentId: string | null = null;
+const dependentIds = (dependents || []).map((d) => d?.id).filter(Boolean) as string[];
 
-      if (isPayingForAll) {
-        resp = await payForAllDependants({
-          parentRegId: resolvedParentRegId,
-          eventId,
-        });
-      } else {
-        dependentId = dependents?.[0]?.id ?? null;
+if (dependentIds.length === 0) {
+  throw new Error("Missing dependent ID. Please refresh and try again.");
+}
 
-        if (!dependentId) {
-          throw new Error("Missing dependent ID. Please refresh and try again.");
-        }
-
-        resp = await initiateDependentPayment({
-          dependantId: dependentId,
-          parentRegId: resolvedParentRegId,
-        });
-      }
+const resp =
+  dependentIds.length > 1
+    ? await payForAllDependants({
+        parentRegId: resolvedParentRegId,
+        reference,
+        notification_url,
+        redirect_url,
+      })
+    : await initiateDependentPayment({
+        dependantId: dependentIds[0]!,
+        parentRegId: resolvedParentRegId,
+        reference,
+        notification_url,
+        redirect_url,
+      });
 
       console.log("🟢 Payment API response:", resp);
 
@@ -97,10 +107,12 @@ export function DependentsPaymentModal({
           JSON.stringify({
             type: "dependents",
             parentRegId: resolvedParentRegId,
-            dependentId: dependentId || undefined,
+            dependentIds,
+            reference,
             startedAt: new Date().toISOString(),
           })
         );
+
       } catch {
         // ignore
       }

@@ -59,6 +59,10 @@ type AccommodationFacilityRecord = {
   selfEmployedUserPrice?: number;
   unemployedUserPrice?: number;
   totalCapacity?: number;
+  totalSpaces?: number;
+  availableSpaces?: number;
+  availableCapacity?: number;
+  freeSpaces?: number;
 };
 
 export type BookAccommodationPayload = {
@@ -142,8 +146,8 @@ export async function getAccommodations(params: {
           description: undefined,
           location: undefined,
           images: undefined,
-          totalSpaces: Number(f?.totalCapacity ?? 0) || 0,
-          availableSpaces: f?.available === false ? 0 : Number(f?.totalCapacity ?? 0) || 0,
+          totalSpaces: Number(f?.totalSpaces ?? f?.totalCapacity ?? 0) || 0,
+          availableSpaces: Number(f?.availableSpaces ?? f?.availableCapacity ?? f?.freeSpaces ?? (f?.available === false ? 0 : (f?.totalSpaces ?? f?.totalCapacity ?? 0)) ) || 0,
           rooms: [],
           amenities: undefined,
         };
@@ -219,7 +223,6 @@ export async function cancelAccommodationBooking(bookingId: string) {
 
 /**
  * Get remaining hostel capacity (unoccupied bed spaces).
- * This endpoint is public (no auth required).
  *
  * @returns capacityLeft (number) or null when unavailable
  */

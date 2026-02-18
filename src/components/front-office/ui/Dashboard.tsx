@@ -49,63 +49,38 @@ type Dependent = {
 };
 
 const toDependent = (d: DashboardDependent): Dependent => {
-  const rec = d as unknown as Record<string, unknown>;
-
-  const id =
-    typeof rec.id === "string" && rec.id
-      ? rec.id
-      : typeof rec.dependantId === "string" && rec.dependantId
-        ? rec.dependantId
-        : typeof rec.dependentId === "string" && rec.dependentId
-          ? rec.dependentId
-          : crypto.randomUUID();
-
+const rec = d as unknown as Record<string, unknown>;
+  const id = typeof rec.id === "string" && rec.id ? rec.id : typeof rec.dependantId === "string" && rec.dependantId ? rec.dependantId : typeof rec.dependentId === "string" && rec.dependentId ? rec.dependentId : crypto.randomUUID();
   const rawName =
     typeof rec.name === "string" && rec.name ? rec.name :
     typeof rec.fullName === "string" ? rec.fullName :
     typeof rec.dependentName === "string" ? rec.dependentName :
     typeof rec.dependantName === "string" ? rec.dependantName :
     "Dependent";
-
   const name = rawName.trim() ? rawName.trim() : "Dependent";
-
   const ageVal = rec.age ?? rec.dependantAge ?? rec.dependentAge;
-  const age =
-    typeof ageVal === "number" ? String(ageVal) :
-    typeof ageVal === "string" ? ageVal.trim() :
-    "";
-
+  const age = typeof ageVal === "number" ? String(ageVal) : typeof ageVal === "string" ? ageVal.trim() : "";
   const genderVal = rec.gender ?? rec.dependantGender ?? rec.dependentGender;
   const gender = typeof genderVal === "string" ? genderVal : "";
-  
   const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : true; 
-
-  const isPaid =
-    typeof rec.isPaid === "boolean" ? rec.isPaid :
-    rec.paymentStatus === "PAID";
-
+  const paymentStatusRaw = (rec as any).paymentStatus ?? (rec as any).payment_state ?? (rec as any).paymentState ?? (rec as any).payment;
+  const paymentStatus = typeof paymentStatusRaw === "string" ? paymentStatusRaw.toUpperCase() : "";
+  const isPaid = typeof rec.isPaid === "boolean" ? rec.isPaid : typeof (rec as any).paid === "boolean" ? Boolean((rec as any).paid) : ["PAID", "SUCCESS", "COMPLETED", "CONFIRMED"].includes(paymentStatus);
   return { id, name, age, gender, isRegistered, isPaid };
 };
 
 const getRegId = (registration: unknown): string | undefined => {
   if (typeof registration !== "object" || registration === null) return undefined;
-
   const reg = registration as Record<string, unknown>;
-
-  // Most common on dashboard payload
   if ("regId" in reg && reg.regId != null) return String(reg.regId);
-
-  // Some backends might use id / registrationId
   if ("registrationId" in reg && reg.registrationId != null) return String(reg.registrationId);
   if ("id" in reg && reg.id != null) return String(reg.id);
-
   return undefined;
 };
 
 const getOwnerRegId = (profile: unknown): string | undefined => {
   if (typeof profile !== "object" || profile === null) return undefined;
   const p = profile as Record<string, unknown>;
-
   if ("regId" in p && p.regId != null) return String(p.regId);
   if ("registrationId" in p && p.registrationId != null) return String(p.registrationId);
 
@@ -254,7 +229,6 @@ export function Dashboard({
     setDashboardHydrating(true);
     setDashboardLoadError(null);
 
-    // Resolve eventId (registration → flow state → legacy)
     const resolvedEventId: string | undefined = (() => {
       if (registration?.eventId) return registration.eventId;
       if (typeof window === "undefined") return undefined;
@@ -368,6 +342,7 @@ export function Dashboard({
   useEffect(() => {
     setLocalProfile(profile);
   }, [profile]);
+
 // Accommodation modal state
   const [isAccommodationModalOpen, setIsAccommodationModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState(1);
@@ -420,7 +395,6 @@ export function Dashboard({
         }).length;
 
         const totalCapacity = items.reduce((sum, i) => {
-          // prefer totalSpaces, else totalCapacity, else availableSpaces
           const cap =
             Number(i?.totalSpaces ?? i?.totalCapacity ?? i?.availableSpaces ?? 0) ||
             0;

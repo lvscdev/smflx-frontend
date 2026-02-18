@@ -172,7 +172,8 @@ export default function DashboardPage() {
 
         // 3) Fetch fresh profile from backend
         const flow0 = safeLoadFlowState() || {};
-        const me = await getMe();
+        const meRaw = await getMe();
+        const me = (meRaw as any)?.profileInfo ?? meRaw;
         const mergedProfile = { ...(flow0?.profile || {}), ...(storedUser || {}), ...(me || {}) };
         setProfile(mergedProfile);
 

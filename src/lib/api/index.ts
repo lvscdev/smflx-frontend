@@ -89,9 +89,9 @@ export type UserProfile = {
 
 export async function getMe() {
   const response = await apiRequest<any>("/user", { method: "GET" });
-  return response?.data || response;
+  const profile = (response as any)?.profileInfo ?? (response as any)?.data?.profileInfo ?? response;
+  return profile;
 }
-
 export async function updateMe(payload: Partial<DashboardUserProfile>) {
   const response = await apiRequest<any>("/user", { method: "PUT", body: payload });
   return response?.data || response;

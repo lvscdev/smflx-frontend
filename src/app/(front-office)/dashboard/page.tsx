@@ -185,24 +185,24 @@ export default function DashboardPage() {
         let myRegIdForEvent: string | null = null;
 
         try {
-          console.log("📋 Fetching user registrations...");
+          if (process.env.NODE_ENV !== "production") console.log("📋 Fetching user registrations...");
           myRegistrations = await listMyRegistrations();
 
           const registrations = myRegistrations;
 
           if (!Array.isArray(registrations) || registrations.length === 0) {
-            console.warn("⚠️ User has no event registrations");
+            if (process.env.NODE_ENV !== "production") console.warn("⚠️ User has no event registrations");
 
             // Check if there's a saved flow state for incomplete registration
             const saved = safeLoadFlowState();
             if (saved?.view && saved.view !== "dashboard") {
-              console.log("📍 Resuming incomplete registration flow");
+              if (process.env.NODE_ENV !== "production") console.log("📍 Resuming incomplete registration flow");
               router.replace("/register");
               return;
             }
 
             // No registrations and no incomplete flow - redirect to event selection
-            console.log("🔄 Redirecting to event selection (no registrations)");
+            if (process.env.NODE_ENV !== "production") console.log("🔄 Redirecting to event selection (no registrations)");
             setError("You haven't registered for any events yet. Please select an event to continue.");
             setLoading(false);
             
@@ -230,7 +230,7 @@ export default function DashboardPage() {
             regDataForEvent?.participation ??
             "";
           
-          console.log("🔑 Registration ID (regId) for event:", {
+          if (process.env.NODE_ENV !== "production") console.log("🔑 Registration ID (regId) for event:", {
             eventId,
             regId: myRegIdForEvent,
             registrationData: matchForEvent,
@@ -240,19 +240,19 @@ export default function DashboardPage() {
           if (ownerRegIdLocal) {
             setOwnerRegId(ownerRegIdLocal);
           } else {
-            console.warn("⚠️ No regId found in registration data!");
+            if (process.env.NODE_ENV !== "production") console.warn("⚠️ No regId found in registration data!");
             setOwnerRegId(null);
           }
 
 
           if (!eventId) {
-            console.error("❌ Registration exists but has no eventId:", mostRecent);
+            if (process.env.NODE_ENV !== "production") console.error("❌ Registration exists but has no eventId:", mostRecent);
             setError("Registration data is incomplete. Please contact support.");
             setLoading(false);
             return;
           }
 
-          console.log(`✅ Found eventId from registrations: ${eventId}`);
+          if (process.env.NODE_ENV !== "production") console.log(`✅ Found eventId from registrations: ${eventId}`);
 
           localSelectedEvent = {
             eventId: eventId,
@@ -261,7 +261,7 @@ export default function DashboardPage() {
           setSelectedEvent(localSelectedEvent);
 
         } catch (regErr: any) {
-          console.error("❌ Failed to fetch registrations:", regErr);
+          if (process.env.NODE_ENV !== "production") console.error("❌ Failed to fetch registrations:", regErr);
           setError(regErr?.message || "Failed to load your registrations. Please try again.");
           setLoading(false);
           return;
@@ -270,7 +270,7 @@ export default function DashboardPage() {
         // 5) ✅ Now fetch dashboard data with valid eventId
         if (eventId) {
           try {
-            console.log(`📊 Fetching dashboard for eventId: ${eventId}`);
+            if (process.env.NODE_ENV !== "production") console.log(`📊 Fetching dashboard for eventId: ${eventId}`);
             const dashboardData = await getUserDashboard(eventId);
 
             setEventCache((prev) => ({ ...prev, [eventId!]: dashboardData }));
@@ -372,7 +372,7 @@ export default function DashboardPage() {
             // Strategy 2: If only one accommodation exists, use it (single-event user)
             if (!accForEvent && dashboardData.accommodations.length === 1) {
               accForEvent = dashboardData.accommodations[0];
-              console.log("✅ Using single accommodation for camper");
+              if (process.env.NODE_ENV !== "production") console.log("✅ Using single accommodation for camper");
             }
 
             // Strategy 3: If user is camper and has any accommodation, use first one
@@ -381,7 +381,7 @@ export default function DashboardPage() {
 
             if (!accForEvent && isCamper && dashboardData.accommodations.length > 0) {
               accForEvent = dashboardData.accommodations[0];
-              console.log("✅ Using first accommodation for camper (no eventId match)");
+              if (process.env.NODE_ENV !== "production") console.log("✅ Using first accommodation for camper (no eventId match)");
             }
 
             setRegistration(normalizedRegistration);
@@ -389,7 +389,7 @@ export default function DashboardPage() {
 
             // Debug logging for campers without accommodation
             if (isCamper && !accForEvent) {
-              console.warn("⚠️ Camper registration but no accommodation found:", {
+              if (process.env.NODE_ENV !== "production") console.warn("⚠️ Camper registration but no accommodation found:", {
                 eventId,
                 registrationId: regForEvent?.registrationId,
                 participationMode,
@@ -412,9 +412,9 @@ export default function DashboardPage() {
             // Persist multi-event snapshot (7-day resume)
             saveDashboardSnapshot(eventId, mergedProfile as unknown as UserProfile, dashboardData);
             
-            console.log("✅ Dashboard data loaded successfully");
+            if (process.env.NODE_ENV !== "production") console.log("✅ Dashboard data loaded successfully");
           } catch (dashErr: any) {
-            console.error("❌ Failed to fetch dashboard data:", dashErr);
+            if (process.env.NODE_ENV !== "production") console.error("❌ Failed to fetch dashboard data:", dashErr);
             setError(dashErr?.message || "Failed to load dashboard. Please try again.");
           }
         }
@@ -436,7 +436,7 @@ export default function DashboardPage() {
         });
 
       } catch (err: any) {
-        console.error("❌ Auth verification failed:", err);
+        if (process.env.NODE_ENV !== "production") console.error("❌ Auth verification failed:", err);
         const status = err?.status;
         if (status === 401 || status === 403) {
           setAuthToken(null);

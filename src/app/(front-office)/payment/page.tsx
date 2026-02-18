@@ -82,10 +82,7 @@ function PaymentCallbackInner() {
         // it is now fulfilled — clear it.
         safeSaveFlowState(flow);
       }
-      const pending = safeLoadPendingCtx();
-      if (pending?.type !== "dependents") {
-        clearPendingCtx();
-      }
+      clearPendingCtx();
       setStatus("success");
 
       // Auto-navigate after a brief moment so the user sees the tick.
@@ -107,10 +104,7 @@ function PaymentCallbackInner() {
       flow.view = "dashboard";
       safeSaveFlowState(flow);
     }
-      const pending = safeLoadPendingCtx();
-      if (pending?.type !== "dependents") {
-        clearPendingCtx();
-      }
+      clearPendingCtx();
     setStatus("success"); // optimistic — webhook is the source of truth
     const timer = setTimeout(() => router.replace("/"), 1800);
     return () => clearTimeout(timer);
@@ -141,7 +135,7 @@ function PaymentCallbackInner() {
             Payment successful
           </h2>
           <p className="text-sm text-gray-500">
-            You'll be taken to your dashboard in a moment…
+            You will be taken to your dashboard in a moment…
           </p>
         </div>
       </div>

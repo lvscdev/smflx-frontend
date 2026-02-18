@@ -286,9 +286,15 @@ export default function HomePage() {
                 accommodation,
               });
 
-              if (selectedEvent?.eventId)
+              // Returning users may not have selectedEvent in memory — let the
+              // dashboard boot() or /dashboard/select-event handle event selection
+              if (selectedEvent?.eventId) {
                 setActiveEventCookie(selectedEvent.eventId);
-              router.push("/dashboard");
+                router.push("/dashboard");
+              } else {
+                // No event context — route through select-event first
+                router.push("/dashboard/select-event");
+              }
             }}
             onCancel={() => setView("verify")}
           />
@@ -327,9 +333,6 @@ export default function HomePage() {
             isSubmitting={registrationSubmitting}
             serverError={registrationPersistError}
             onComplete={async (data) => {
-              if (process.env.NODE_ENV !== "production") {
-                console.log("Event registration data:", data);
-              }
               setRegistrationPersistError(null);
               setRegistrationSubmitting(true);
 

@@ -254,19 +254,29 @@ export async function payForDependant(payload: {
 export async function initiateDependentPayment(payload: {
   dependantId: string;
   parentRegId: string;
+  reference: string;
+  notification_url: string;
+  redirect_url: string;
 }) {
-  console.log("🔵 API Request - initiateDependentPayment:", {
-    endpoint: "/user-dashboard/pay-for-dependants",
-    payload
-  });
-  
   const response = await apiRequest<any>("/user-dashboard/pay-for-dependants", {
     method: "POST",
     body: payload,
   });
-  
-  console.log("🟢 API Response - initiateDependentPayment:", response);
-  
+
+  return response?.data || response;
+}
+
+export async function payForAllDependants(payload: {
+  parentRegId: string;
+  reference: string;
+  notification_url: string;
+  redirect_url: string;
+}) {
+  const response = await apiRequest<any>("/user-dashboard/pay-for-all-dependants", {
+    method: "POST",
+    body: payload,
+  });
+
   return response?.data || response;
 }
 
@@ -378,18 +388,19 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
 
   registrations.forEach((reg) => {
     const regObj = reg as Record<string, unknown>;
-    
+
     // If attendeeType is missing but participationMode exists, map it
     if (!regObj.attendeeType && regObj.participationMode) {
       regObj.attendeeType = mapParticipationModeToAttendeeType(regObj.participationMode as string);
     }
-    
+
     if (!regObj.eventId && eventId) {
       regObj.eventId = eventId;
     }
-  
   });
 
+  // Fallback: if the API returned a flat object instead of a registrations array,
+  // synthesize a single registration entry from the root-level fields.
   if (registrations.length === 0) {
     const flatRegId =
       (obj["registrationId"] as string | undefined) ??
@@ -407,7 +418,7 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
         : null;
 
     if (flatRegId || participationMode || eventData) {
-      const regObj: Record<string, unknown> = {
+      const flatReg: Record<string, unknown> = {
         registrationId: flatRegId,
         regId: flatRegId,
         eventId: (eventData?.["eventId"] as string | undefined) ?? eventId,
@@ -421,7 +432,7 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
           (eventData?.["eventName"] as string | undefined),
       };
 
-      registrations.push(regObj as DashboardReg);
+      registrations.push(flatReg as DashboardReg);
     }
   }
 
@@ -561,16 +572,4 @@ export async function verifyPayment(params: {
   const url = qs.toString() ? `${path}?${qs.toString()}` : path;
   const response = await apiRequest<any>(url, { method: "GET" });
   return response?.data || response;
-}
-
-export type PayForAllDependantsPayload = {
-  parentRegId: string;
-  eventId?: string;
-};
-
-export async function payForAllDependants(payload: PayForAllDependantsPayload) {
-  return apiRequest(`/user-dashboard/pay-for-all-dependants`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
 }

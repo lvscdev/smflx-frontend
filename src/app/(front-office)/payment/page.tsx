@@ -87,16 +87,19 @@ function PaymentCallbackInner() {
       clearPendingCtx();
       setStatus("success");
 
+      // Redirect to dashboard after brief success message
       const timer = setTimeout(() => router.replace("/dashboard"), 2000);
       return () => clearTimeout(timer);
     }
 
     if (rawStatus === "failed" || rawStatus === "error" || rawStatus === "cancelled") {
       setStatus("failed");
+      // Keep pending context so user can retry
       return;
     }
 
-
+    // If status is missing or unknown, redirect to dashboard with pending state
+    // The webhook will update the backend; dashboard will show current status
     if (process.env.NODE_ENV !== "production") {
       console.warn("⚠️ Payment callback with unknown status, redirecting to dashboard");
     }
@@ -107,7 +110,8 @@ function PaymentCallbackInner() {
       safeSaveFlowState(flow);
     }
     
-=    setStatus("loading");
+    // Don't clear pending context yet — let dashboard show pending state
+    setStatus("loading");
     const timer = setTimeout(() => router.replace("/dashboard"), 1500);
     return () => clearTimeout(timer);
   }, [params, router]);

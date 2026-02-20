@@ -628,29 +628,93 @@ type AccommodationData = Parameters<
     };
   }, [isDropdownOpen]);
 
-  // Load dependents on mount and when event changes
   useEffect(() => {
     let cancelled = false;
-    
+
     const loadInitialDependents = async () => {
       const eventId = activeEventId ?? resolvedEventId;
       if (!eventId) return;
 
+      // Detect post-payment return
+      let pendingCtx: { dependentIds?: string[] } | null = null;
       try {
-        const data = await getUserDashboard(eventId);
-        if (!cancelled) {
+        const raw = localStorage.getItem("smflx_pending_payment_ctx");
+        if (raw) pendingCtx = JSON.parse(raw) as { dependentIds?: string[] };
+      } catch {
+        // ignore
+      }
+
+      const isPostPayment = !!(
+        pendingCtx?.dependentIds?.length &&
+        (() => {
+          try {
+            const flow = JSON.parse(localStorage.getItem("smflx_flow_state_v1") ?? "{}") as Record<string, unknown>;
+            return flow?.paymentStatus === "success";
+          } catch {
+            return false;
+          }
+        })()
+      );
+
+      const MAX_POLLS = isPostPayment ? 6 : 1;
+      const POLL_INTERVAL_MS = 5000;
+
+      for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
+        if (cancelled) return;
+
+        try {
+          const data = await getUserDashboard(eventId);
+          if (cancelled) return;
+
           const deps = (data.dependents || []).map((d) => toDependent(d));
           setDependents(deps);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error("Failed to load dependents:", err);
+
+          // If post-payment: keep polling until the paid dependent shows up, or we run out of retries
+          if (isPostPayment && pendingCtx?.dependentIds?.length) {
+            const targetIds = pendingCtx.dependentIds as string[];
+            const allPaid = targetIds.every((id) => deps.find((d) => d.id === id)?.isPaid);
+            if (allPaid || attempt === MAX_POLLS - 1) {
+              if (!allPaid && attempt === MAX_POLLS - 1) {
+                // Retries exhausted and payment still not confirmed by backend
+                toast.warning("Payment is still being confirmed", {
+                  description:
+                    "Your payment was received but is still being processed. Please refresh your dashboard in a few minutes.",
+                  duration: 10000,
+                  action: {
+                    label: "Refresh now",
+                    onClick: () => window.location.reload(),
+                  },
+                });
+              }
+              // Clear the pending ctx so we don't keep polling on next load
+              try { localStorage.removeItem("smflx_pending_payment_ctx"); } catch { /* ignore */ }
+              // Also clear paymentStatus from flow state
+              try {
+                const raw = localStorage.getItem("smflx_flow_state_v1");
+                if (raw) {
+                  const flow = JSON.parse(raw) as Record<string, unknown>;
+                  delete flow.paymentStatus;
+                  localStorage.setItem("smflx_flow_state_v1", JSON.stringify(flow));
+                }
+              } catch { /* ignore */ }
+              break;
+            }
+            // Wait before next poll
+            await new Promise<void>((res) => setTimeout(res, POLL_INTERVAL_MS));
+          } else {
+            break;
+          }
+        } catch (err) {
+          if (!cancelled) {
+            console.error("Failed to load dependents:", err);
+          }
+          break;
         }
       }
     };
 
     void loadInitialDependents();
-    
+
     return () => {
       cancelled = true;
     };

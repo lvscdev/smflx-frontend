@@ -635,25 +635,20 @@ type AccommodationData = Parameters<
       const eventId = activeEventId ?? resolvedEventId;
       if (!eventId) return;
 
-      // Detect post-payment return
-      let pendingCtx: { dependentIds?: string[] } | null = null;
+      let pendingCtx: { dependentIds?: string[]; startedAt?: string } | null = null;
       try {
         const raw = localStorage.getItem("smflx_pending_payment_ctx");
-        if (raw) pendingCtx = JSON.parse(raw) as { dependentIds?: string[] };
+        if (raw) pendingCtx = JSON.parse(raw) as { dependentIds?: string[]; startedAt?: string };
       } catch {
         // ignore
       }
 
+      const THIRTY_MIN_MS = 30 * 60 * 1000;
+      const ctxStartedAt = pendingCtx?.startedAt ? new Date(pendingCtx.startedAt).getTime() : 0;
       const isPostPayment = !!(
         pendingCtx?.dependentIds?.length &&
-        (() => {
-          try {
-            const flow = JSON.parse(localStorage.getItem("smflx_flow_state_v1") ?? "{}") as Record<string, unknown>;
-            return flow?.paymentStatus === "success";
-          } catch {
-            return false;
-          }
-        })()
+        ctxStartedAt > 0 &&
+        Date.now() - ctxStartedAt < THIRTY_MIN_MS
       );
 
       const MAX_POLLS = isPostPayment ? 6 : 1;

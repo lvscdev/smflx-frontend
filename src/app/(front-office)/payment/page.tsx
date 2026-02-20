@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { markDependentsPaymentReturned } from "@/lib/storage/pendingDependentsPayments";
 
 const FLOW_STATE_KEY = "smflx_flow_state_v1";
 const PENDING_CTX_KEY = "smflx_pending_payment_ctx";
@@ -72,56 +73,53 @@ function PaymentCallbackInner() {
     ).toLowerCase();
 
     if (rawStatus === "success") {
+      // Payment succeeded — mark in flow state
       const flow = safeLoadFlowState();
       if (flow) {
         flow.view = "dashboard";
         flow.paymentStatus = "success";
         safeSaveFlowState(flow);
       }
-      const pending = safeLoadPendingCtx();
-      if (pending?.type === "dependents") {
-        try {
-          pending.status = "returned_success";
-          pending.completedAtMs = Date.now();
-          localStorage.setItem(PENDING_CTX_KEY, JSON.stringify(pending));
-        } catch {
-          // ignore
-        }
-      } else {
-        clearPendingCtx();
+      clearPendingCtx();
+
+      try {
+        const ref =
+          params.get("reference") ||
+          params.get("ref") ||
+          params.get("transaction_reference") ||
+          params.get("transactionReference") ||
+          "";
+        if (ref) markDependentsPaymentReturned(String(ref));
+      } catch {
+        // ignore
       }
       setStatus("success");
 
-      // Auto-navigate after a brief moment so the user sees the tick.
-      const timer = setTimeout(() => router.replace("/"), 1800);
+      // Redirect to dashboard after success message
+      const timer = setTimeout(() => router.replace("/dashboard"), 2000);
       return () => clearTimeout(timer);
     }
 
-    if (rawStatus === "failed") {
+    if (rawStatus === "failed" || rawStatus === "error" || rawStatus === "cancelled") {
       setStatus("failed");
-      // Do NOT clear pending ctx — user may retry.
+      // Keep pending context so user can retry
       return;
     }
 
+    // Unknown status — redirect to dashboard, let webhook determine truth
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("⚠️ Payment callback with unknown status, redirecting to dashboard");
+    }
+    
     const flow = safeLoadFlowState();
     if (flow) {
       flow.view = "dashboard";
       safeSaveFlowState(flow);
     }
-      const pending = safeLoadPendingCtx();
-      if (pending?.type === "dependents") {
-        try {
-          pending.status = "returned_success";
-          pending.completedAtMs = Date.now();
-          localStorage.setItem(PENDING_CTX_KEY, JSON.stringify(pending));
-        } catch {
-          // ignore
-        }
-      } else {
-        clearPendingCtx();
-      }
-    setStatus("success");
-    const timer = setTimeout(() => router.replace("/"), 1800);
+
+    // Don't assume success for unknown status
+    setStatus("loading");
+    const timer = setTimeout(() => router.replace("/dashboard"), 1500);
     return () => clearTimeout(timer);
   }, [params, router]);
 
@@ -150,7 +148,7 @@ function PaymentCallbackInner() {
             Payment successful
           </h2>
           <p className="text-sm text-gray-500">
-            You'll be taken to your dashboard in a moment…
+            You will be redirected to your dashboard in a moment…
           </p>
         </div>
       </div>

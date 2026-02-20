@@ -78,8 +78,14 @@ export default function DashboardPage() {
     async function boot() {
       const token = getAuthToken();
 
+      // Check if returning from payment — skip snapshot if so to force fresh data
+      const flowState = safeLoadFlowState();
+      const justPaid = flowState?.paymentStatus === "success";
+      
       // 0) Fast hydrate from 7-day snapshot (multi-event ready)
-      const snap = loadDashboardSnapshot();
+      // BUT skip if returning from payment to ensure fresh dependent data
+      const snap = !justPaid ? loadDashboardSnapshot() : null;
+      
       if (snap?.profile) {
         setProfile((prev) => prev ?? snap.profile);
 
@@ -119,7 +125,8 @@ export default function DashboardPage() {
             });
           }
 
-          if (preferred && String(preferred).trim()) {
+          // Only hide loading if NOT returning from payment
+          if (preferred && String(preferred).trim() && !justPaid) {
             setLoading(false);
           }
         }
@@ -172,8 +179,7 @@ export default function DashboardPage() {
 
         // 3) Fetch fresh profile from backend
         const flow0 = safeLoadFlowState() || {};
-        const meRaw = await getMe();
-        const me = (meRaw as any)?.profileInfo ?? meRaw;
+        const me = await getMe();
         const mergedProfile = { ...(flow0?.profile || {}), ...(storedUser || {}), ...(me || {}) };
         setProfile(mergedProfile);
 
@@ -434,6 +440,7 @@ export default function DashboardPage() {
           registration: regForEvent || (sameEvent ? saved0?.registration : null),
           accommodation: accForEvent || (sameEvent ? saved0?.accommodation : null),
           activeEventId: eventId || activeEventId || saved0?.activeEventId,
+          paymentStatus: undefined, // Clear payment flag after processing
         });
 
       } catch (err: any) {

@@ -6,6 +6,7 @@ import { Home, Tent, User, LogOut, X, Building2, Hotel, Users, Facebook, Instagr
 import { InlineAlert } from "./InlineAlert";
 import Image from "next/image";
 import { toast } from "sonner";
+import { loadPendingDependentsPayments, clearOldPendingDependentsPayments } from "@/lib/storage/pendingDependentsPayments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AccommodationSelection } from "./AccommodationSelection";
 import { DependentsBanner } from "./DependentsBanner";
@@ -46,8 +47,27 @@ type Dependent = {
   gender: string;
   isRegistered: boolean;
   isPaid: boolean;
-  isProcessing?: boolean;
+  isProcessing: boolean;
 };
+
+const isDependentProcessing = (dependentId: string): boolean => {
+  if (!dependentId) return false;
+  clearOldPendingDependentsPayments(3 * 60 * 60 * 1000);
+
+  const list = loadPendingDependentsPayments();
+  const now = Date.now();
+  const TTL_MS = 30 * 60 * 1000;
+
+  return list.some((it) => {
+    const ids = Array.isArray(it?.dependantIds) ? it.dependantIds : [];
+    if (!ids.includes(dependentId)) return false;
+    const startedAtMs = typeof it?.startedAtMs === "number" ? it.startedAtMs : 0;
+    if (!startedAtMs) return false;
+    if (now - startedAtMs > TTL_MS) return false;
+    return true;
+  });
+};
+
 
 const toDependent = (d: DashboardDependent): Dependent => {
   const rec = d as unknown as Record<string, unknown>;
@@ -82,40 +102,27 @@ const toDependent = (d: DashboardDependent): Dependent => {
   const isRegistered = typeof rec.isRegistered === "boolean" ? rec.isRegistered : true; // Assume registered if from API
 
   const paymentStatusRaw =
-    (rec as any).paymentStatus ?? (rec as any).payment_state ?? (rec as any).paymentState ?? (rec as any).payment;
+    (rec as any).paymentStatus ??
+    (rec as any).payment_state ??
+    (rec as any).paymentState ??
+    (rec as any).payment ??
+    (rec as any).payment_status ??
+    (rec as any).status;
 
   const paymentStatus =
     typeof paymentStatusRaw === "string" ? paymentStatusRaw.toUpperCase() : "";
 
   const isPaid =
-    typeof (rec as any).isPaid === "boolean"
-      ? Boolean((rec as any).isPaid)
+    typeof rec.isPaid === "boolean"
+      ? (rec.isPaid as boolean)
       : typeof (rec as any).paid === "boolean"
         ? Boolean((rec as any).paid)
         : ["PAID", "SUCCESS", "COMPLETED", "CONFIRMED"].includes(paymentStatus);
 
-  let isProcessing = ["PENDING", "INITIATED", "PROCESSING"].includes(paymentStatus);
-  try {
-    const raw = localStorage.getItem("smflx_pending_payment_ctx");
-    if (raw) {
-      const ctx = JSON.parse(raw);
-      if (ctx?.type === "dependents") {
-        const ids: string[] = Array.isArray(ctx?.dependentIds) ? ctx.dependentIds : [];
-        const startedAt = Number(ctx?.startedAtMs ?? Date.parse(ctx?.startedAt ?? ""));
-        const completedAt = Number(ctx?.completedAtMs ?? Date.parse(ctx?.completedAt ?? ""));
-        const now = Date.now();
-        if (ids.includes(id)) {
-          if (Number.isFinite(completedAt) && completedAt > 0) {
-            if (now - completedAt < 10 * 60 * 1000) isProcessing = true;
-          } else if (Number.isFinite(startedAt) && startedAt > 0) {
-            if (now - startedAt < 15 * 60 * 1000) isProcessing = true;
-          }
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
+  const isProcessing =
+    !isPaid &&
+    (["PENDING", "PROCESSING", "INITIATED", "IN_PROGRESS"].includes(paymentStatus) ||
+      isDependentProcessing(id));
 
   return { id, name, age, gender, isRegistered, isPaid, isProcessing };
 };
@@ -125,7 +132,10 @@ const getRegId = (registration: unknown): string | undefined => {
 
   const reg = registration as Record<string, unknown>;
 
+  // Most common on dashboard payload
   if ("regId" in reg && reg.regId != null) return String(reg.regId);
+
+  // Some backends might use id / registrationId
   if ("registrationId" in reg && reg.registrationId != null) return String(reg.registrationId);
   if ("id" in reg && reg.id != null) return String(reg.id);
 
@@ -282,6 +292,7 @@ export function Dashboard({
     setDashboardHydrating(true);
     setDashboardLoadError(null);
 
+    // Resolve eventId (registration → flow state → legacy)
     const resolvedEventId: string | undefined = (() => {
       if (registration?.eventId) return registration.eventId;
       if (typeof window === "undefined") return undefined;
@@ -447,6 +458,7 @@ export function Dashboard({
         }).length;
 
         const totalCapacity = items.reduce((sum, i) => {
+          // prefer totalSpaces, else totalCapacity, else availableSpaces
           const cap =
             Number(i?.totalSpaces ?? i?.totalCapacity ?? i?.availableSpaces ?? 0) ||
             0;
@@ -528,7 +540,7 @@ export function Dashboard({
   gender: string;
   isRegistered: boolean;
   isPaid: boolean;
-  isProcessing?: boolean;
+  isProcessing: boolean;
 };
 
 const getErrorMessage = (err: unknown, fallback: string) =>
@@ -616,29 +628,88 @@ type AccommodationData = Parameters<
     };
   }, [isDropdownOpen]);
 
-  // Load dependents on mount and when event changes
   useEffect(() => {
     let cancelled = false;
-    
+
     const loadInitialDependents = async () => {
       const eventId = activeEventId ?? resolvedEventId;
       if (!eventId) return;
 
+      let pendingCtx: { dependentIds?: string[]; startedAt?: string } | null = null;
       try {
-        const data = await getUserDashboard(eventId);
-        if (!cancelled) {
+        const raw = localStorage.getItem("smflx_pending_payment_ctx");
+        if (raw) pendingCtx = JSON.parse(raw) as { dependentIds?: string[]; startedAt?: string };
+      } catch {
+        // ignore
+      }
+
+      const THIRTY_MIN_MS = 30 * 60 * 1000;
+      const ctxStartedAt = pendingCtx?.startedAt ? new Date(pendingCtx.startedAt).getTime() : 0;
+      const isPostPayment = !!(
+        pendingCtx?.dependentIds?.length &&
+        ctxStartedAt > 0 &&
+        Date.now() - ctxStartedAt < THIRTY_MIN_MS
+      );
+
+      const MAX_POLLS = isPostPayment ? 6 : 1;
+      const POLL_INTERVAL_MS = 5000;
+
+      for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
+        if (cancelled) return;
+
+        try {
+          const data = await getUserDashboard(eventId);
+          if (cancelled) return;
+
           const deps = (data.dependents || []).map((d) => toDependent(d));
           setDependents(deps);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error("Failed to load dependents:", err);
+
+          // If post-payment: keep polling until the paid dependent shows up, or we run out of retries
+          if (isPostPayment && pendingCtx?.dependentIds?.length) {
+            const targetIds = pendingCtx.dependentIds as string[];
+            const allPaid = targetIds.every((id) => deps.find((d) => d.id === id)?.isPaid);
+            if (allPaid || attempt === MAX_POLLS - 1) {
+              if (!allPaid && attempt === MAX_POLLS - 1) {
+                // Retries exhausted and payment still not confirmed by backend
+                toast.warning("Payment is still being confirmed", {
+                  description:
+                    "Your payment was received but is still being processed. Please refresh your dashboard in a few minutes.",
+                  duration: 10000,
+                  action: {
+                    label: "Refresh now",
+                    onClick: () => window.location.reload(),
+                  },
+                });
+              }
+              // Clear the pending ctx so we don't keep polling on next load
+              try { localStorage.removeItem("smflx_pending_payment_ctx"); } catch { /* ignore */ }
+              // Also clear paymentStatus from flow state
+              try {
+                const raw = localStorage.getItem("smflx_flow_state_v1");
+                if (raw) {
+                  const flow = JSON.parse(raw) as Record<string, unknown>;
+                  delete flow.paymentStatus;
+                  localStorage.setItem("smflx_flow_state_v1", JSON.stringify(flow));
+                }
+              } catch { /* ignore */ }
+              break;
+            }
+            // Wait before next poll
+            await new Promise<void>((res) => setTimeout(res, POLL_INTERVAL_MS));
+          } else {
+            break;
+          }
+        } catch (err) {
+          if (!cancelled) {
+            console.error("Failed to load dependents:", err);
+          }
+          break;
         }
       }
     };
 
     void loadInitialDependents();
-    
+
     return () => {
       cancelled = true;
     };
@@ -1214,13 +1285,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           onManageDependents={() => setIsDependentsModalOpen(true)}
         />
 
-        <DependentsSection
-          dependents={dependents}
-          onRegister={handleRegisterDependent}
-          onPay={handlePayForDependents}
-        />
-
-        
         {/* Top grid */}
         <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
           {/* Event card */}
@@ -1322,67 +1386,66 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         {isCamper && (
           normalizedAccommodation && !accommodationHoldExpired ? (
             <div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-2">
-                    <Home className="w-5 h-5 text-gray-700" />
-                    <h3 className="text-lg lg:text-xl font-semibold">
-                      Accommodation Details
-                    </h3>
-                  </div>
-                  <span
-                    className={
-                      "px-3 py-1 text-sm rounded-full " +
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Home className="w-5 h-5 text-gray-700" />
+                  <h3 className="text-lg lg:text-xl font-semibold">
+                    Accommodation Details
+                  </h3>
+                </div>
+                <span
+                  className={
+                    "px-3 py-1 text-sm rounded-full " +
                     (paidForAccommodation
                       ? "bg-gray-100 text-gray-700"
                       : "bg-amber-50 text-amber-800 border border-amber-200")
-                    }
-                    >
-                    {paidForAccommodation ? "Reserved" : "Pending Payment"}
+                  }
+                >
+                  {paidForAccommodation ? "Reserved" : "Pending Payment"}
+                </span>
+              </div>
+
+              <div className="grid lg:grid-cols-2 gap-6 items-center">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                  <div>
+                    <span className="text-sm text-gray-500 block mb-2">Type</span>
+                    <span className="text-base font-semibold">
+                      {(() => {
+                        const a = normalizedAccommodation as Record<string, unknown>;
+                        if (typeof a.accommodationType === "string") return a.accommodationType;
+                        if (typeof a.type === "string") return a.type;
+                        return "Hostel";
+                      })()}
                     </span>
-            </div>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-500 block mb-2">Hall</span>
+                    <span className="text-base font-semibold">
+                      {(accommodationFacilityName || "").replace(/-/g, " ") || "—"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-500 block mb-2">Room</span>
+                    <span className="text-base font-semibold">
+                      {(accommodationBedspaceLabel || accommodationRoomLabel || "—").replace(/-/g, " ")}
+                    </span>
+                  </div>
+                </div>
 
-            <div className="grid lg:grid-cols-2 gap-6 items-center">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                <div>
-                  <span className="text-sm text-gray-500 block mb-2">Type</span>
-                      <span className="text-base font-semibold">
-                        {(() => {
-                          const a = normalizedAccommodation as Record<string, unknown>;
-                          if (typeof a.accommodationType === "string") return a.accommodationType;
-                          if (typeof a.type === "string") return a.type;
-                          return "Hostel";
-                        })()}
-                      </span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500 block mb-2">Hall</span>
-                  <span className="text-base font-semibold">
-                    {(accommodationFacilityName || "").replace(/-/g, " ") || "—"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500 block mb-2">
-                    Room
-                  </span>
-                  <span className="text-base font-semibold">
-                    {(accommodationBedspaceLabel || accommodationRoomLabel || "—").replace(/-/g, " ")}
-                  </span>
+                <div className="rounded-2xl overflow-hidden h-35 lg:h-40">
+                  <Image
+                    src={
+                      accommodationImageUrl ||
+                      "https://images.unsplash.com/photo-1694595437436-2ccf5a95591f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1080"
+                    }
+                    alt="Accommodation"
+                    width={1080}
+                    height={400}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               </div>
 
-              <div className="rounded-2xl overflow-hidden h-35 lg:h-40">
-                <Image
-                  src={accommodationImageUrl || "https://images.unsplash.com/photo-1694595437436-2ccf5a95591f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1080"}
-                  alt="Accommodation"
-                  width={1080}
-                  height={400}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-
-            {isCamper && (
-              normalizedAccommodation ? (
               <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div className="text-sm text-gray-600">
                   {paidForAccommodation ? (
@@ -1405,7 +1468,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                             .
                           </>
                         ) : null}{" "}
-                        If the hold expires, you’ll need to book again.
+                        If the hold expires, you will need to book again.
                       </div>
                     </div>
                   )}
@@ -1418,9 +1481,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   >
                     <RefreshCcw
                       className={
-                        dashboardHydrating
-                          ? "w-4 h-4 animate-spin"
-                          : "w-4 h-4"
+                        dashboardHydrating ? "w-4 h-4 animate-spin" : "w-4 h-4"
                       }
                     />
                     Refresh
@@ -1429,18 +1490,19 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   {!paidForAccommodation && (
                     <button
                       onClick={() => {
-                        setIsAccommodationModalOpen(true);
-
                         if (!localProfile?.ageRange) {
-                          toast.error("Please update your Age Range in your profile before booking accommodation.");
+                          toast.error(
+                            "Please update your Age Range in your profile before booking accommodation."
+                          );
                           return;
                         }
                         if (!localProfile?.gender) {
-                          toast.error("Please update your Gender in your profile before booking accommodation.");
+                          toast.error(
+                            "Please update your Gender in your profile before booking accommodation."
+                          );
                           return;
                         }
                         setIsAccommodationModalOpen(true);
-
                         setModalStep(1);
                       }}
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -1450,25 +1512,22 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   )}
                 </div>
               </div>
-  ) : (
-<div className="rounded-xl border p-4">
-  <p className="font-medium">Accommodation</p>
-  <p className="text-sm opacity-80">
-    You’re registered as a camper. Your accommodation details aren’t loaded yet.
-  </p>
-</div>
-  )
-)}
-          </div>
-  ) : (
-<div className="rounded-xl border p-4">
-  <p className="font-medium">Accommodation</p>
-  <p className="text-sm opacity-80">
-    You’re registered as a camper. Your accommodation details aren’t loaded yet.
-  </p>
-</div>
-  )
-)}
+            </div>
+          ) : (
+            <div className="rounded-xl border p-4 mb-6">
+              <p className="font-medium">Accommodation</p>
+              <p className="text-sm opacity-80">
+                You are registered as a camper. Your accommodation details are yet to load.
+              </p>
+            </div>
+          )
+        )}
+
+        <DependentsSection
+          dependents={dependents}
+          onRegister={handleRegisterDependent}
+          onPay={handlePayForDependents}
+        />
 
         {/* Non-camper upgrade CTA (re-using your existing promo card) */}
         {showAccommodationPromo && (

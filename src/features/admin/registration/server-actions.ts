@@ -6,7 +6,7 @@ import { Gender } from "./types/api-types";
 import { BASE_URL } from "@/lib/base-url";
 
 const REGISTRATION_BASE_URL = `${BASE_URL}/registrations`;
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 type RegistrationFilters = {
   type?: string;
@@ -18,6 +18,7 @@ type RegistrationFilters = {
 type GetRegistrationsArgs = {
   eventId: string;
   page: number;
+  pageSize?: number;
   filters?: RegistrationFilters;
 };
 
@@ -62,6 +63,7 @@ function normalizeText(value?: string) {
 export async function getRegistrationsByEventId({
   eventId,
   page,
+  pageSize = DEFAULT_PAGE_SIZE,
   filters,
 }: GetRegistrationsArgs): Promise<{
   data: RegistrationTableUi[];
@@ -71,6 +73,7 @@ export async function getRegistrationsByEventId({
     campers: number;
     nonCampers: number;
     onlineAttendees: number;
+    totalRevenueSuccessful: number;
   };
 }> {
   const token = (await cookies()).get("admin_session")?.value;
@@ -79,7 +82,12 @@ export async function getRegistrationsByEventId({
       data: [],
       totalPages: 1,
       totalRegistrations: 0,
-      stats: { campers: 0, nonCampers: 0, onlineAttendees: 0 },
+      stats: {
+        campers: 0,
+        nonCampers: 0,
+        onlineAttendees: 0,
+        totalRevenueSuccessful: 0,
+      },
     };
 
   async function fetchPage(pageNumber: number) {
@@ -145,6 +153,20 @@ export async function getRegistrationsByEventId({
   const gender = (filters?.gender ?? "").toUpperCase();
   const payment = normalizePaymentStatus(filters?.payment);
 
+  const totalRegistrations = enriched.length;
+  const stats = {
+    campers: enriched.filter(r => r.participationMode === "CAMPER").length,
+    nonCampers: enriched.filter(r => r.participationMode === "NON_CAMPER")
+      .length,
+    onlineAttendees: enriched.filter(r => r.participationMode === "ONLINE")
+      .length,
+    totalRevenueSuccessful: enriched.reduce((sum, r) => {
+      const amount = Number(r.user?.amount ?? 0);
+      const isSuccessful = r.user?.paymentStatus === "SUCCESSFUL";
+      return sum + (isSuccessful ? amount : 0);
+    }, 0),
+  };
+
   const filtered = enriched.filter(r => {
     if (query) {
       const name = normalizeText(r.user?.fullName);
@@ -163,18 +185,10 @@ export async function getRegistrationsByEventId({
     return true;
   });
 
-  const totalRegistrations = filtered.length;
-  const stats = {
-    campers: filtered.filter(r => r.participationMode === "CAMPER").length,
-    nonCampers: filtered.filter(r => r.participationMode === "NON_CAMPER")
-      .length,
-    onlineAttendees: filtered.filter(r => r.participationMode === "ONLINE")
-      .length,
-  };
-  const totalPages = Math.max(1, Math.ceil(totalRegistrations / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(Math.max(page, 1), totalPages);
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const data = filtered.slice(start, start + PAGE_SIZE);
+  const start = (currentPage - 1) * pageSize;
+  const data = filtered.slice(start, start + pageSize);
 
   return {
     data,

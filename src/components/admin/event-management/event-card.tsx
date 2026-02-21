@@ -12,17 +12,12 @@ async function EventCard({ event }: { event: Event }) {
   const role = "ADMIN"; // TODO: replace with real role from session
   const status = getEventStatusBadge(event.eventStatus);
 
-  const { data: registrations, totalRegistrations } =
-    await getRegistrationsByEventId({
-      eventId: event.eventId,
-      page: 1,
-    });
+  const { totalRegistrations, stats } = await getRegistrationsByEventId({
+    eventId: event.eventId,
+    page: 1,
+  });
 
-  const totalRevenue = (registrations ?? []).reduce((sum, r) => {
-    const amount = r.user?.amount ?? 0;
-    const paid = r.user?.paymentStatus === "SUCCESSFUL";
-    return sum + (paid ? amount : 0);
-  }, 0);
+  const totalRevenue = stats.totalRevenueSuccessful;
 
   return (
     <Card className="rounded-2xl bg-slate-50 border-slate-300">

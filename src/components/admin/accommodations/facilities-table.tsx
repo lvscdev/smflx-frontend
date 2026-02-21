@@ -46,9 +46,12 @@ export function FacilitiesTable({
   loading?: boolean;
   selectedEventId: string;
 }) {
+  const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
   const [facilityType, setFacilityType] = useState<FacilityTypeFilter>("all");
 
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   // const filteredFacilities = useMemo(() => {
   //   return facilities.filter(facility => {
@@ -82,6 +85,29 @@ export function FacilitiesTable({
     });
   }, [facilities, facilityType, search]);
 
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredFacilities.length / pageSize),
+  );
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * pageSize;
+  const pagedFacilities = filteredFacilities.slice(start, start + pageSize);
+
+  function handlePageSizeChange(value: string) {
+    setPageSize(Number(value));
+    setPage(1);
+  }
+
+  function handleFilterChange(value: FacilityTypeFilter) {
+    setFacilityType(value);
+    setPage(1);
+  }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
+
   return (
     <div className="rounded-xl border bg-white">
       {/* Header */}
@@ -98,7 +124,7 @@ export function FacilitiesTable({
           <Select
             value={facilityType}
             onValueChange={value =>
-              setFacilityType(value as typeof facilityType)
+              handleFilterChange(value as FacilityTypeFilter)
             }
           >
             <SelectTrigger className="w-40">
@@ -116,7 +142,7 @@ export function FacilitiesTable({
             placeholder="Facility Name"
             className="w-48"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
           />
         </div>
       </div>
@@ -143,14 +169,14 @@ export function FacilitiesTable({
                 <FacilitiesTableSkeletonRows />
               </TableCell>
             </TableRow>
-          ) : filteredFacilities.length === 0 ? (
+          ) : pagedFacilities.length === 0 ? (
             <TableRow>
               <TableCell colSpan={8} className="text-center py-10">
                 No facilities found
               </TableCell>
             </TableRow>
           ) : (
-            filteredFacilities.map(facility => (
+            pagedFacilities.map(facility => (
               <TableRow key={facility.facilityId}>
                 <TableCell>{facility.eventName}</TableCell>
 
@@ -216,15 +242,59 @@ export function FacilitiesTable({
 
       {/* Pagination (UI only for now) */}
       <div className="flex items-center justify-between px-4 py-3 border-t">
-        <Button variant="outline" size="sm">
-          ← Previous
-        </Button>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Rows per page</span>
+          <select
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+            value={String(pageSize)}
+            onChange={e => handlePageSizeChange(e.target.value)}
+          >
+            {PAGE_SIZE_OPTIONS.map(size => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <div className="text-sm text-muted-foreground">Page 1 of 10</div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={safePage <= 1}
+            onClick={() => setPage(safePage - 1)}
+          >
+            Previous
+          </Button>
 
-        <Button variant="outline" size="sm">
-          Next →
-        </Button>
+          {Array.from({ length: totalPages })
+            .slice(0, 10)
+            .map((_, i) => {
+              const p = i + 1;
+              return (
+                <Button
+                  key={p}
+                  size="sm"
+                  variant={p === safePage ? "default" : "ghost"}
+                  onClick={() => setPage(p)}
+                  className={p === safePage ? "bg-brand-blue-400" : ""}
+                >
+                  {p}
+                </Button>
+              );
+            })}
+
+          {totalPages > 10 && <span className="px-1">…</span>}
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={safePage >= totalPages}
+            onClick={() => setPage(safePage + 1)}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );

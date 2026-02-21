@@ -44,6 +44,7 @@ export default function RegistrationsClient({
   const router = useRouter();
   const params = useSearchParams();
   const page = Number(params.get("page") ?? 1);
+  const pageSize = Number(params.get("pageSize") ?? 10);
   const [emailOpen, setEmailOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -75,9 +76,25 @@ export default function RegistrationsClient({
     });
   }
 
-  function resetFilters() {
+  function updatePageSize(nextPageSize: number) {
+    const sp = new URLSearchParams(params.toString());
+    sp.set("pageSize", String(nextPageSize));
+    sp.set("page", "1");
+
     startTransition(() => {
-      router.replace("?page=1", { scroll: false });
+      router.replace(`?${sp.toString()}`, { scroll: false });
+    });
+  }
+
+  function resetFilters() {
+    const sp = new URLSearchParams(params.toString());
+    const currentPageSize = sp.get("pageSize") ?? "10";
+    sp.forEach((_, key) => sp.delete(key));
+    sp.set("page", "1");
+    sp.set("pageSize", currentPageSize);
+
+    startTransition(() => {
+      router.replace(`?${sp.toString()}`, { scroll: false });
     });
   }
 
@@ -187,10 +204,12 @@ export default function RegistrationsClient({
           <RegistrationsTable
             data={data}
             page={page}
+            pageSize={pageSize}
             totalPages={totalPages}
             isPending={isPending}
             isReadOnly={isReadOnly}
             onPageChange={updatePage}
+            onPageSizeChange={updatePageSize}
           />
         </div>
       </div>

@@ -15,14 +15,12 @@ export function ComingSoon({
   onAction,
 }: ComingSoonProps) {
   return (
-    <div className="flex items-center h-full justify-center px-6 text-center">
+    <div className="h-full flex items-center justify-center text-center">
       <div className="w-full max-w-xl">
         <LottiePlayer
           animationData={comingSoonAnimation}
-          className="mx-auto h-64 w-64"
+          className="mx-auto h-60 w-60"
         />
-
-        {/* <h1 className="mt-6 text-2xl font-bold text-gray-900">{title}</h1> */}
 
         <p className="font-medium text-2xl">{description}</p>
 

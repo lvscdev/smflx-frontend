@@ -1,17 +1,15 @@
 import { ReactNode } from "react";
-import { redirect } from "next/navigation";
-import { assertAdminSession } from "@/features/admin/auth/server-actions";
+import { AdminLayoutWrapper } from "@/components/admin/layout/admin-layout-wrapper";
+import { AuthProvider } from "@/features/admin/auth/auth-context";
 
-export default async function AdminLayout({
+export default function AdminLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const isValid = await assertAdminSession();
-
-  if (!isValid) {
-    redirect("/admin/login");
-  }
-
-  return children;
+  return (
+    <AuthProvider>
+      <AdminLayoutWrapper>{children}</AdminLayoutWrapper>
+    </AuthProvider>
+  );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { logoutAdmin } from "@/features/admin/auth/server-actions";
+import { logoutAdmin } from "@/features/admin/auth/client-actions";
 import { toast } from "sonner";
 import { useTransition } from "react";
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -33,10 +34,26 @@ function RegistrationsFilters({
   onReset: () => void;
 }) {
   const searchParams = useSearchParams();
+  const [localSearch, setLocalSearch] = useState(searchValue);
+
+  useEffect(() => {
+    setLocalSearch(searchValue);
+  }, [searchValue]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== searchValue) {
+        onSearch(localSearch);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [localSearch, onSearch, searchValue]);
 
   function exportCsv() {
     const sp = new URLSearchParams(searchParams.toString());
     sp.set("eventId", eventId);
+    sp.delete("page");
     window.location.href = `/api/export?${sp.toString()}`;
   }
 
@@ -44,10 +61,10 @@ function RegistrationsFilters({
     <div className="flex justify-between items-center gap-3">
       <div className="flex items-center gap-3">
         <Input
-          value={searchValue}
+          value={localSearch}
           placeholder="Search by name or email..."
           className="max-w-60 border-slate-500 !bg-inherit focus-visible:ring-0 rounded-xl"
-          onChange={e => onSearch(e.target.value)}
+          onChange={e => setLocalSearch(e.target.value)}
         />
 
         <Select
@@ -88,7 +105,7 @@ function RegistrationsFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Payments</SelectItem>
-            <SelectItem value="COMPLETED">Completed</SelectItem>
+            <SelectItem value="SUCCESSFUL">Successful</SelectItem>
             <SelectItem value="PENDING">Pending</SelectItem>
           </SelectContent>
         </Select>

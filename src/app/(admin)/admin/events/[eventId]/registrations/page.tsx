@@ -70,7 +70,7 @@ export default async function RegistrationsPage({
   const sp = await searchParams;
   const page = Number(sp.page ?? "1");
 
-  const { data, totalPages, totalRegistrations } =
+  const { data, totalPages, totalRegistrations, stats } =
     await getRegistrationsByEventId({
       eventId,
       page,
@@ -89,6 +89,7 @@ export default async function RegistrationsPage({
         data={data}
         totalPages={totalPages}
         totalRegistrations={totalRegistrations}
+        stats={stats}
       />
     </Suspense>
   );

@@ -2,20 +2,40 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-// import { fetchEvents, fetchEventById, fetchActiveEvent } from "./api";
 import { Event } from "./types";
 import { authHeaders } from "./auth";
 import { mapCreateEventFormToApi } from "./event-mapper";
 import { createEventSchema, editEventSchema } from "./event-form-schema";
 
-import { assertAdminSession } from "../auth/server-actions";
 import { BASE_URL } from "@/lib/base-url";
+import { AdminSessionResponse } from "../auth/types";
 
 const EVENTS_BASE_URL = `${BASE_URL}/events`;
 
+/**
+ * Helper to validate session from token
+ */
+async function validateSessionFromToken(
+  token: string,
+): Promise<AdminSessionResponse> {
+  const res = await fetch(`${BASE_URL}/admin-x-auth/login`, {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Unauthorized");
+  }
+
+  const response = (await res.json()).data.userDetails as AdminSessionResponse;
+  return response;
+}
+
 export async function getAllEvents(): Promise<Event[]> {
   const token = (await cookies()).get("admin_session")?.value;
-  // console.log("Token:", token);
   if (!token) return [];
 
   const res = await fetch(`${EVENTS_BASE_URL}`, {
@@ -54,7 +74,7 @@ export async function createEventAction(formValues: unknown) {
   const token = (await cookies()).get("admin_session")?.value;
   if (!token) throw new Error("Unauthorized");
 
-  const session = await assertAdminSession();
+  const session = await validateSessionFromToken(token);
 
   // console.log("User Session:", session);
   if (!session) throw new Error("Unauthorized");
@@ -93,12 +113,12 @@ export async function updateEventAction(eventId: string, formValues: unknown) {
   // 1️⃣ Validate input
   const values = editEventSchema.parse(formValues);
 
-  // 2️⃣ Auth
-  const session = await assertAdminSession();
-  if (!session) throw new Error("Unauthorized");
-
   const token = (await cookies()).get("admin_session")?.value;
   if (!token) throw new Error("Unauthorized");
+
+  // 2️⃣ Auth
+  const session = await validateSessionFromToken(token);
+  if (!session) throw new Error("Unauthorized");
 
   // 3️⃣ Map form → backend payload
   const payload = {

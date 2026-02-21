@@ -1,20 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AdminSessionResponse } from "@/features/admin/auth/types";
-import { assertAdminSession } from "@/features/admin/auth/server-actions";
+import { useAuthContext } from "@/features/admin/auth/auth-context";
 
+/**
+ * Hook to access admin session data
+ * Must be used within AuthProvider
+ */
 export function useAdminSession() {
-  const [session, setSession] = useState<AdminSessionResponse | null>(null);
-
-  useEffect(() => {
-    async function fetchSession() {
-      const data = await assertAdminSession();
-      setSession(data);
-    }
-
-    fetchSession();
-  }, []);
-
+  const { session } = useAuthContext();
   return session;
 }

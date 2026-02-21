@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Facility } from "@/features/admin/accommodation/types";
 import { Event } from "@/features/admin/events/types";
+import { FacilitiesTableSkeletonRows } from "@/components/admin/accommodations/facilities-table-skeleton";
 
 type FacilityTypeFilter = "all" | string;
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString();
@@ -138,8 +139,8 @@ export function FacilitiesTable({
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-10">
-                Loading facilities...
+              <TableCell colSpan={8} className="py-2">
+                <FacilitiesTableSkeletonRows />
               </TableCell>
             </TableRow>
           ) : filteredFacilities.length === 0 ? (

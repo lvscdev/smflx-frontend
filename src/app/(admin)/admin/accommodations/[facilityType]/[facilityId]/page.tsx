@@ -11,6 +11,38 @@ import { RoomsSection } from "@/components/admin/accommodations/rooms-section";
 import { AddRoomModal } from "@/components/admin/accommodations/add-room-modal";
 
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function FacilityDetailsSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <Skeleton className="h-10 w-36 animate-skeleton" />
+
+      <div className="rounded-2xl border border-slate-200 p-6 space-y-4">
+        <Skeleton className="h-8 w-72 animate-skeleton" />
+        <Skeleton className="h-4 w-56 animate-skeleton" />
+        <div className="flex justify-end">
+          <Skeleton className="h-10 w-40 animate-skeleton" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-xl animate-skeleton" />
+        ))}
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 p-6 space-y-4">
+        <Skeleton className="h-6 w-56 animate-skeleton" />
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full animate-skeleton" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function FacilityDetailsPage() {
   const router = useRouter();
@@ -41,7 +73,7 @@ export default function FacilityDetailsPage() {
     loadFacility();
   }, [facilityType, facilityId]);
 
-  if (loading) return <div className="p-6">Loading...</div>;
+  if (loading) return <FacilityDetailsSkeleton />;
   if (!facility) return <div className="p-6">Not Found</div>;
 
   return (

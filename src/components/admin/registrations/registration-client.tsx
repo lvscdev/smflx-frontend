@@ -13,7 +13,6 @@ import {
 import { ArrowLeft2 } from "iconsax-reactjs";
 
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import RegistrationsTable from "./table";
 import SendEmailModal from "./send-email-modal";
 import SendNotificationModal from "./send-notifications-modal";
@@ -22,7 +21,6 @@ import { StatsCard } from "./registration-stats";
 import { RegistrationsFilters } from "./filters";
 
 import { Registration } from "@/features/admin/registration/types/mapped-types"; // ✅ ADD THIS
-import { AddRegistrationModal } from "./add-registration/add-registration-modal";
 import { useEventInfo } from "@/hooks/useEventInfo";
 
 export default function RegistrationsClient({
@@ -30,11 +28,17 @@ export default function RegistrationsClient({
   data,
   totalPages,
   totalRegistrations,
+  stats,
 }: {
   eventId: string;
   data: Registration[];
   totalPages: number;
   totalRegistrations: number;
+  stats: {
+    campers: number;
+    nonCampers: number;
+    onlineAttendees: number;
+  };
 }) {
   const isReadOnly = false; // Assuming event is always open for now
   const router = useRouter();
@@ -42,7 +46,6 @@ export default function RegistrationsClient({
   const page = Number(params.get("page") ?? 1);
   const [emailOpen, setEmailOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const eventInfo = useEventInfo(eventId);
@@ -57,18 +60,25 @@ export default function RegistrationsClient({
   function updatePage(page: number) {
     const sp = new URLSearchParams(params.toString());
     sp.set("page", String(page));
-    router.push(`?${sp.toString()}`, { scroll: false });
+    startTransition(() => {
+      router.replace(`?${sp.toString()}`, { scroll: false });
+    });
   }
 
   function updateFilter(key: string, value?: string) {
     const sp = new URLSearchParams(params.toString());
-    value ? sp.set(key, value) : sp.delete(key);
+    const normalized = value?.trim();
+    normalized ? sp.set(key, normalized) : sp.delete(key);
     sp.set("page", "1"); // reset page only on filter/search
-    router.push(`?${sp.toString()}`, { scroll: false });
+    startTransition(() => {
+      router.replace(`?${sp.toString()}`, { scroll: false });
+    });
   }
 
   function resetFilters() {
-    router.push("?page=1", { scroll: false });
+    startTransition(() => {
+      router.replace("?page=1", { scroll: false });
+    });
   }
 
   return (
@@ -119,9 +129,7 @@ export default function RegistrationsClient({
             <Button
               variant="default"
               className="bg-brand-red hover:bg-brand-red/80"
-              onClick={() => {
-                setAddOpen(true);
-              }}
+              onClick={() => {}}
               disabled={isReadOnly}
             >
               <Plus /> Add Registration
@@ -141,7 +149,7 @@ export default function RegistrationsClient({
 
         <StatsCard
           label="Campers"
-          value={data.filter(r => r.participationMode === "CAMPER").length}
+          value={stats.campers}
           icon={<User2Icon size={20} />}
           iconBg="orange"
           meta="+0% from last year"
@@ -149,7 +157,7 @@ export default function RegistrationsClient({
 
         <StatsCard
           label="Non-Campers"
-          value={data.filter(r => r.participationMode === "NON_CAMPER").length}
+          value={stats.nonCampers}
           icon={<UserPlus2Icon size={20} />}
           iconBg="purple"
           meta="+0% from last year"
@@ -157,7 +165,7 @@ export default function RegistrationsClient({
 
         <StatsCard
           label="Online Attendees"
-          value={data.filter(r => r.participationMode === "ONLINE").length}
+          value={stats.onlineAttendees}
           icon={<User2Icon size={20} />}
           iconBg="red"
           meta="+0% from last year"

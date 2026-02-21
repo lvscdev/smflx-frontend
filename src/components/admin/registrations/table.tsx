@@ -132,6 +132,8 @@ function RegistrationsTable({
     pageCount: totalPages,
   });
 
+  console.log("Registrations:", data);
+
   return (
     <div className="space-y-4">
       {/* Table */}

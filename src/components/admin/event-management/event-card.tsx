@@ -18,6 +18,12 @@ async function EventCard({ event }: { event: Event }) {
       page: 1,
     });
 
+  const totalRevenue = (registrations ?? []).reduce((sum, r) => {
+    const amount = r.user?.amount ?? 0;
+    const paid = r.user?.paymentStatus === "SUCCESSFUL";
+    return sum + (paid ? amount : 0);
+  }, 0);
+
   return (
     <Card className="rounded-2xl bg-slate-50 border-slate-300">
       <CardContent className="space-y-6 p-6">
@@ -43,7 +49,10 @@ async function EventCard({ event }: { event: Event }) {
             value={totalRegistrations ?? 0}
           />
 
-          <StatsCard label="Total Revenue" value={`₦${(0).toLocaleString()}`} />
+          <StatsCard
+            label="Total Revenue"
+            value={`₦${totalRevenue.toLocaleString()}`}
+          />
 
           <StatsCard label="Status" value={status.label} />
         </div>

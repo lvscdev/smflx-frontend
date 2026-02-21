@@ -9,10 +9,11 @@ import { Loader2 } from "lucide-react";
 
 import { adminOtpSchema, AdminOtpInput } from "@/features/admin/auth/schemas";
 import {
-  validateAdminOtpAction,
-  resendAdminOtpAction,
-} from "@/features/admin/auth/server-actions";
+  validateAdminOtpClient,
+  resendAdminOtpClient,
+} from "@/features/admin/auth/client-actions";
 import { useCountdown } from "@/hooks/useCountdown";
+import { useRouter } from "next/navigation";
 
 import {
   Form,
@@ -27,6 +28,7 @@ import { Label } from "@/components/ui/label";
 
 export function AdminOtpForm() {
   const params = useSearchParams();
+  const router = useRouter();
 
   const [isVerifying, startVerify] = useTransition();
   const [isResending, startResend] = useTransition();
@@ -65,7 +67,15 @@ export function AdminOtpForm() {
 
   function onSubmit(values: AdminOtpInput) {
     startVerify(async () => {
-      await validateAdminOtpAction(values, redirect);
+      try {
+        await validateAdminOtpClient(values);
+        toast.success("Log in successful");
+        router.push(redirect);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "OTP verification failed",
+        );
+      }
     });
   }
 
@@ -73,13 +83,7 @@ export function AdminOtpForm() {
 
   // function onSubmit(values: AdminOtpInput) {
   //   startVerify(async () => {
-  //     try {
-  //       await validateAdminOtpAction(values, redirect);
-  //     } catch (error) {
-  //       toast.error(
-  //         error instanceof Error ? error.message : "OTP verification failed",
-  //       );
-  //     }
+  //     await validateAdminOtpAction(values, redirect);
   //   });
   // }
 
@@ -88,7 +92,7 @@ export function AdminOtpForm() {
 
     startResend(async () => {
       try {
-        const res = await resendAdminOtpAction({ email });
+        const res = await resendAdminOtpClient({ email });
 
         toast.success("New OTP sent to your email");
 

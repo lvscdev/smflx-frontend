@@ -1,12 +1,12 @@
 import { Gender } from "./api-types";
 import { Registration } from "./mapped-types";
 
-export type PaymentStatus = "COMPLETED" | "PENDING" | "FAILED";
+export type PaymentStatus = "SUCCESSFUL" | "PENDING" | "false";
 
 export const paymentStatusLabel: Record<PaymentStatus, string> = {
-  COMPLETED: "Completed",
+  SUCCESSFUL: "Successful",
   PENDING: "Pending",
-  FAILED: "Failed",
+  false: "Not paid",
 };
 
 export interface RegistrationTableUi extends Registration {

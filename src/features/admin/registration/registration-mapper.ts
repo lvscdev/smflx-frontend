@@ -24,7 +24,7 @@ export const accommodationTypeLabel: Record<AccommodationType, string> = {
 };
 
 export const paymentStatusBadgeClass: Record<PaymentStatus, string> = {
-  COMPLETED: "bg-green-100 text-green-700",
+  SUCCESSFUL: "bg-green-100 text-green-700",
   PENDING: "bg-amber-100 text-amber-700",
-  FAILED: "bg-red-100 text-red-700",
+  false: "bg-slate-200 text-slate-700",
 };

@@ -39,9 +39,11 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString();
 export function FacilitiesTable({
   facilities,
   loading,
+  selectedEventId,
 }: {
   facilities: Facility[];
   loading?: boolean;
+  selectedEventId: string;
 }) {
   const [facilityType, setFacilityType] = useState<FacilityTypeFilter>("all");
 
@@ -70,8 +72,7 @@ export function FacilitiesTable({
     const q = search.trim().toLowerCase();
 
     return facilities.filter(f => {
-      // if (facilityType !== "all" && f.categoryRecord.name !== facilityType)
-      if (facilityType !== "all" && f.facilityName !== facilityType)
+      if (facilityType !== "all" && f.categoryName !== facilityType)
         return false;
 
       if (q && !f.facilityName.toLowerCase().includes(q)) return false;
@@ -150,15 +151,12 @@ export function FacilitiesTable({
           ) : (
             filteredFacilities.map(facility => (
               <TableRow key={facility.facilityId}>
-                {/* <TableCell>{facility.eventRecord.eventName}</TableCell> */}
-                <TableCell>{facility.facilityName}</TableCell>
+                <TableCell>{facility.eventName}</TableCell>
+
                 <TableCell className="font-medium">
                   {facility.facilityName}
                 </TableCell>
-                <TableCell>
-                  {/* {facility.categoryRecord.name || "Nothing"} */}
-                  {facility.selfEmployedUserPrice}
-                </TableCell>
+                <TableCell>{facility.categoryName}</TableCell>
                 <TableCell>
                   ₦{facility.employedUserPrice?.toLocaleString()}
                 </TableCell>
@@ -189,13 +187,15 @@ export function FacilitiesTable({
                       </Button>
                     </DropdownMenuTrigger>
 
-                    {/* <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() =>
+                        onClick={() => {
                           router.push(
-                            `/admin/accommodations/${facility.categoryRecord.name.toLowerCase()}/${facility.facilityId}`,
-                          )
-                        }
+                            `/admin/accommodations/${facility.categoryName.toLowerCase()}/${facility.facilityId}` +
+                              `?eventId=${encodeURIComponent(selectedEventId)}` +
+                              `&name=${encodeURIComponent(facility.facilityName)}`,
+                          );
+                        }}
                       >
                         View Details
                       </DropdownMenuItem>
@@ -204,7 +204,7 @@ export function FacilitiesTable({
                         Delete
                       </DropdownMenuItem>
                       <DropdownMenuItem>Create Rooms</DropdownMenuItem>
-                    </DropdownMenuContent> */}
+                    </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
               </TableRow>

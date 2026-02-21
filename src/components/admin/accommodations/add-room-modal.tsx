@@ -1,37 +1,3 @@
-// "use client";
-
-// import { ReactNode } from "react";
-// import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-
-// import { HostelRoomForm } from "./forms/hostel-room-form";
-// import { HotelRoomForm } from "./forms/hotel-room-form";
-
-// export function AddRoomModal({
-//   children,
-//   facilityType,
-//   facilityId,
-//   onSuccess,
-// }: {
-//   children: ReactNode;
-//   facilityType: string;
-//   facilityId: string;
-//   onSuccess?: () => void;
-// }) {
-//   return (
-//     <Dialog>
-//       <DialogTrigger asChild>{children}</DialogTrigger>
-
-//       <DialogContent className="max-w-2xl p-6">
-//         {facilityType === "hotel" ? (
-//           <HotelRoomForm facilityId={facilityId} onSuccess={onSuccess} />
-//         ) : (
-//           <HostelRoomForm facilityId={facilityId} onSuccess={onSuccess} />
-//         )}
-//       </DialogContent>
-//     </Dialog>
-//   );
-// }
-
 "use client";
 
 import { ReactNode } from "react";

@@ -55,21 +55,54 @@ function HotelStats({ rooms }: { rooms: HotelRoomType[] }) {
   );
 }
 
-function HostelStats({ rooms }: { rooms: any[] }) {
+// function HostelStats({ rooms }: { rooms: any[] }) {
+//   const totalRooms = rooms.length;
+
+//   const totalCapacity = rooms.reduce((sum, r) => sum + (r.capacity ?? 0), 0);
+
+//   const totalOccupied = rooms.reduce((sum, r) => sum + (r.occupants ?? 0), 0);
+
+//   const availableRooms = rooms.filter(r => r.available).length;
+
+//   return (
+//     <StatsContainer>
+//       <StatItem label="Total Rooms" value={totalRooms} />
+//       <StatItem label="Total Capacity" value={totalCapacity} />
+//       <StatItem label="Total Occupants" value={totalOccupied} />
+//       <StatItem label="Available Rooms" value={availableRooms} />
+//     </StatsContainer>
+//   );
+// }
+
+function HostelStats({
+  rooms,
+}: {
+  rooms: Array<{
+    capacity?: number;
+    capacityOccupied?: number;
+  }>;
+}) {
   const totalRooms = rooms.length;
 
   const totalCapacity = rooms.reduce((sum, r) => sum + (r.capacity ?? 0), 0);
 
-  const totalOccupied = rooms.reduce((sum, r) => sum + (r.occupants ?? 0), 0);
+  const totalOccupied = rooms.reduce(
+    (sum, r) => sum + (r.capacityOccupied ?? 0),
+    0,
+  );
 
-  const availableRooms = rooms.filter(r => r.available).length;
+  const availableBedSpaces = rooms.reduce((sum, r) => {
+    const cap = r.capacity ?? 0;
+    const occ = r.capacityOccupied ?? 0;
+    return sum + Math.max(0, cap - occ);
+  }, 0);
 
   return (
     <StatsContainer>
       <StatItem label="Total Rooms" value={totalRooms} />
-      <StatItem label="Total Capacity" value={totalCapacity} />
+      <StatItem label="Total Capacity/Bed Space" value={totalCapacity} />
       <StatItem label="Total Occupants" value={totalOccupied} />
-      <StatItem label="Available Rooms" value={availableRooms} />
+      <StatItem label="Available Bed Spaces/Rooms" value={availableBedSpaces} />
     </StatsContainer>
   );
 }

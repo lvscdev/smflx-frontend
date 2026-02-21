@@ -46,7 +46,7 @@ export async function createCategoryAction(values: unknown) {
     })),
   };
 
-  // console.log("PAYLOAD", payload);
+  console.log("PAYLOAD", payload);
 
   const res = await fetch(`${ACCOMODATION_BASE_URL}/category`, {
     method: "POST",
@@ -199,7 +199,7 @@ export async function getFacilityDetails(
   }
 
   const facilityDetails = data.data;
-  // console.log("FACILITY dETAILS:", facilityDetails);
+  console.log("FACILITY dETAILS:", facilityDetails);
 
   return facilityDetails;
 }

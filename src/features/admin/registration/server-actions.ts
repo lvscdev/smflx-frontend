@@ -129,5 +129,7 @@ export async function getAllRegistrations(): Promise<{
   const data: Registration[] = response.data?.data ?? [];
   const totalRegistrations = response.data?.meta?.totalItems ?? 0;
 
+  console.log("Registrations:", data);
+
   return { data, totalRegistrations };
 }

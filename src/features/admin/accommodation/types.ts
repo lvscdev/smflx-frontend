@@ -12,12 +12,8 @@ export type Facility = {
   selfEmployedUserPrice: number;
   unemployedUserPrice: number;
   employedUserPrice: number;
-  // eventRecord: {
-  //   eventName: string;
-  // };
-  // categoryRecord: {
-  //   name: string;
-  // };
+  eventName: string;
+  categoryName: string;
 };
 
 export interface AccommodationCategory {

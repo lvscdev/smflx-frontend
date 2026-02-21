@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 
 import { getFacilityDetails } from "@/features/admin/accommodation/server-actions";
@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 export default function FacilityDetailsPage() {
   const router = useRouter();
   const { facilityType, facilityId } = useParams();
+  const searchParams = useSearchParams();
+  const facilityName = searchParams.get("name");
 
   const [facility, setFacility] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,6 @@ export default function FacilityDetailsPage() {
     }
   }
 
-  // ✅ Call it inside effect
   useEffect(() => {
     loadFacility();
   }, [facilityType, facilityId]);
@@ -48,20 +49,21 @@ export default function FacilityDetailsPage() {
       {/* Back */}
       <Button variant="ghost" onClick={() => router.back()} className="w-fit">
         <ArrowLeft className="w-4 h-4 mr-2" />
-        Back
+        Back to events
       </Button>
 
       {/* Hero Card */}
       <FacilityHeroCard
         facilityType={facilityType as string}
         facilityId={facilityId as string}
+        facilityName={facilityName ?? "Facility"}
       >
         <AddRoomModal
           facilityType={facilityType as string}
           facilityId={facilityId as string}
           onSuccess={loadFacility}
         >
-          <Button className="bg-brand-red">
+          <Button className="bg-brand-red hover:bg-brand-red/80">
             <Plus className="w-4 h-4 mr-1" />
             Add New Room
           </Button>

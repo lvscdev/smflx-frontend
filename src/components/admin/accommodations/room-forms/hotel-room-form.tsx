@@ -131,7 +131,7 @@ export function HotelRoomForm({
 
               <div className="flex justify-between gap-4">
                 <div className="flex-1">
-                  <GenderSelect form={form} className="w-full flex-3" />
+                  <GenderSelect form={form} className="w-full" />
                 </div>
 
                 <div className="flex-1">
@@ -152,19 +152,18 @@ export function HotelRoomForm({
                 </div>
               </div>
             </div>
-            <div className="self-end w-full">
-              <Button
-                type="submit"
-                className="w-full bg-brand-red hover:bg-brand-red/80"
-                disabled={form.formState.isSubmitting}
-              >
-                {form.formState.isSubmitting ? (
-                  <Loader2 className="animate-spin w-4 h-4" />
-                ) : (
-                  "Save"
-                )}
-              </Button>
-            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-brand-red hover:bg-brand-red/80"
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? (
+                <Loader2 className="animate-spin w-4 h-4" />
+              ) : (
+                "Save"
+              )}
+            </Button>
           </form>
         </Form>
       </div>

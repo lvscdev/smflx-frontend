@@ -198,39 +198,56 @@ export function HostelRoomForm({
   }
 
   return (
-    <>
-      <h2 className="text-3xl font-bold mb-4">Add Hostel Room</h2>
+    <div className="space-y-10 flex flex-col">
+      <div className="pt-5">
+        <h2 className="text-3xl font-bold mb-4">Add Hostel Room</h2>
+      </div>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <InputField form={form} name="roomCode" label="Room Code" />
-          <InputField
-            form={form}
-            name="roomIdentifier"
-            label="Room Identifier"
-          />
-          <NumberField form={form} name="capacity" label="Capacity" />
-          <GenderSelect form={form} />
-          <BooleanSelect
-            form={form}
-            name="adminReserved"
-            label="Admin Reserved"
-          />
-
-          <Button
-            type="submit"
-            className="w-full bg-brand-red"
-            disabled={form.formState.isSubmitting}
+      <div className="flex-1">
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex flex-col justify-between h-full"
           >
-            {form.formState.isSubmitting ? (
-              <Loader2 className="animate-spin w-4 h-4" />
-            ) : (
-              "Save"
-            )}
-          </Button>
-        </form>
-      </Form>
-    </>
+            <div className="space-y-5">
+              <InputField form={form} name="roomCode" label="Room Code" />
+              <InputField
+                form={form}
+                name="roomIdentifier"
+                label="Room Identifier"
+              />
+              <NumberField form={form} name="capacity" label="Capacity" />
+
+              <div className="flex justify-between gap-4">
+                <div className="flex-1">
+                  <GenderSelect form={form} className="w-full" />
+                </div>
+                <div className="flex-1">
+                  <BooleanSelect
+                    form={form}
+                    name="adminReserved"
+                    label="Admin Reserved"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-brand-red hover:bg-brand-red/80"
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? (
+                <Loader2 className="animate-spin w-4 h-4" />
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </form>
+        </Form>
+      </div>
+    </div>
   );
 }
 
@@ -270,7 +287,7 @@ function NumberField({ form, name, label }: any) {
   );
 }
 
-function GenderSelect({ form }: any) {
+function GenderSelect({ form, className }: any) {
   return (
     <FormField
       control={form.control}
@@ -279,7 +296,7 @@ function GenderSelect({ form }: any) {
         <FormItem>
           <FormLabel>Gender Restriction</FormLabel>
           <Select value={field.value} onValueChange={field.onChange}>
-            <SelectTrigger>
+            <SelectTrigger className={`${className}`}>
               <SelectValue placeholder="Select gender" />
             </SelectTrigger>
             <SelectContent>
@@ -293,7 +310,7 @@ function GenderSelect({ form }: any) {
   );
 }
 
-function BooleanSelect({ form, name, label }: any) {
+function BooleanSelect({ form, name, label, className }: any) {
   return (
     <FormField
       control={form.control}
@@ -305,7 +322,7 @@ function BooleanSelect({ form, name, label }: any) {
             value={String(field.value)}
             onValueChange={val => field.onChange(val === "true")}
           >
-            <SelectTrigger>
+            <SelectTrigger className={`${className}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -1,17 +1,15 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Banknote, Clock4, CircleAlert, CheckCheck } from "lucide-react";
 
-async function getFinancials() {
-  return {
+function DashboardFinancials() {
+  const data = {
     revenue: "₦10,000,000",
     pending: 1,
     failed: 1,
     completion: "98%",
   };
-}
-
-async function DashboardFinancials() {
-  const data = await getFinancials();
 
   return (
     <Card className="lg:col-span-2 bg-slate-50 border-slate-300">
@@ -36,7 +34,19 @@ async function DashboardFinancials() {
   );
 }
 
-function Metric({ label, value, icon }: any) {
+function Metric({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string | number;
+  icon:
+    | typeof Banknote
+    | typeof Clock4
+    | typeof CircleAlert
+    | typeof CheckCheck;
+}) {
   const IconComponent = icon;
   return (
     <div className="flex gap-4 rounded-xl border border-slate-300 bg-slate-50 py-5 px-6 shadow-card">
@@ -45,10 +55,10 @@ function Metric({ label, value, icon }: any) {
           icon === Banknote
             ? "bg-brand-blue-500"
             : icon === Clock4
-            ? "bg-orange-500"
-            : icon === CircleAlert
-            ? "bg-brand-red"
-            : "bg-green-500"
+              ? "bg-orange-500"
+              : icon === CircleAlert
+                ? "bg-brand-red"
+                : "bg-green-500"
         } p-1.5 w-fit self-center`}
       >
         {IconComponent && <IconComponent className="size-6 text-slate-50" />}

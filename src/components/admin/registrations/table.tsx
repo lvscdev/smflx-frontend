@@ -108,15 +108,19 @@ function getColumns(isReadOnly: boolean): ColumnDef<Registration>[] {
 function RegistrationsTable({
   data,
   page,
+  pageSize,
   totalPages,
   onPageChange,
+  onPageSizeChange,
   isPending,
   isReadOnly,
 }: {
   data: Registration[];
   page: number;
+  pageSize: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   isPending: boolean;
   isReadOnly: boolean;
   // onSearch: (value: string) => void;
@@ -186,44 +190,61 @@ function RegistrationsTable({
 
       {/* Pagination */}
 
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page <= 1 || isPending}
-          onClick={() => onPageChange(page - 1)}
-        >
-          Previous
-        </Button>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Rows per page</span>
+          <select
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+            value={String(pageSize)}
+            onChange={e => onPageSizeChange(Number(e.target.value))}
+            disabled={isPending}
+          >
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
 
-        {Array.from({ length: totalPages })
-          .slice(0, 10)
-          .map((_, i) => {
-            const p = i + 1;
-            return (
-              <Button
-                key={p}
-                size="sm"
-                variant={p === page ? "default" : "ghost"}
-                disabled={isPending}
-                onClick={() => onPageChange(p)}
-                className={p === page ? "bg-brand-blue-400" : ""}
-              >
-                {p}
-              </Button>
-            );
-          })}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1 || isPending}
+            onClick={() => onPageChange(page - 1)}
+          >
+            Previous
+          </Button>
 
-        {totalPages > 10 && <span className="px-1">…</span>}
+          {Array.from({ length: totalPages })
+            .slice(0, 10)
+            .map((_, i) => {
+              const p = i + 1;
+              return (
+                <Button
+                  key={p}
+                  size="sm"
+                  variant={p === page ? "default" : "ghost"}
+                  disabled={isPending}
+                  onClick={() => onPageChange(p)}
+                  className={p === page ? "bg-brand-blue-400" : ""}
+                >
+                  {p}
+                </Button>
+              );
+            })}
 
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page >= totalPages || isPending}
-          onClick={() => onPageChange(page + 1)}
-        >
-          Next
-        </Button>
+          {totalPages > 10 && <span className="px-1">…</span>}
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages || isPending}
+            onClick={() => onPageChange(page + 1)}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );

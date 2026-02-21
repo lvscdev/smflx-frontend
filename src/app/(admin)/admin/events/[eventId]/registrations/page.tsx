@@ -52,6 +52,7 @@ type PageProps = {
   params: Promise<{ eventId: string }>;
   searchParams: Promise<{
     page?: string;
+    pageSize?: string;
     q?: string;
     type?: string;
     gender?: string;
@@ -69,11 +70,13 @@ export default async function RegistrationsPage({
 
   const sp = await searchParams;
   const page = Number(sp.page ?? "1");
+  const pageSize = Number(sp.pageSize ?? "10");
 
   const { data, totalPages, totalRegistrations, stats } =
     await getRegistrationsByEventId({
       eventId,
       page,
+      pageSize,
       filters: {
         q: sp.q,
         type: sp.type,

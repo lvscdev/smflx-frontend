@@ -32,15 +32,19 @@ const navItems = [
   },
   { label: "Registrations", href: "/admin/registrations", icon: UserRoundPlus },
   { label: "Accommodations", href: "/admin/accommodations", icon: Building2 },
-  { label: "Payments", href: "/payments", icon: Wallet },
-  { label: "User Management", href: "/users", icon: UsersRound },
+  { label: "Payments", href: "/admin/payments", icon: Wallet },
+  {
+    label: "User Management",
+    href: "/admin/user-management",
+    icon: UsersRound,
+  },
   {
     label: "Communications",
-    href: "/communications",
+    href: "/admin/communications",
     icon: MessageCircleMoreIcon,
   },
-  { label: "Reports", href: "/reports", icon: ChartLine },
-  { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Reports", href: "/admin/reports", icon: ChartLine },
+  { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
 function AdminSidebar() {

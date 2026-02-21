@@ -2,8 +2,8 @@
 // import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { DashboardStats } from "@/components/admin/dashboard/stats.server";
-import { DashboardFinancials } from "@/components/admin/dashboard/financials.server";
+import { DashboardStats } from "@/components/admin/dashboard/stats-dashboard";
+import { DashboardFinancials } from "@/components/admin/dashboard/financials-dashboard";
 import { DashboardQuickActions } from "@/components/admin/dashboard/quick-actions";
 import { RecentActivity } from "@/components/admin/dashboard/recent-activity";
 import { StatsSkeleton } from "@/components/admin/ui/stat-card-skeleton";

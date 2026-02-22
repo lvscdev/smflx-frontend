@@ -107,10 +107,15 @@ export async function getAccommodations(params: {
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
 
+   if (!params.eventId) {
+     throw new Error('Missing eventId for accommodation lookup');
+   }
+
   try {
     console.log(`🏨 Fetching ${params.type} accommodations...`);
     
-    const categoriesResp = await apiRequest<any>('/accommodation/categories', { method: 'GET' });
+    const id = encodeURIComponent(params.eventId);
+    const categoriesResp = await apiRequest<any>(`/accommodation/categories/${id}`, { method: 'GET' });
     const categories: AccommodationCategory[] =
       categoriesResp?.data || categoriesResp?.categories || categoriesResp || [];
 

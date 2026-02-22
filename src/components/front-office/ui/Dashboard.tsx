@@ -423,7 +423,7 @@ export function Dashboard({
   }>({ loading: false, error: null });
 
   useEffect(() => {
-    const eventId = activeEventId ?? resolvedEventId;
+    const eventId = registration?.eventId;
     if (!isAccommodationModalOpen || modalStep !== 1 || !eventId) return;
 
     let cancelled = false;
@@ -435,10 +435,10 @@ export function Dashboard({
       }));
       try {
         const [hostel, hotel] = await Promise.all([
-          getAccommodations({ eventId, type: "HOSTEL" }).catch(() => ({
+          getAccommodations({ eventId, type: "HOSTEL", gender: (profile?.gender as any) || undefined, ageRange: (profile?.ageRange as any) || undefined }).catch(() => ({
             facilities: [],
           })),
-          getAccommodations({ eventId, type: "HOTEL" }).catch(() => ({
+          getAccommodations({ eventId, type: "HOTEL", gender: (profile?.gender as any) || undefined, ageRange: (profile?.ageRange as any) || undefined }).catch(() => ({
             facilities: [],
           })),
         ]);
@@ -486,11 +486,11 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [isAccommodationModalOpen, modalStep, activeEventId, registration?.eventId]);
+  }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
 
       // Fetch accommodation categories when modal opens
     useEffect(() => {
-      const eventId = activeEventId ?? resolvedEventId;
+      const eventId = registration?.eventId;
       if (!isAccommodationModalOpen || !eventId) return;
 
       let cancelled = false;
@@ -529,7 +529,7 @@ export function Dashboard({
       return () => {
         cancelled = true;
       };
-    }, [isAccommodationModalOpen, activeEventId, registration?.eventId]);
+    }, [isAccommodationModalOpen, registration?.eventId]);
 
 
   // Dependents state
@@ -1803,8 +1803,15 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               )}
 
               {modalStep === 2 && (() => {
-                const eventId = activeEventId ?? getEventId(registration) ?? resolvedEventId;
-
+                const eventId =
+                  registration?.eventId ??
+                  (registration?.event &&
+                  typeof registration.event === "object" &&
+                  "eventId" in registration.event
+                    ? String(
+                        (registration.event as { eventId?: unknown }).eventId || ""
+                      )
+                    : "");
 
                 if (!eventId) {
                   return (

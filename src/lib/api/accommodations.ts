@@ -102,22 +102,21 @@ export async function getAccommodations(params: {
   type: 'HOSTEL' | 'HOTEL';
   gender?: 'MALE' | 'FEMALE';
   age?: string;
+  ageRange?: string;
 }): Promise<GetAccommodationsResponse> {
 
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
 
-   if (!params.eventId) {
-     throw new Error('Missing eventId for accommodation lookup');
-   }
-
   try {
     console.log(`🏨 Fetching ${params.type} accommodations...`);
     
-    const id = encodeURIComponent(params.eventId);
-    const categoriesResp = await apiRequest<any>(`/accommodation/categories/${id}`, { method: 'GET' });
-    const categories: AccommodationCategory[] =
-      categoriesResp?.data || categoriesResp?.categories || categoriesResp || [];
+    const categoriesResp = await apiRequest<any>(`/accommodation/categories/${encodeURIComponent(params.eventId)}`, { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
+    const rawCategories: any[] = categoriesResp?.data || (categoriesResp?.categories as any[]) || (categoriesResp as any[]) || [];
+    const categories: AccommodationCategory[] = (rawCategories || []).map((c) => ({
+      id: String((c as any)?.id || (c as any)?.categoryId || ''),
+      name: String((c as any)?.name || ''),
+    })).filter((c) => Boolean(c.id));
 
     const match = (categories || []).find((c) => {
       const name = normalize(String(c?.name || ''));
@@ -129,7 +128,7 @@ export async function getAccommodations(params: {
     const payload = {
       categoryId: match.id,
       gender: params.gender || 'MALE',  
-      age: params.age || '20-29',     
+      ageRange: (params as any).ageRange || params.age || '20-49',     
     };
 
     console.log(`🏨 POST /accommodation/facilities for ${params.type}:`, payload);

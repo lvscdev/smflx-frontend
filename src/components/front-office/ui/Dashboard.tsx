@@ -131,11 +131,7 @@ const getRegId = (registration: unknown): string | undefined => {
   if (typeof registration !== "object" || registration === null) return undefined;
 
   const reg = registration as Record<string, unknown>;
-
-  // Most common on dashboard payload
   if ("regId" in reg && reg.regId != null) return String(reg.regId);
-
-  // Some backends might use id / registrationId
   if ("registrationId" in reg && reg.registrationId != null) return String(reg.registrationId);
   if ("id" in reg && reg.id != null) return String(reg.id);
 
@@ -435,10 +431,10 @@ export function Dashboard({
       }));
       try {
         const [hostel, hotel] = await Promise.all([
-          getAccommodations({ eventId, type: "HOSTEL", gender: (profile?.gender as any) || undefined, ageRange: (profile?.ageRange as any) || undefined }).catch(() => ({
+          getAccommodations({ eventId, type: "HOSTEL" }).catch(() => ({
             facilities: [],
           })),
-          getAccommodations({ eventId, type: "HOTEL", gender: (profile?.gender as any) || undefined, ageRange: (profile?.ageRange as any) || undefined }).catch(() => ({
+          getAccommodations({ eventId, type: "HOTEL" }).catch(() => ({
             facilities: [],
           })),
         ]);
@@ -486,11 +482,19 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
+  }, [isAccommodationModalOpen, modalStep, activeEventId, resolvedEventId]);
 
       // Fetch accommodation categories when modal opens
     useEffect(() => {
-      const eventId = registration?.eventId;
+      const eventId =
+        activeEventId ??
+        resolvedEventId ??
+        registration?.eventId ??
+        (registration?.event &&
+        typeof registration.event === "object" &&
+        "eventId" in registration.event
+          ? String((registration.event as { eventId?: unknown }).eventId || "")
+          : "");
       if (!isAccommodationModalOpen || !eventId) return;
 
       let cancelled = false;
@@ -529,7 +533,7 @@ export function Dashboard({
       return () => {
         cancelled = true;
       };
-    }, [isAccommodationModalOpen, registration?.eventId]);
+    }, [isAccommodationModalOpen, activeEventId, resolvedEventId]);
 
 
   // Dependents state
@@ -1804,6 +1808,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
               {modalStep === 2 && (() => {
                 const eventId =
+                  activeEventId ??
+                  resolvedEventId ??
                   registration?.eventId ??
                   (registration?.event &&
                   typeof registration.event === "object" &&

@@ -7,11 +7,5 @@ interface Props {
 }
 
 export default function ReturningUserPage({ searchParams }: Props) {
-  const email = searchParams?.email;
-
-  if (email) {
-    redirect(`/register?view=login&email=${encodeURIComponent(email)}`);
-  }
-
   redirect("/register?view=login");
 }

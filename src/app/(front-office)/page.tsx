@@ -62,8 +62,16 @@ export default function HomePage() {
 
   useEffect(() => {
     const v = searchParams.get("view");
-    const e = searchParams.get("email");
-    if (e) setEmail(e);
+    try {
+      const pending = sessionStorage.getItem("smflx_pending_email");
+      if (pending) {
+        setEmail(pending);
+        sessionStorage.removeItem("smflx_pending_email");
+      }
+    } catch {
+      // ignore
+    }
+
     if (
       v === "verify" ||
       v === "login" ||

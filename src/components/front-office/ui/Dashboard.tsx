@@ -423,7 +423,7 @@ export function Dashboard({
   }>({ loading: false, error: null });
 
   useEffect(() => {
-    const eventId = registration?.eventId;
+    const eventId = resolvedEventId;
     if (!isAccommodationModalOpen || modalStep !== 1 || !eventId) return;
 
     let cancelled = false;
@@ -486,11 +486,11 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
+  }, [isAccommodationModalOpen, modalStep, resolvedEventId]);
 
       // Fetch accommodation categories when modal opens
     useEffect(() => {
-      const eventId = registration?.eventId;
+      const eventId = resolvedEventId;
       if (!isAccommodationModalOpen || !eventId) return;
 
       let cancelled = false;
@@ -529,7 +529,7 @@ export function Dashboard({
       return () => {
         cancelled = true;
       };
-    }, [isAccommodationModalOpen, registration?.eventId]);
+    }, [isAccommodationModalOpen, resolvedEventId]);
 
 
   // Dependents state
@@ -1803,15 +1803,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               )}
 
               {modalStep === 2 && (() => {
-                const eventId =
-                  registration?.eventId ??
-                  (registration?.event &&
-                  typeof registration.event === "object" &&
-                  "eventId" in registration.event
-                    ? String(
-                        (registration.event as { eventId?: unknown }).eventId || ""
-                      )
-                    : "");
+                const eventId = resolvedEventId ?? "";
 
                 if (!eventId) {
                   return (

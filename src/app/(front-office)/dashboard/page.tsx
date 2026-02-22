@@ -136,7 +136,12 @@ export default function DashboardPage() {
       if (!token) {
         const otp = readOtpCookie();
         if (otp?.email) {
-          router.replace(`/register?view=login&email=${encodeURIComponent(otp.email)}`);
+          try {
+            sessionStorage.setItem("smflx_pending_email", String(otp.email));
+          } catch {
+            // ignore
+          }
+          router.replace(`/register?view=login`);
           return;
         }
 

@@ -11,6 +11,7 @@ import { listAccommodationCategories } from "@/lib/api/accommodation";
 import { AccommodationCategories } from "@/lib/api/accommodation/types";
 
 interface RegistrationData {
+  eventId:string;
   attendeeType: string;
   accommodationType: string;
   categoryId: string;
@@ -99,6 +100,7 @@ export function EventRegistration({
   >([]);
   const [registration, setRegistration] = useState<RegistrationData>(
     initialData || {
+      eventId:"",
       attendeeType: "",
       accommodationType: "",
       categoryId: "",

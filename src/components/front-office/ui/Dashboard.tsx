@@ -423,7 +423,7 @@ export function Dashboard({
   }>({ loading: false, error: null });
 
   useEffect(() => {
-    const eventId = registration?.eventId;
+    const eventId = activeEventId ?? resolvedEventId;
     if (!isAccommodationModalOpen || modalStep !== 1 || !eventId) return;
 
     let cancelled = false;
@@ -486,11 +486,11 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
+  }, [isAccommodationModalOpen, modalStep, activeEventId, registration?.eventId]);
 
       // Fetch accommodation categories when modal opens
     useEffect(() => {
-      const eventId = registration?.eventId;
+      const eventId = activeEventId ?? resolvedEventId;
       if (!isAccommodationModalOpen || !eventId) return;
 
       let cancelled = false;
@@ -529,7 +529,7 @@ export function Dashboard({
       return () => {
         cancelled = true;
       };
-    }, [isAccommodationModalOpen, registration?.eventId]);
+    }, [isAccommodationModalOpen, activeEventId, registration?.eventId]);
 
 
   // Dependents state
@@ -800,7 +800,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         try {
           localStorage.removeItem("smflx_pending_accommodation_payment");
           localStorage.removeItem("smflx_pending_accommodation_payment_started_at");
-          localStorage.removeItem("smflx_pending_accommodation_payment_expired");
         } catch {
           // ignore
         }
@@ -825,12 +824,16 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
       const existing = readStartedAt();
       if (existing) return existing;
 
-      // Persist a stable start time so the 1-hour hold survives refreshes / return visits.
+      // Fallback for older flows that only saved the pending flag.
       const now = Date.now();
       try {
-        localStorage.setItem("smflx_pending_accommodation_payment", "1");
-        localStorage.setItem("smflx_pending_accommodation_payment_started_at", String(now));
-        localStorage.removeItem("smflx_pending_accommodation_payment_expired");
+        const pending = localStorage.getItem("smflx_pending_accommodation_payment");
+        if (pending === "1") {
+          localStorage.setItem(
+            "smflx_pending_accommodation_payment_started_at",
+            String(now),
+          );
+        }
       } catch {
         // ignore
       }
@@ -862,11 +865,10 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
       handledExpire = true;
 
-      // Hold expired: mark as expired and switch UI back to “Book Accommodation”.
+      // Hold expired: clear markers and switch UI back to “Book Accommodation”.
       try {
-        // Keep started_at so a refresh doesn't restart the 1-hour window.
-        localStorage.setItem("smflx_pending_accommodation_payment", "1");
-        localStorage.setItem("smflx_pending_accommodation_payment_expired", "1");
+        localStorage.removeItem("smflx_pending_accommodation_payment");
+        localStorage.removeItem("smflx_pending_accommodation_payment_started_at");
 
         // Clear saved accommodation snapshot so the promo card matches “book again”.
         const raw =
@@ -961,16 +963,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         // If user was Physical/Online, update their attendee type to Camper
         if (isNonCamper) {
           console.log('User upgraded from Physical/Online to Camper by booking accommodation');
-        }
-
-        // Start (or restart) the 1-hour hold timer for pending accommodation payment.
-        try {
-          const now = Date.now();
-          localStorage.setItem("smflx_pending_accommodation_payment", "1");
-          localStorage.setItem("smflx_pending_accommodation_payment_started_at", String(now));
-          localStorage.removeItem("smflx_pending_accommodation_payment_expired");
-        } catch {
-          // ignore
         }
 
         resetModal();
@@ -1374,16 +1366,16 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3">
               <a
                 href={badgeHref}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors inline-flex items-center justify-center"
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors inline-flex items-center justify-center"
               >
                 Download Badge
               </a>
-              <button className="w-full sm:w-auto px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">
+              <button className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">
                 Meal Ticket
               </button>
             </div>
@@ -1811,13 +1803,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
               )}
 
               {modalStep === 2 && (() => {
-                const eventId =
-                  (typeof activeEventId === "string" && activeEventId.trim()
-                    ? activeEventId
-                    : undefined) ??
-                  getEventId(registration) ??
-                  resolvedEventId ??
-                  "";
+                const eventId = activeEventId ?? getEventId(registration) ?? resolvedEventId;
+
 
                 if (!eventId) {
                   return (

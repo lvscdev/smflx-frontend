@@ -1812,14 +1812,12 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
               {modalStep === 2 && (() => {
                 const eventId =
-                  registration?.eventId ??
-                  (registration?.event &&
-                  typeof registration.event === "object" &&
-                  "eventId" in registration.event
-                    ? String(
-                        (registration.event as { eventId?: unknown }).eventId || ""
-                      )
-                    : "");
+                  (typeof activeEventId === "string" && activeEventId.trim()
+                    ? activeEventId
+                    : undefined) ??
+                  getEventId(registration) ??
+                  resolvedEventId ??
+                  "";
 
                 if (!eventId) {
                   return (

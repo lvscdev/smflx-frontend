@@ -128,7 +128,7 @@ export async function getAccommodations(params: {
     const payload = {
       categoryId: match.id,
       gender: params.gender || 'MALE',  
-      ageRange: (params as any).ageRange || params.age || '20-49',     
+      ageRange: (params as any).ageRange || params.age || "23-29"    
     };
 
     console.log(`🏨 POST /accommodation/facilities for ${params.type}:`, payload);

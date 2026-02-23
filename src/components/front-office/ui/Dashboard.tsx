@@ -506,21 +506,16 @@ export function Dashboard({
           
           if (cancelled) return;
           
-            const mappedCategories = categories.map((cat) => {
-            const nameUpper = (cat.name || "").toUpperCase();
-
-              let type: "hotel" | "hostel" | "shared" | "unknown" = "unknown";
-
-              if (nameUpper.includes("HOTEL")) type = "hotel";
-              else if (nameUpper.includes("HOSTEL")) type = "hostel";
-              else if (nameUpper.includes("SHARED") || nameUpper.includes("APARTMENT")) type = "shared";
-
-              return {
-                categoryId: cat.categoryId,
-                name: cat.name,
-                type,
-              };
-            });
+          const mappedCategories = categories.map(cat => {
+            const nameLower = cat.name.toLowerCase();
+            const type = nameLower.includes('hotel') ? 'hotel' : 'hostel';
+            
+            return {
+              categoryId: cat.categoryId,
+              name: cat.name,
+              type,
+            };
+          });
           
           setAccommodationCategories(mappedCategories);
         } catch (error) {
@@ -1830,12 +1825,9 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   );
                 }
 
-                const matchingCategory = accommodationCategories.find((cat) => {
-                  if (selectedAccommodationType === "hostel") return cat.type === "hostel";
-                  if (selectedAccommodationType === "hotel") return cat.type === "hotel";
-                  if (selectedAccommodationType === "shared") return cat.type === "shared";
-                  return false;
-                });
+                const matchingCategory = accommodationCategories.find(
+                  cat => cat.type === selectedAccommodationType
+                );
 
                 if (loadingCategories) {
                   return (
@@ -1863,18 +1855,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                     categoryId={matchingCategory.categoryId} 
                     accommodationType={selectedAccommodationType}
                     eventId={eventId}
-                    registrationId={
-                      typeof registration?.id === "string"
-                        ? registration.id
-                        : typeof registration?.registrationId === "string"
-                          ? registration.registrationId
-                          : typeof registration?.id === "number"
-                            ? String(registration.id)
-                            : typeof registration?.registrationId === "number"
-                              ? String(registration.registrationId)
-                              : undefined
-                    }
-                    userId={profile?.userId}
+                    registrationId={getRegId(registration) ?? getOwnerRegId(profile) ?? getOwnerRegId(localProfile)}
+                    userId={profile?.userId ?? localProfile?.userId}
                     profile={localProfile}
                     onComplete={handleAccommodationComplete}
                     onBack={handleModalBack}

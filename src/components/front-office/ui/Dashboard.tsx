@@ -506,10 +506,15 @@ export function Dashboard({
           
           if (cancelled) return;
           
-          const mappedCategories = categories.map(cat => {
-            const nameLower = cat.name.toLowerCase();
-            const type = nameLower.includes('hotel') ? 'hotel' : 'hostel';
-            
+          const mappedCategories = categories.map((cat) => {
+            const nameUpper = (cat.name || "").toUpperCase();
+
+            let type: "hotel" | "hostel" | "shared" | "unknown" = "unknown";
+
+            if (nameUpper.includes("HOTEL")) type = "hotel";
+            else if (nameUpper.includes("HOSTEL")) type = "hostel";
+            else if (nameUpper.includes("SHARED") || nameUpper.includes("APARTMENT")) type = "shared";
+
             return {
               categoryId: cat.categoryId,
               name: cat.name,
@@ -1853,14 +1858,12 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   );
                 }
 
-                // Find the categoryId for the selected accommodation type
-                const matchingCategory = accommodationCategories.find(
-                  cat => cat.type === selectedAccommodationType
-                );
-                // Find the categoryId for the selected accommodation type
-                const matchingCategory = accommodationCategories.find(
-                  cat => cat.type === selectedAccommodationType
-                );
+                const matchingCategory = accommodationCategories.find((cat) => {
+                  if (selectedAccommodationType === "hostel") return cat.type === "hostel";
+                  if (selectedAccommodationType === "hotel") return cat.type === "hotel";
+                  if (selectedAccommodationType === "shared") return cat.type === "shared";
+                  return false;
+                });
 
                 if (loadingCategories) {
                   return (

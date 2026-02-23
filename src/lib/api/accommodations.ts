@@ -105,6 +105,35 @@ export async function getAccommodations(params: {
   ageRange?: string;
 }): Promise<GetAccommodationsResponse> {
 
+  const normalizeAgeRange = (input?: string): string => {
+    const v = (input ?? "").toString().trim().replace(/[–—]/g, "-");
+    if (!v) return "";
+
+    const allowed = new Set(["0-12", "13-19", "20-22", "23-29", "30-39", "40+"]);
+    if (allowed.has(v)) return v;
+
+    // UI sometimes stores dependents age range as 5-12, backend expects 0-12.
+    if (/^\s*5\s*-\s*12\s*$/i.test(v)) return "0-12";
+
+    const lower = v.toLowerCase();
+    if (lower.includes("40")) return "40+";
+
+    // Legacy/variant buckets
+    if (v === "20-29" || v === "20 - 29") return "23-29";
+
+    const asNum = Number(v);
+    if (Number.isFinite(asNum) && asNum >= 0) {
+      if (asNum <= 12) return "0-12";
+      if (asNum <= 19) return "13-19";
+      if (asNum <= 22) return "20-22";
+      if (asNum <= 29) return "23-29";
+      if (asNum <= 39) return "30-39";
+      return "40+";
+    }
+
+    return "";
+  };
+
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
 
@@ -128,7 +157,7 @@ export async function getAccommodations(params: {
     const payload = {
       categoryId: match.id,
       gender: params.gender || 'MALE',  
-      ageRange: (params as any).ageRange || params.age || "23-29"    
+      ageRange: normalizeAgeRange((params as any).ageRange ?? params.age) || "23-29"
     };
 
     console.log(`🏨 POST /accommodation/facilities for ${params.type}:`, payload);

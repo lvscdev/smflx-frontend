@@ -34,12 +34,14 @@ function safeSaveFlowState(state: unknown) {
   }
 }
 
-function normalizeAgeRange(input?: string) { const v = (input ?? "").toString().trim().replace(/[–—]/g, "-");
+function normalizeAgeRange(input?: string) {
+  const v = (input ?? "").toString().trim().replace(/[–—]/g, "-");
 
   if (!v) return "";
 
   const allowed = new Set(["0-12", "13-19", "20-22", "23-29", "30-39", "40+"]);
   if (allowed.has(v)) return v;
+  if (/^\s*5\s*-\s*12\s*$/i.test(v)) return "0-12";
 
   const lower = v.toLowerCase();
 

@@ -166,7 +166,7 @@ export function DependentsModal({
           <div>
             <h2 className="text-2xl font-semibold">Manage Dependents</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Add your children or anyone you're a guardian of
+              Add your children or anyone you are a Guardian of
             </p>
           </div>
           <button
@@ -204,19 +204,19 @@ export function DependentsModal({
 
                 <div>
                   <label className="block text-sm text-gray-700 font-medium mb-2">
-                    Age (0–12) *
+                    Age (3–12) *
                   </label>
                   <Input
                     type="text"
                     value={currentDependent.age}
                     onChange={(e) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, age: sanitizeDependentAge(e.target.value) }); }}
-                    placeholder="Enter age (0–12)"
+                    placeholder="Enter age (3–12)"
                     inputMode="numeric"
                     min="0"
                     max="12"
                   />
                   <p className="mt-2 text-xs text-gray-600">
-                    Dependents must be <span className="font-medium">0–12</span>. Age <span className="font-medium">13+</span> must register as an attendee.
+                    Dependents must be <span className="font-medium">3–12</span>. Age <span className="font-medium">13+</span> must register as an attendee.
                   </p>
                 </div>
 

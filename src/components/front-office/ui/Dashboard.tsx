@@ -420,7 +420,13 @@ export function Dashboard({
 
   useEffect(() => {
     const eventId = registration?.eventId;
-    if (!isAccommodationModalOpen || modalStep !== 1 || !eventId) return;
+    // Prefetch availability so the dashboard promo can show real counts.
+    // Also refresh when opening the modal at step 1.
+    if (!eventId) return;
+
+    const hasSummary = Boolean(availabilitySummary.hostel || availabilitySummary.hotel);
+    const shouldRefreshForModal = isAccommodationModalOpen && modalStep === 1;
+    if (!shouldRefreshForModal && hasSummary) return;
 
     let cancelled = false;
     (async () => {
@@ -482,7 +488,7 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [isAccommodationModalOpen, modalStep, activeEventId, resolvedEventId]);
+  }, [isAccommodationModalOpen, modalStep, registration?.eventId, availabilitySummary.hostel, availabilitySummary.hotel]);
 
       // Fetch accommodation categories when modal opens
     useEffect(() => {
@@ -506,21 +512,21 @@ export function Dashboard({
           
           if (cancelled) return;
           
-          const mappedCategories = categories.map((cat) => {
-            const nameUpper = (cat.name || "").toUpperCase();
+        const mappedCategories = categories.map((cat) => {
+          const nameUpper = (cat.name || "").toUpperCase();
 
-            let type: "hotel" | "hostel" | "shared" | "unknown" = "unknown";
+          let type: "hotel" | "hostel" | "shared" | "unknown" = "unknown";
 
-            if (nameUpper.includes("HOTEL")) type = "hotel";
-            else if (nameUpper.includes("HOSTEL")) type = "hostel";
-            else if (nameUpper.includes("SHARED") || nameUpper.includes("APARTMENT")) type = "shared";
+          if (nameUpper.includes("HOTEL")) type = "hotel";
+          else if (nameUpper.includes("HOSTEL")) type = "hostel";
+          else if (nameUpper.includes("SHARED") || nameUpper.includes("APARTMENT")) type = "shared";
 
-            return {
-              categoryId: cat.categoryId,
-              name: cat.name,
-              type,
-            };
-          });
+          return {
+            categoryId: cat.categoryId,
+            name: cat.name,
+            type,
+          };
+        });
           
           setAccommodationCategories(mappedCategories);
         } catch (error) {
@@ -829,6 +835,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
     const ensureStartedAt = (): number | null => {
       const existing = readStartedAt();
       if (existing) return existing;
+
       try {
         const pending = localStorage.getItem("smflx_pending_accommodation_payment");
         if (pending !== "1") return null;
@@ -846,6 +853,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
     const startedAtMs = ensureStartedAt();
     if (!startedAtMs) {
+      // No local pending marker: treat this as a stale/abandoned payment.
       setAccommodationHold({ startedAtMs: null, expiresAtMs: null, remainingMs: null, expired: true });
       try {
         localStorage.removeItem("smflx_pending_accommodation_payment");
@@ -962,6 +970,11 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
       const accommodationTypeLabel =
         acc?.accommodationType || (acc as any)?.accommodationType || "";
 
+      const hasAccommodationBookingDetails =
+        Boolean((facilityName || "").trim()) ||
+        Boolean((roomLabel || "").trim()) ||
+        Boolean((accommodationTypeLabel || "").trim());
+
       const paidAmount =
         typeof acc?.amountPaidForAccommodation === "number"
           ? acc.amountPaidForAccommodation
@@ -975,8 +988,20 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
       // Non-campers can book accommodation. Campers see the same CTA when the 1-hour hold expires.
       const showAccommodationPromo =
-        (isNonCamper && !normalizedAccommodation) ||
-        (isCamper && (!normalizedAccommodation || accommodationHoldExpired));
+        (isNonCamper && !hasAccommodationBookingDetails) ||
+        (isCamper && (!hasAccommodationBookingDetails || accommodationHoldExpired));
+
+      const promoSpacesCount = (() => {
+        const hostelCap = availabilitySummary.hostel?.totalCapacity ?? 0;
+        const hotelCap = availabilitySummary.hotel?.totalCapacity ?? 0;
+        const cap = (Number(hostelCap) || 0) + (Number(hotelCap) || 0);
+        if (cap > 0) return cap;
+
+        const hostelFac = availabilitySummary.hostel?.availableFacilities ?? 0;
+        const hotelFac = availabilitySummary.hotel?.availableFacilities ?? 0;
+        const fac = (Number(hostelFac) || 0) + (Number(hotelFac) || 0);
+        return fac;
+      })();
 
       const handleAccommodationType = (type: string) => {
         setSelectedAccommodationType(type);
@@ -1552,7 +1577,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
             <div className="rounded-xl border p-4 mb-6">
               <p className="font-medium">Accommodation</p>
               <p className="text-sm opacity-80">
-                You are registered as a camper. Your accommodation details are yet to load.
+                You are registered as a camper and your accommodation details are yet to be confirmed.
+                Please book an accomodation below to confrim your status as a camper.
               </p>
             </div>
           )
@@ -1587,7 +1613,13 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   ) : (
                     <>
                       You can still book your accommodation space. You have just{" "}
-                      <span className="font-bold text-purple-800">100 spaces</span>{" "}
+                      <span className="font-bold text-purple-800">
+                        {availabilitySummary.loading
+                          ? "…"
+                          : promoSpacesCount > 0
+                          ? `${promoSpacesCount} ${promoSpacesCount === 1 ? "space" : "spaces"}`
+                          : "few spaces"}
+                      </span>{" "}
                       available, book now.
                     </>
                   )}
@@ -1891,8 +1923,18 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                     categoryId={matchingCategory.categoryId} 
                     accommodationType={selectedAccommodationType}
                     eventId={eventId}
-                    registrationId={getRegId(registration) ?? getOwnerRegId(profile) ?? getOwnerRegId(localProfile)}
-                    userId={profile?.userId ?? localProfile?.userId}
+                    registrationId={
+                      typeof registration?.id === "string"
+                        ? registration.id
+                        : typeof registration?.registrationId === "string"
+                          ? registration.registrationId
+                          : typeof registration?.id === "number"
+                            ? String(registration.id)
+                            : typeof registration?.registrationId === "number"
+                              ? String(registration.registrationId)
+                              : undefined
+                    }
+                    userId={profile?.userId}
                     profile={localProfile}
                     onComplete={handleAccommodationComplete}
                     onBack={handleModalBack}

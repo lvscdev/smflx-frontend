@@ -12,6 +12,8 @@ export interface UserProfile {
   maritalStatus?: string | null;
   employmentStatus?: string | null;
   stateOfResidence?: string | null;
+  country?: string | null;
+  residentialAddress?: string | null;
   [key: string]: unknown;
 }
 

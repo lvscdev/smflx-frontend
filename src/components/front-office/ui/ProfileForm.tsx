@@ -643,6 +643,18 @@ export function ProfileForm({
           : typeof initialData.phone === "string"
             ? initialData.phone.replace(/^\+\d{1,4}/, "")
             : "",
+        country:
+          initialData.country ||
+          (initialData as any).countryOfResidence ||
+          "",
+        address:
+          initialData.address ||
+          (initialData as any).residentialAddress ||
+          "",
+        state:
+          initialData.state ||
+          (initialData as any).stateOfResidence ||
+          "",
       };
     }
     return {
@@ -795,6 +807,8 @@ const payload = {
           })()
         : {}),
       ...(profile.state ? { stateOfResidence: profile.state } : {}),
+      ...(profile.country ? { country: profile.country } : {}),
+      ...(profile.address ? { residentialAddress: profile.address } : {}),
     };
     let ok = true;
 

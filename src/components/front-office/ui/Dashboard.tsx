@@ -985,11 +985,9 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         (acc as any)?.imageUrl ||
         "";
 
-
-      // Non-campers can book accommodation. Campers see the same CTA when the 1-hour hold expires.
       const showAccommodationPromo =
-        (isNonCamper && !hasAccommodationBookingDetails) ||
-        (isCamper && (!hasAccommodationBookingDetails || accommodationHoldExpired));
+        !hasAccommodationBookingDetails ||
+        (isCamper && accommodationHoldExpired);
 
       const promoSpacesCount = (() => {
         const hostelCap = availabilitySummary.hostel?.totalCapacity ?? 0;
@@ -1404,7 +1402,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   {registration?.eventName || "WOTH Camp Meeting 2026"}
                 </h4>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-base font-medium">
                     {attendeeType === "camper" && "Camper"}
                     {attendeeType === "physical" && "Physical Attendance"}
@@ -1412,6 +1410,41 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                     {!attendeeType && "Registered"}
                   </span>
                   <Tent className="w-5 h-5 text-gray-700" />
+                  {/* Payment status badge */}
+                  {(() => {
+                    const regStatus = String(
+                      (registration as any)?.status ??
+                      (registration as any)?.paymentStatus ??
+                      (registration as any)?.payment_status ??
+                      ""
+                    ).toUpperCase();
+                    const isPaid = ["PAID", "SUCCESS", "COMPLETED", "CONFIRMED", "ACTIVE"].includes(regStatus);
+                    const isPending = ["PENDING", "PROCESSING", "INITIATED", "IN_PROGRESS"].includes(regStatus);
+                    if (isPaid) {
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                          Paid
+                        </span>
+                      );
+                    }
+                    if (isPending) {
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Payment Pending
+                        </span>
+                      );
+                    }
+                    if (regStatus && !isPaid && !isPending) {
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                          {regStatus.charAt(0) + regStatus.slice(1).toLowerCase()}
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
 
@@ -1442,9 +1475,19 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           </div>
         </div>
 
-        {/* Camper-only accommodation details */}
-        {isCamper && (
-          normalizedAccommodation && (paidForAccommodation || hasActivePendingAccommodationHold) && !accommodationHoldExpired ? (
+        {/* Camper-only notice when no accommodation has been booked yet */}
+        {isCamper && !normalizedAccommodation && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6">
+            <p className="font-medium text-amber-900">Accommodation</p>
+            <p className="text-sm text-amber-800 mt-1 opacity-90">
+              You are registered as a camper and your accommodation details are yet to be confirmed.
+              Please book an accommodation below to confirm your status as a camper.
+            </p>
+          </div>
+        )}
+
+        {/* Accommodation details — shown for ALL attendee types when they have a booking */}
+        {normalizedAccommodation && (paidForAccommodation || hasActivePendingAccommodationHold || !isCamper) && !accommodationHoldExpired ? (
             <div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-2">
@@ -1573,16 +1616,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="rounded-xl border p-4 mb-6">
-              <p className="font-medium">Accommodation</p>
-              <p className="text-sm opacity-80">
-                You are registered as a camper and your accommodation details are yet to be confirmed.
-                Please book an accomodation below to confrim your status as a camper.
-              </p>
-            </div>
-          )
-        )}
+          ) : null}
 
         <DependentsSection
           dependents={dependents}

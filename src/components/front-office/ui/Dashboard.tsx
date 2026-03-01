@@ -1786,17 +1786,15 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                     accommodationType={selectedAccommodationType}
                     eventId={eventId}
                     registrationId={
-                      typeof registration?.id === "string"
-                        ? registration.id
-                        : typeof registration?.registrationId === "string"
-                          ? registration.registrationId
-                          : typeof registration?.id === "number"
-                            ? String(registration.id)
-                            : typeof registration?.registrationId === "number"
-                              ? String(registration.registrationId)
-                              : undefined
+                      resolvedRegId ||
+                      (typeof (registration as any)?.regId === "string" ? (registration as any).regId : undefined) ||
+                      (typeof registration?.id === "string" ? registration.id : undefined) ||
+                      (typeof registration?.registrationId === "string" ? registration.registrationId : undefined) ||
+                      (typeof (registration as any)?.regId === "number" ? String((registration as any).regId) : undefined) ||
+                      (typeof registration?.id === "number" ? String(registration.id) : undefined) ||
+                      (typeof registration?.registrationId === "number" ? String(registration.registrationId) : undefined)
                     }
-                    userId={profile?.userId}
+                    userId={profile?.userId || (profile as any)?.id || (profile as any)?._id}
                     profile={localProfile}
                     onComplete={handleAccommodationComplete}
                     onBack={handleModalBack}

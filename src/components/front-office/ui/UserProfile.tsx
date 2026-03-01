@@ -253,7 +253,7 @@ const displayEmploymentStatus = (v?: string) => {
   if (x === "EMPLOYED" || x === "SELF_EMPLOYED" || x === "EMPLOYED/SELF-EMPLOYED") return "Employed/Self-Employed";
   if (x === "UNEMPLOYED") return "Unemployed";
   if (x === "STUDENT") return "Student";
-  // support legacy lower-case values stored in UI state
+
   const xl = x.toLowerCase();
   if (xl === "employed" || xl === "self-employed" || xl === "self_employed") return "Employed/Self-Employed";
   if (xl === "unemployed") return "Unemployed";
@@ -288,13 +288,13 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
     gender: profile?.gender || '',
     ageRange: profile?.ageRange || '',
     country: profile?.country || '',
-    state: profile?.state || '',
+    state: (profile as any)?.state || (profile as any)?.stateOfResidence || '',
     localAssembly: profile?.localAssembly || '',
-    address: profile?.address || '',
-    isMinister: profile?.isMinister || '',
+    address: (profile as any)?.address || (profile as any)?.residentialAddress || '',
+    isMinister: (profile as any)?.isMinister || '',
     employmentStatus: profile?.employmentStatus || '',
     maritalStatus: profile?.maritalStatus || '',
-    spouseName: profile?.spouseName || '',
+    spouseName: (profile as any)?.spouseName || '',
   });
 
   const [dependentsList, setDependentsList] = useState(dependents);
@@ -388,13 +388,13 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
       gender: profile?.gender || '',
       ageRange: profile?.ageRange || '',
       country: profile?.country || '',
-      state: profile?.state || '',
+      state: (profile as any)?.state || (profile as any)?.stateOfResidence || '',
       localAssembly: profile?.localAssembly || '',
-      address: profile?.address || '',
-      isMinister: profile?.isMinister || '',
+      address: (profile as any)?.address || (profile as any)?.residentialAddress || '',
+      isMinister: (profile as any)?.isMinister || '',
       employmentStatus: profile?.employmentStatus || '',
       maritalStatus: profile?.maritalStatus || '',
-      spouseName: profile?.spouseName || '',
+      spouseName: (profile as any)?.spouseName || '',
     });
     setIsEditingProfile(false);
   };

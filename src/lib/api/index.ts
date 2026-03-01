@@ -134,13 +134,20 @@ export type CreateEventRegistrationPayload = {
 
 export type EventRegistration = {
   registrationId?: string;
+  regId?: string;
   userId: string;
   eventId: string;
   eventName?: string;
   participationMode: string;
   accommodationType: string;
+  status?: string;
+  paymentStatus?: string;
+  payment_status?: string;
+  attendeeType?: string;
+  attendanceType?: string;
   createdAt?: string;
   updatedAt?: string | null;
+  [key: string]: unknown;
 };
 
 export async function createUserRegistration(

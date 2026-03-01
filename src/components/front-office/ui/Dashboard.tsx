@@ -206,30 +206,11 @@ export function Dashboard({
     if (registration?.eventId) return registration.eventId;
 
     try {
-      const flowRaw =
-        localStorage.getItem("smflx_flow_state_v1") ||
-        localStorage.getItem("smflx_flow_state") ||
-        localStorage.getItem("flowState");
-
+      const flowRaw = localStorage.getItem("smflx_flow_state_v1");
       if (flowRaw) {
         const flow = JSON.parse(flowRaw);
-        const fromFlow =
-          flow?.selectedEvent?.eventId ||
-          flow?.event?.eventId ||
-          flow?.eventId;
-
+        const fromFlow = flow?.selectedEvent?.eventId || flow?.event?.eventId || flow?.eventId || flow?.activeEventId;
         if (fromFlow) return fromFlow;
-      }
-    } catch {
-      // ignore corrupted storage
-    }
-
-    // Legacy fallback
-    try {
-      const legacy = localStorage.getItem("smflx_selected_event");
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (parsed?.eventId) return parsed.eventId;
       }
     } catch {
       // ignore
@@ -294,37 +275,12 @@ export function Dashboard({
       if (typeof window === "undefined") return undefined;
 
       try {
-        const flowRaw =
-          localStorage.getItem("smflx_flow_state_v1") ||
-          localStorage.getItem("smflx_flow_state") ||
-          localStorage.getItem("flowState");
+        const flowRaw = localStorage.getItem("smflx_flow_state_v1");
         if (flowRaw) {
-          const flow = JSON.parse(flowRaw) as unknown;
-          if (flow && typeof flow === "object") {
-            const f = flow as Record<string, unknown>;
-            const selectedEvent = f["selectedEvent"] as unknown;
-            if (selectedEvent && typeof selectedEvent === "object") {
-              const se = selectedEvent as Record<string, unknown>;
-              const id = se["eventId"];
-              if (typeof id === "string" && id) return id;
-            }
-            const rid = f["eventId"];
-            if (typeof rid === "string" && rid) return rid;
-          }
-        }
-      } catch {
-        // ignore
-      }
-
-      try {
-        const legacy = localStorage.getItem("smflx_selected_event");
-        if (legacy) {
-          const parsed = JSON.parse(legacy) as unknown;
-          if (parsed && typeof parsed === "object") {
-            const p = parsed as Record<string, unknown>;
-            const id = p["eventId"];
-            if (typeof id === "string" && id) return id;
-          }
+          const flow = JSON.parse(flowRaw) as Record<string, unknown>;
+          const se = flow["selectedEvent"] as Record<string, unknown> | undefined;
+          const id = se?.["eventId"] ?? flow["activeEventId"] ?? flow["eventId"];
+          if (typeof id === "string" && id) return id;
         }
       } catch {
         // ignore
@@ -648,74 +604,14 @@ type AccommodationData = Parameters<
       const eventId = activeEventId ?? resolvedEventId;
       if (!eventId) return;
 
-      let pendingCtx: { dependentIds?: string[]; startedAt?: string } | null = null;
       try {
-        const raw = localStorage.getItem("smflx_pending_payment_ctx");
-        if (raw) pendingCtx = JSON.parse(raw) as { dependentIds?: string[]; startedAt?: string };
-      } catch {
-        // ignore
-      }
-
-      const THIRTY_MIN_MS = 30 * 60 * 1000;
-      const ctxStartedAt = pendingCtx?.startedAt ? new Date(pendingCtx.startedAt).getTime() : 0;
-      const isPostPayment = !!(
-        pendingCtx?.dependentIds?.length &&
-        ctxStartedAt > 0 &&
-        Date.now() - ctxStartedAt < THIRTY_MIN_MS
-      );
-
-      const MAX_POLLS = isPostPayment ? 6 : 1;
-      const POLL_INTERVAL_MS = 5000;
-
-      for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
+        const data = await getUserDashboard(eventId);
         if (cancelled) return;
-
-        try {
-          const data = await getUserDashboard(eventId);
-          if (cancelled) return;
-
-          const deps = (data.dependents || []).map((d) => toDependent(d));
-          setDependents(deps);
-
-          if (isPostPayment && pendingCtx?.dependentIds?.length) {
-            const targetIds = pendingCtx.dependentIds as string[];
-            const allPaid = targetIds.every((id) => deps.find((d) => d.id === id)?.isPaid);
-            if (allPaid || attempt === MAX_POLLS - 1) {
-              if (!allPaid && attempt === MAX_POLLS - 1) {
-                // Retries exhausted and payment still not confirmed by backend
-                toast.warning("Payment is still being confirmed", {
-                  description:
-                    "Your payment was received but is still being processed. Please refresh your dashboard in a few minutes.",
-                  duration: 10000,
-                  action: {
-                    label: "Refresh now",
-                    onClick: () => window.location.reload(),
-                  },
-                });
-              }
-              // Clear the pending ctx so we don't keep polling on next load
-              try { localStorage.removeItem("smflx_pending_payment_ctx"); } catch { /* ignore */ }
-              // Also clear paymentStatus from flow state
-              try {
-                const raw = localStorage.getItem("smflx_flow_state_v1");
-                if (raw) {
-                  const flow = JSON.parse(raw) as Record<string, unknown>;
-                  delete flow.paymentStatus;
-                  localStorage.setItem("smflx_flow_state_v1", JSON.stringify(flow));
-                }
-              } catch { /* ignore */ }
-              break;
-            }
-            // Wait before next poll
-            await new Promise<void>((res) => setTimeout(res, POLL_INTERVAL_MS));
-          } else {
-            break;
-          }
-        } catch (err) {
-          if (!cancelled) {
-            console.error("Failed to load dependents:", err);
-          }
-          break;
+        const deps = (data.dependents || []).map((d) => toDependent(d));
+        setDependents(deps);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load dependents:", err);
         }
       }
     };
@@ -744,20 +640,37 @@ type AccommodationData = Parameters<
   const accommodationFacilityName: string =
     (accAny?.room?.facilityName as string) ||
     (accAny?.facilityName as string) ||
-    (accAny?.facility as string) ||
+    (accAny?.facility?.facilityName as string) ||
+    (accAny?.facility?.name as string) ||
+    (typeof accAny?.facility === "string" ? accAny.facility : "") ||
+    (accAny?.hostelName as string) ||
+    (accAny?.hotelName as string) ||
     "";
 
   const accommodationRoomLabel: string =
     (accAny?.room?.roomIdentifier as string) ||
     (accAny?.room?.roomCode as string) ||
+    (accAny?.room?.roomNumber as string) ||
+    (accAny?.room?.roomType as string) ||
     (accAny?.roomIdentifier as string) ||
     (accAny?.roomCode as string) ||
+    (accAny?.roomNumber as string) ||
+    (typeof accAny?.room === "string" ? accAny.room : "") ||
     "";
 
   const accommodationBedspaceLabel: string =
     (accAny?.bedspace?.bedspaceName as string) ||
+    (accAny?.bedspace?.name as string) ||
     (accAny?.bedspaceName as string) ||
+    (accAny?.bedNumber as string) ||
     (typeof accAny?.bed === "string" ? (accAny?.bed as string) : "") ||
+    (typeof accAny?.bedspace === "string" ? accAny.bedspace : "") ||
+    "";
+
+  const accommodationTypeDisplay: string =
+    (accAny?.accommodationType as string) ||
+    (accAny?.type as string) ||
+    (accAny?.category as string) ||
     "";
 
   const accommodationImageUrl: string =
@@ -782,91 +695,46 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
   }, [onAccommodationUpdate]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const isCamperLocal = isCamper;
+    const HOLD_MS = 60 * 60 * 1000;
     const hasPendingAccommodation = !!normalizedAccommodation && !paidForAccommodation;
 
-    // If not in a pending accommodation state, clear countdown state.
-    if (!isCamperLocal || !hasPendingAccommodation) {
-      // Only update state if it isn't already cleared to avoid render loops.
+    if (!hasPendingAccommodation) {
       setAccommodationHold((prev) => {
-        if (
-          prev.startedAtMs === null &&
-          prev.expiresAtMs === null &&
-          prev.remainingMs === null &&
-          prev.expired === false
-        ) {
-          return prev;
-        }
-        return {
-          startedAtMs: null,
-          expiresAtMs: null,
-          remainingMs: null,
-          expired: false,
-        };
+        if (prev.startedAtMs === null && prev.expiresAtMs === null && prev.remainingMs === null && prev.expired === false) return prev;
+        return { startedAtMs: null, expiresAtMs: null, remainingMs: null, expired: false };
       });
-
-      // If payment becomes confirmed, clear markers.
-      if (paidForAccommodation) {
-        try {
-          localStorage.removeItem("smflx_pending_accommodation_payment");
-          localStorage.removeItem("smflx_pending_accommodation_payment_started_at");
-        } catch {
-          // ignore
-        }
-      }
       return;
     }
 
-    const HOLD_MS = 60 * 60 * 1000;
-
-    const readStartedAt = (): number | null => {
+    // Derive hold start time from API (preferred) or localStorage bridge flag written by AccommodationSelection
+    const getStartedAtMs = (): number | null => {
+      const a = normalizedAccommodation as any;
+      const apiTs =
+        a?.bookingInitiatedAt ?? a?.booking_initiated_at ??
+        a?.holdStartedAt ?? a?.hold_started_at ??
+        a?.createdAt ?? a?.created_at ?? null;
+      if (apiTs) {
+        const ms = typeof apiTs === "number" ? apiTs : new Date(apiTs).getTime();
+        if (Number.isFinite(ms) && ms > 0) return ms;
+      }
+      // Bridge fallback — removed from localStorage on next dashboard boot
       try {
         const raw = localStorage.getItem("smflx_pending_accommodation_payment_started_at");
         const n = raw ? Number(raw) : NaN;
         if (Number.isFinite(n) && n > 0) return n;
-      } catch {
-        // ignore
-      }
+      } catch {}
       return null;
     };
 
-    const ensureStartedAt = (): number | null => {
-      const existing = readStartedAt();
-      if (existing) return existing;
-
-      try {
-        const pending = localStorage.getItem("smflx_pending_accommodation_payment");
-        if (pending !== "1") return null;
-
-        const now = Date.now();
-        localStorage.setItem(
-          "smflx_pending_accommodation_payment_started_at",
-          String(now),
-        );
-        return now;
-      } catch {
-        return null;
-      }
-    };
-
-    const startedAtMs = ensureStartedAt();
+    const startedAtMs = getStartedAtMs();
     if (!startedAtMs) {
-      // No local pending marker: treat this as a stale/abandoned payment.
+      // No timestamp available — treat as expired
       setAccommodationHold({ startedAtMs: null, expiresAtMs: null, remainingMs: null, expired: true });
-      try {
-        localStorage.removeItem("smflx_pending_accommodation_payment");
-        localStorage.removeItem("smflx_pending_accommodation_payment_started_at");
-      } catch {
-        // ignore
-      }
       onAccommodationUpdateRef.current?.(null);
       return;
     }
 
     const expiresAtMs = startedAtMs + HOLD_MS;
-
     let handledExpire = false;
 
     const tick = () => {
@@ -874,74 +742,44 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
       const expired = remainingMs <= 0;
 
       setAccommodationHold((prev) => {
-        if (
-          prev.startedAtMs === startedAtMs &&
-          prev.expiresAtMs === expiresAtMs &&
-          prev.remainingMs === remainingMs &&
-          prev.expired === expired
-        ) {
-          return prev;
-        }
+        if (prev.startedAtMs === startedAtMs && prev.expiresAtMs === expiresAtMs && prev.remainingMs === remainingMs && prev.expired === expired) return prev;
         return { startedAtMs, expiresAtMs, remainingMs, expired };
       });
 
       if (!expired || handledExpire) return;
-
       handledExpire = true;
-
-      // Hold expired: clear markers and switch UI back to “Book Accommodation”.
-      try {
-        localStorage.removeItem("smflx_pending_accommodation_payment");
-        localStorage.removeItem("smflx_pending_accommodation_payment_started_at");
-
-        // Clear saved accommodation snapshot so the promo card matches “book again”.
-        const raw =
-          localStorage.getItem("smflx_flow_state_v1") ||
-          localStorage.getItem("smflx_flow_state") ||
-          localStorage.getItem("flowState");
-        if (raw) {
-          const flow = JSON.parse(raw) as Record<string, unknown>;
-          const next = { ...flow, accommodation: null };
-          // Prefer the v1 key if it exists; otherwise fall back.
-          if (localStorage.getItem("smflx_flow_state_v1")) {
-            localStorage.setItem("smflx_flow_state_v1", JSON.stringify(next));
-          } else {
-            localStorage.setItem("smflx_flow_state", JSON.stringify(next));
-          }
-        }
-      } catch {
-        // ignore
-      }
-
       onAccommodationUpdateRef.current?.(null);
-        };
+    };
 
-        tick();
-        const id = window.setInterval(tick, 1000);
-        return () => window.clearInterval(id);
-      }, [attendeeType, Boolean(normalizedAccommodation), paidForAccommodation]);
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [Boolean(normalizedAccommodation), paidForAccommodation]);
 
-      const accommodationHoldExpired = accommodationHold.expired;
-      const accommodationHoldRemainingMs = accommodationHold.remainingMs;
+  const accommodationHoldExpired = accommodationHold.expired;
+  const accommodationHoldRemainingMs = accommodationHold.remainingMs;
 
-      const hasActivePendingAccommodationHold = useMemo(() => {
-        if (typeof window === "undefined") return false;
-        if (!isCamper) return false;
-        if (!normalizedAccommodation) return false;
-        if (paidForAccommodation) return false;
-
-        const HOLD_MS = 60 * 60 * 1000;
-        try {
-          const flag = localStorage.getItem("smflx_pending_accommodation_payment");
-          const startedRaw = localStorage.getItem("smflx_pending_accommodation_payment_started_at");
-          const started = startedRaw ? Number(startedRaw) : NaN;
-          if (flag !== "1") return false;
-          if (!Number.isFinite(started) || started <= 0) return false;
-          return Date.now() - started < HOLD_MS;
-        } catch {
-          return false;
-        }
-      }, [isCamper, Boolean(normalizedAccommodation), paidForAccommodation]);
+  const hasActivePendingAccommodationHold = useMemo(() => {
+    if (!normalizedAccommodation) return false;
+    if (paidForAccommodation) return false;
+    const HOLD_MS = 60 * 60 * 1000;
+    const a = normalizedAccommodation as any;
+    const apiTs = a?.bookingInitiatedAt ?? a?.booking_initiated_at ?? a?.holdStartedAt ?? a?.hold_started_at ?? a?.createdAt ?? a?.created_at ?? null;
+    let startedAtMs: number | null = null;
+    if (apiTs) {
+      const ms = typeof apiTs === "number" ? apiTs : new Date(apiTs).getTime();
+      if (Number.isFinite(ms) && ms > 0) startedAtMs = ms;
+    }
+    if (!startedAtMs) {
+      try {
+        const raw = localStorage.getItem("smflx_pending_accommodation_payment_started_at");
+        const n = raw ? Number(raw) : NaN;
+        if (Number.isFinite(n) && n > 0) startedAtMs = n;
+      } catch {}
+    }
+    if (!startedAtMs) return false;
+    return Date.now() - startedAtMs < HOLD_MS;
+  }, [Boolean(normalizedAccommodation), paidForAccommodation]);
 
       const formatHoldRemaining = (ms: number | null) => {
         if (ms == null) return "";
@@ -986,8 +824,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         "";
 
       const showAccommodationPromo =
-        !hasAccommodationBookingDetails ||
-        (isCamper && accommodationHoldExpired);
+        !paidForAccommodation &&
+        (!normalizedAccommodation || accommodationHoldExpired || !hasActivePendingAccommodationHold);
 
       const promoSpacesCount = (() => {
         const hostelCap = availabilitySummary.hostel?.totalCapacity ?? 0;
@@ -1008,6 +846,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
       const handleAccommodationComplete = (data: AccommodationData) => {
         // Save selection snapshot for UI, then close modal.
+        // NOTE: attendee type is NOT upgraded here — that only happens after payment is confirmed.
         const snapshot: DashboardAccommodation = {
           accommodationType: data.type,
           facility: data.facilityId ?? "",
@@ -1018,11 +857,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         };
 
         onAccommodationUpdate?.(snapshot);
-        // If user was Physical/Online, update their attendee type to Camper
-        if (isNonCamper) {
-          console.log('User upgraded from Physical/Online to Camper by booking accommodation');
-        }
-
         resetModal();
       };
 
@@ -1486,8 +1320,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           </div>
         )}
 
-        {/* Accommodation details — shown for ALL attendee types when they have a booking */}
-        {normalizedAccommodation && (paidForAccommodation || hasActivePendingAccommodationHold || !isCamper) && !accommodationHoldExpired ? (
+        {normalizedAccommodation && (paidForAccommodation || (!accommodationHoldExpired && hasActivePendingAccommodationHold)) ? (
             <div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-2">
@@ -1513,12 +1346,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                   <div>
                     <span className="text-sm text-gray-500 block mb-2">Type</span>
                     <span className="text-base font-semibold">
-                      {(() => {
-                        const a = normalizedAccommodation as Record<string, unknown>;
-                        if (typeof a.accommodationType === "string") return a.accommodationType;
-                        if (typeof a.type === "string") return a.type;
-                        return "Hostel";
-                      })()}
+                      {accommodationTypeDisplay || "—"}
                     </span>
                   </div>
                   <div>

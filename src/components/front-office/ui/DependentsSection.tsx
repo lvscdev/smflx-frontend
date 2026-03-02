@@ -68,7 +68,7 @@ export function DependentsSection({ dependents, onRegister, onPay }: DependentsS
               <div className="flex-1 min-w-0">
                 <h4 className="font-semibold text-gray-900 truncate">{dependent.name}</h4>
                 <p className="text-sm text-gray-600">
-                  {dependent.age} years old • {dependent.gender === 'male' ? 'Male' : 'Female'}
+                  {dependent.age} years old • {dependent.gender?.toUpperCase() === 'MALE' ? 'Male' : dependent.gender?.toUpperCase() === 'FEMALE' ? 'Female' : dependent.gender || ''}
                 </p>
               </div>
 

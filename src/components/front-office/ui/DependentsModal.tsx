@@ -212,7 +212,7 @@ export function DependentsModal({
                     onChange={(e) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, age: sanitizeDependentAge(e.target.value) }); }}
                     placeholder="Enter age (3–12)"
                     inputMode="numeric"
-                    min="3"
+                    min="0"
                     max="12"
                   />
                   <p className="mt-2 text-xs text-gray-600">
@@ -227,9 +227,9 @@ export function DependentsModal({
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, gender: 'male' }); }}
+                      onClick={() => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, gender: 'MALE' }); }}
                       className={`py-3 px-4 rounded-lg border-2 transition-colors ${
-                        currentDependent.gender === 'male'
+                        currentDependent.gender?.toUpperCase() === 'MALE'
                           ? 'border-blue-600 bg-blue-50 text-blue-700'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
@@ -238,9 +238,9 @@ export function DependentsModal({
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, gender: 'female' }); }}
+                      onClick={() => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, gender: 'FEMALE' }); }}
                       className={`py-3 px-4 rounded-lg border-2 transition-colors ${
-                        currentDependent.gender === 'female'
+                        currentDependent.gender?.toUpperCase() === 'FEMALE'
                           ? 'border-blue-600 bg-blue-50 text-blue-700'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}

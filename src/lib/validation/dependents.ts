@@ -9,11 +9,8 @@ export interface DependentDraft {
 export type ValidationResult = { ok: true } | { ok: false; message: string };
 
 export function sanitizeDependentAge(age: string): string {
-  // keep digits only, max 3 chars
   const d = digitsOnly(age, 3);
   if (!d) return '';
-  // Clamp broadly to avoid extreme values while typing.
-  // The actual allowed range for dependents is enforced in validateDependentDraft.
   const n = clampNumber(parseInt(d, 10), 0, 120);
   return String(n);
 }
@@ -31,7 +28,6 @@ export function validateDependentDraft(d: DependentDraft): ValidationResult {
 
   const n = parseInt(age, 10);
   if (Number.isNaN(n)) return { ok: false, message: 'Please enter a valid age.' };
-  // Business rule: dependents must be ages 3–12.
   if (n >= 13) {
     return {
       ok: false,

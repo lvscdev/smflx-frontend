@@ -43,7 +43,7 @@ export function toUserMessage(
     return "Your session has expired. Please verify your email again.";
   }
   if (status === 403) {
-    return "You don’t have permission to perform this action.";
+    return "You don’t have permission to proceed. Please refresh this page to retry";
   }
 
   // OTP-specific translations

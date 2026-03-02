@@ -212,7 +212,7 @@ export function DependentsModal({
                     onChange={(e) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, age: sanitizeDependentAge(e.target.value) }); }}
                     placeholder="Enter age (3–12)"
                     inputMode="numeric"
-                    min="0"
+                    min="3"
                     max="12"
                   />
                   <p className="mt-2 text-xs text-gray-600">

@@ -72,16 +72,25 @@ function PaymentCallbackInner() {
       ""
     ).toLowerCase();
 
+    let resolvedStatus: CallbackStatus = "loading";
+    let redirectDelay: number | null = null;
+
     if (rawStatus === "success") {
+      resolvedStatus = "success";
+      redirectDelay = 2000;
       const flow = safeLoadFlowState();
       const merged = flow ?? {};
       merged.view = "dashboard";
       merged.paymentStatus = "success";
       safeSaveFlowState(merged);
-      try { localStorage.setItem("smflx_post_payment_poll", "1"); } catch {}
+
+      // smflx_post_payment_poll is consumed by consumePostPaymentFlag() in the
+      // dashboard page to kick off polling until the API confirms the payment.
+      try { localStorage.setItem("smflx_post_payment_poll", "1"); } catch { /* ignore */ }
 
       clearPendingCtx();
 
+      // Mark any in-flight dependents payment as returned so the UI updates.
       try {
         const ref =
           params.get("reference") ||
@@ -90,37 +99,32 @@ function PaymentCallbackInner() {
           params.get("transactionReference") ||
           "";
         if (ref) markDependentsPaymentReturned(String(ref));
-      } catch {
-        // ignore
-      }
-      setStatus("success");
+      } catch { /* ignore */ }
 
-      // Redirect to dashboard after success message
-      const timer = setTimeout(() => router.replace("/dashboard"), 2000);
+    } else if (rawStatus === "failed" || rawStatus === "error" || rawStatus === "cancelled") {
+      resolvedStatus = "failed";
+
+    } else {
+
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("⚠️ Payment callback with unknown status, redirecting to dashboard");
+      }
+      resolvedStatus = "loading";
+      redirectDelay = 1500;
+
+      const flow = safeLoadFlowState();
+      if (flow) {
+        flow.view = "dashboard";
+        safeSaveFlowState(flow);
+      }
+    }
+
+    setStatus(resolvedStatus);
+
+    if (redirectDelay !== null) {
+      const timer = setTimeout(() => router.replace("/dashboard"), redirectDelay);
       return () => clearTimeout(timer);
     }
-
-    if (rawStatus === "failed" || rawStatus === "error" || rawStatus === "cancelled") {
-      setStatus("failed");
-      // Keep pending context so user can retry
-      return;
-    }
-
-    // Unknown status — redirect to dashboard, let webhook determine truth
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("⚠️ Payment callback with unknown status, redirecting to dashboard");
-    }
-    
-    const flow = safeLoadFlowState();
-    if (flow) {
-      flow.view = "dashboard";
-      safeSaveFlowState(flow);
-    }
-
-    // Don't assume success for unknown status
-    setStatus("loading");
-    const timer = setTimeout(() => router.replace("/dashboard"), 1500);
-    return () => clearTimeout(timer);
   }, [params, router]);
 
   // ---------- UI ----------

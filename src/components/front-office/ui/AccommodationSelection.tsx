@@ -88,6 +88,7 @@ interface AccommodationSelectionProps {
   isSubmitting?: boolean;
   serverError?: string | null;
   categoryId: string;
+  attendTeensEvent?: boolean;
 }
 
 export function AccommodationSelection({
@@ -102,6 +103,7 @@ export function AccommodationSelection({
   categoryId,
   isSubmitting: externalSubmitting,
   serverError: externalError,
+  attendTeensEvent = false,
 }: AccommodationSelectionProps) {
   if (process.env.NODE_ENV !== "production") {
     console.log("userId", userId);
@@ -144,7 +146,9 @@ export function AccommodationSelection({
       const profileGenderRaw = (profile?.gender ?? "").toString().toUpperCase();
       const profileGender = profileGenderRaw === "FEMALE" ? "FEMALE" : profileGenderRaw === "MALE" ? "MALE" : "";
       const profileAgeRangeRaw = (profile?.ageRange ?? "").toString();
-      const profileAgeRange = normalizeAgeRange(profileAgeRangeRaw);
+      const profileAgeRange = (profile as any)?.isYAT === true
+        ? "13-19"
+        : normalizeAgeRange(profileAgeRangeRaw);
 
       if (!profileGender || !profileAgeRange) {
         setFacilities([]);
@@ -157,10 +161,11 @@ export function AccommodationSelection({
         return;
       }
 
+      const effectiveAgeRange = attendTeensEvent ? "13-19" : profileAgeRange;
       const response = await listFacilitiesByDemographics({
         categoryId,
         gender: profileGender,
-        ageRange: profileAgeRange,
+        ageRange: effectiveAgeRange,
       });
 
       setFacilities(response);
@@ -185,7 +190,7 @@ export function AccommodationSelection({
     if (categoryId) {
       loadAccommodations();
     }
-  }, [categoryId, isHostel, profile?.gender, profile?.ageRange]);
+  }, [categoryId, isHostel, profile?.gender, profile?.ageRange, attendTeensEvent]);
 
   const loadHotelRooms = async (facilityId: string) => {
     try {

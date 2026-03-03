@@ -315,137 +315,131 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
   const response = await apiRequest<unknown>(`/user-dashboard/${eventId}`, { method: "GET" });
 
   const root: unknown =
-    (response && typeof response === "object" && "data" in (response as Record<string, unknown>))
+    response && typeof response === "object" && "data" in (response as Record<string, unknown>)
       ? (response as Record<string, unknown>)["data"]
       : response;
 
   const obj = (root && typeof root === "object") ? (root as Record<string, unknown>) : {};
-
-  const profileCandidate =
+  const profileNested =
     (obj["profile"] && typeof obj["profile"] === "object") ? (obj["profile"] as Record<string, unknown>) :
-    (obj["user"] && typeof obj["user"] === "object") ? (obj["user"] as Record<string, unknown>) :
+    (obj["user"]    && typeof obj["user"]    === "object") ? (obj["user"]    as Record<string, unknown>) :
     null;
 
-  const profileFromFlat = obj;
+  const pSrc = profileNested ?? obj;
 
   const profile: UserProfile = {
-    userId: (profileCandidate?.["userId"] as string | undefined) ?? (profileFromFlat["userId"] as string | undefined),
-    firstName: (profileCandidate?.["firstName"] as string | undefined) ?? (profileFromFlat["firstName"] as string | undefined),
-    lastName: (profileCandidate?.["lastName"] as string | undefined) ?? (profileFromFlat["lastName"] as string | undefined),
-    email: (profileCandidate?.["email"] as string | undefined) ?? (profileFromFlat["email"] as string | undefined),
-    phoneNumber: (profileCandidate?.["phoneNumber"] as string | undefined) ?? (profileFromFlat["phoneNumber"] as string | undefined),
-    gender: (profileCandidate?.["gender"] as string | undefined) ?? (profileFromFlat["gender"] as string | undefined),
-    ageRange: (profileCandidate?.["ageRange"] as string | undefined) ?? (profileFromFlat["ageRange"] as string | undefined),
-    localAssembly: (profileCandidate?.["localAssembly"] as string | undefined) ?? (profileFromFlat["localAssembly"] as string | undefined),
-    maritalStatus: (profileCandidate?.["maritalStatus"] as string | undefined) ?? (profileFromFlat["maritalStatus"] as string | undefined),
-    employmentStatus: (profileCandidate?.["employmentStatus"] as string | undefined) ?? (profileFromFlat["employmentStatus"] as string | undefined),
-    stateOfResidence: (profileCandidate?.["stateOfResidence"] as string | undefined) ?? (profileFromFlat["stateOfResidence"] as string | undefined),
+    userId:           (pSrc["userId"]           as string | undefined),
+    firstName:        (pSrc["firstName"]        as string | undefined),
+    lastName:         (pSrc["lastName"]         as string | undefined),
+    email:            (pSrc["email"]            as string | undefined),
+    phoneNumber:      (pSrc["phoneNumber"]      as string | undefined),
+    gender:           (pSrc["gender"]           as string | undefined),
+    ageRange:         (pSrc["ageRange"]         as string | undefined),
+    localAssembly:    (pSrc["localAssembly"]    as string | undefined),
+    maritalStatus:    (pSrc["maritalStatus"]    as string | undefined),
+    employmentStatus: (pSrc["employmentStatus"] as string | undefined),
+    stateOfResidence: (pSrc["stateOfResidence"] as string | undefined),
   };
 
-  const regsUnknown =
-    (obj["registrations"] as unknown) ??
-    (obj["registration"] as unknown) ??
-    (obj["data"] as unknown);
+  const registrations: DashboardReg[] = [];
 
-  const registrations: DashboardReg[] = Array.isArray(regsUnknown)
-    ? (regsUnknown as unknown[]).filter((r): r is Record<string, unknown> => !!r && typeof r === "object").map((r) => r as DashboardReg)
-    : regsUnknown && typeof regsUnknown === "object"
-      ? [regsUnknown as DashboardReg]
-      : [];
-
-  registrations.forEach((reg) => {
-    const regObj = reg as Record<string, unknown>;
-    
-    // If attendeeType is missing but participationMode exists, map it
-    if (!regObj.attendeeType && regObj.participationMode) {
-      regObj.attendeeType = mapParticipationModeToAttendeeType(regObj.participationMode as string);
+  const regsRaw = obj["registrations"] ?? obj["registration"];
+  if (Array.isArray(regsRaw) && regsRaw.length > 0) {
+    for (const r of regsRaw as Record<string, unknown>[]) {
+      const regObj = { ...r } as Record<string, unknown>;
+      if (!regObj["eventId"]) regObj["eventId"] = eventId;
+      if (!regObj["attendeeType"] && regObj["participationMode"])
+        regObj["attendeeType"] = mapParticipationModeToAttendeeType(regObj["participationMode"] as string);
+      if (!regObj["attendeeType"] && regObj["attendanceType"])
+        regObj["attendeeType"] = mapParticipationModeToAttendeeType(regObj["attendanceType"] as string);
+      registrations.push(regObj as DashboardReg);
     }
-    
-    if (!regObj.eventId && eventId) {
-      regObj.eventId = eventId;
-    }
-  
-
-  if (registrations.length === 0) {
+  } else {
+    // Flat shape — build a synthetic registration from top-level fields.
     const flatRegId =
+      (obj["regId"]          as string | undefined) ??
       (obj["registrationId"] as string | undefined) ??
-      (obj["regId"] as string | undefined) ??
-      (obj["id"] as string | undefined);
+      (obj["id"]             as string | undefined);
 
-    const participationMode =
+    const rawMode =
       (obj["participationMode"] as string | undefined) ??
-      (obj["attendanceType"] as string | undefined) ??
-      (obj["attendeeType"] as string | undefined);
+      (obj["attendanceType"]    as string | undefined) ??
+      (obj["attendeeType"]      as string | undefined);
 
     const eventData =
-      (obj["eventData"] && typeof obj["eventData"] === "object")
+      obj["eventData"] && typeof obj["eventData"] === "object"
         ? (obj["eventData"] as Record<string, unknown>)
         : null;
 
-    if (flatRegId || participationMode || eventData) {
-      const regObj: Record<string, unknown> = {
-        registrationId: flatRegId,
-        regId: flatRegId,
-        eventId: (eventData?.["eventId"] as string | undefined) ?? eventId,
-        participationMode,
-        attendeeType: mapParticipationModeToAttendeeType(participationMode ?? ""),
-        eventTitle:
-          (eventData?.["eventTitle"] as string | undefined) ??
-          (eventData?.["eventName"] as string | undefined),
-        eventName:
-          (eventData?.["eventTitle"] as string | undefined) ??
-          (eventData?.["eventName"] as string | undefined),
-      };
+    const resolvedEventId = (eventData?.["eventId"] as string | undefined) ?? eventId;
 
-      registrations.push(regObj as DashboardReg);
+    const eventName =
+      (eventData?.["eventTitle"] as string | undefined) ??
+      (eventData?.["eventName"]  as string | undefined) ??
+      (obj["eventTitle"]         as string | undefined) ??
+      (obj["eventName"]          as string | undefined);
+
+    if (flatRegId || rawMode || eventData) {
+      registrations.push({
+        regId:             flatRegId,
+        registrationId:    flatRegId,
+        eventId:           resolvedEventId,
+        eventName,
+        eventTitle:        eventName,
+        participationMode: rawMode,
+        attendanceType:    rawMode,
+        attendeeType:      mapParticipationModeToAttendeeType(rawMode ?? ""),
+        mealTicket:        obj["mealTicket"],
+        userId:            obj["userId"],
+      } as DashboardReg);
     }
   }
-});
 
-  const accUnknown =
-    (obj["accommodations"] as unknown) ??
-    (obj["accommodation"] as unknown);
+  // ── Accommodations ───────────────────────────────────────────────────────
+  // Support both data.accommodations[] array shape and the flat
+  // data.accommodation object the current API returns.
+  const accommodations: DashboardAcc[] = [];
 
-  const accommodations: DashboardAcc[] = Array.isArray(accUnknown)
-    ? (accUnknown as unknown[]).filter((a): a is Record<string, unknown> => !!a && typeof a === "object").map((a) => a as DashboardAcc)
-    : accUnknown && typeof accUnknown === "object"
-      ? [accUnknown as DashboardAcc]
-      : [];
-
-  accommodations.forEach((acc) => {
-    const accObj = acc as Record<string, unknown>;
-    if (!accObj.eventId && eventId) {
-      accObj.eventId = eventId;
+  const accsRaw = obj["accommodations"];
+  if (Array.isArray(accsRaw) && accsRaw.length > 0) {
+    for (const a of accsRaw as Record<string, unknown>[]) {
+      const accObj = { ...(a as Record<string, unknown>) };
+      if (!accObj["eventId"]) accObj["eventId"] = eventId;
+      accommodations.push(accObj as DashboardAcc);
     }
-  });
+  } else {
+    const accRaw = obj["accommodation"];
+    if (accRaw && typeof accRaw === "object") {
+      const accObj = { ...(accRaw as Record<string, unknown>) };
+      if (!accObj["eventId"]) accObj["eventId"] = eventId;
+      accommodations.push(accObj as DashboardAcc);
+    }
+  }
 
-  const depsUnknown =
-    (obj["dependents"] as unknown) ??
-    (obj["dependentRegistrations"] as unknown) ??
-    (obj["dependantsData"] as unknown) ??
+  const dependents: DashboardDep[] = [];
+
+  const depsRaw =
+    obj["dependents"] ??
+    obj["dependentRegistrations"] ??
+    obj["dependantsData"] ??
     (obj["dependants"] && typeof obj["dependants"] === "object"
       ? (obj["dependants"] as Record<string, unknown>)["dependantsData"]
       : undefined) ??
-    (obj["dependants"] as unknown);
+    (Array.isArray(obj["dependants"]) ? obj["dependants"] : undefined);
 
-  const dependents: DashboardDep[] = Array.isArray(depsUnknown)
-    ? (depsUnknown as unknown[]).filter((d): d is Record<string, unknown> => !!d && typeof d === "object").map((d) => d as DashboardDep)
-    : [];
+  if (Array.isArray(depsRaw)) {
+    for (const d of depsRaw as Record<string, unknown>[]) {
+      if (d && typeof d === "object") dependents.push(d as DashboardDep);
+    }
+  }
 
-  const paymentSummaryUnknown = obj["paymentSummary"] as unknown;
+  // ── Payment summary ──────────────────────────────────────────────────────
   const paymentSummary: DashboardPaymentSummary | null =
-    paymentSummaryUnknown && typeof paymentSummaryUnknown === "object"
-      ? (paymentSummaryUnknown as DashboardPaymentSummary)
+    obj["paymentSummary"] && typeof obj["paymentSummary"] === "object"
+      ? (obj["paymentSummary"] as DashboardPaymentSummary)
       : null;
 
-  return {
-    eventId,
-    profile,
-    registrations,
-    accommodations,
-    dependents,
-    paymentSummary,
-  };
+  return { eventId, profile, registrations, accommodations, dependents, paymentSummary };
 }
 
 export {

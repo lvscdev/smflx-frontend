@@ -89,14 +89,12 @@ export type UserProfile = {
 
 export async function getMe() {
   const response = await apiRequest<any>("/user", { method: "GET" });
-  // Backend returns { profileInfo: {...} } after apiRequest unwraps outer data
   const data = response?.data || response;
   return data?.profileInfo || data;
 }
 
 export async function updateMe(payload: Partial<DashboardUserProfile>) {
   const response = await apiRequest<any>("/user", { method: "PUT", body: payload });
-  // Backend returns { profileInfo: {...} } after apiRequest unwraps outer data
   const data = response?.data || response;
   return data?.profileInfo || data;
 }
@@ -313,13 +311,10 @@ function mapParticipationModeToAttendeeType(
 
 export async function getUserDashboard(eventId: string): Promise<NormalizedDashboardResponse> {
   const response = await apiRequest<unknown>(`/user-dashboard/${eventId}`, { method: "GET" });
+  const obj = (response && typeof response === "object") ? (response as Record<string, unknown>) : {};
 
-  const root: unknown =
-    response && typeof response === "object" && "data" in (response as Record<string, unknown>)
-      ? (response as Record<string, unknown>)["data"]
-      : response;
+  // ── Profile ──────────────────────────────────────────────────────────────────
 
-  const obj = (root && typeof root === "object") ? (root as Record<string, unknown>) : {};
   const profileNested =
     (obj["profile"] && typeof obj["profile"] === "object") ? (obj["profile"] as Record<string, unknown>) :
     (obj["user"]    && typeof obj["user"]    === "object") ? (obj["user"]    as Record<string, unknown>) :
@@ -340,6 +335,8 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
     employmentStatus: (pSrc["employmentStatus"] as string | undefined),
     stateOfResidence: (pSrc["stateOfResidence"] as string | undefined),
   };
+
+  // ── Registrations ────────────────────────────────────────────────────────
 
   const registrations: DashboardReg[] = [];
 
@@ -396,8 +393,7 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
   }
 
   // ── Accommodations ───────────────────────────────────────────────────────
-  // Support both data.accommodations[] array shape and the flat
-  // data.accommodation object the current API returns.
+  
   const accommodations: DashboardAcc[] = [];
 
   const accsRaw = obj["accommodations"];
@@ -415,6 +411,8 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
       accommodations.push(accObj as DashboardAcc);
     }
   }
+
+  // ── Dependents ───────────────────────────────────────────────────────────
 
   const dependents: DashboardDep[] = [];
 

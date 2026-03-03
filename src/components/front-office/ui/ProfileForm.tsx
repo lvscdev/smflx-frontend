@@ -450,7 +450,7 @@ const payload = {
                 onClick={() => setProfile({ ...profile, gender: "male" })}
                 icon={<User className="w-5 h-5" />}
                 label="Male"
-                description="Select if you identify as male"
+                description="Select if you are a male"
               />
               <GridOption
                 value="female"
@@ -458,7 +458,7 @@ const payload = {
                 onClick={() => setProfile({ ...profile, gender: "female" })}
                 icon={<User className="w-5 h-5" />}
                 label="Female"
-                description="Select if you identify as female"
+                description="Select if you are female"
               />
             </div>
           </div>

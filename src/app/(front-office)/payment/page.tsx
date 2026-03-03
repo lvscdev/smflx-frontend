@@ -73,13 +73,13 @@ function PaymentCallbackInner() {
     ).toLowerCase();
 
     if (rawStatus === "success") {
-      // Payment succeeded — mark in flow state
       const flow = safeLoadFlowState();
-      if (flow) {
-        flow.view = "dashboard";
-        flow.paymentStatus = "success";
-        safeSaveFlowState(flow);
-      }
+      const merged = flow ?? {};
+      merged.view = "dashboard";
+      merged.paymentStatus = "success";
+      safeSaveFlowState(merged);
+      try { localStorage.setItem("smflx_post_payment_poll", "1"); } catch {}
+
       clearPendingCtx();
 
       try {

@@ -376,8 +376,6 @@ export function Dashboard({
 
   useEffect(() => {
     const eventId = registration?.eventId;
-    // Prefetch availability so the dashboard promo can show real counts.
-    // Also refresh when opening the modal at step 1.
     if (!eventId) return;
 
     const hasSummary = Boolean(availabilitySummary.hostel || availabilitySummary.hotel);
@@ -416,7 +414,6 @@ export function Dashboard({
         }).length;
 
         const totalCapacity = items.reduce((sum, i) => {
-          // prefer totalSpaces, else totalCapacity, else availableSpaces
           const cap =
             Number(i?.totalSpaces ?? i?.totalCapacity ?? i?.availableSpaces ?? 0) ||
             0;
@@ -537,7 +534,6 @@ type AccommodationData = Parameters<
   const [isRegistrationSuccessModalOpen, setIsRegistrationSuccessModalOpen] =
     useState(false);
   const [registeredDependentName, setRegisteredDependentName] = useState("");
-// Countdown timer state
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
@@ -825,7 +821,8 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
       const showAccommodationPromo =
         !paidForAccommodation &&
-        (!normalizedAccommodation || accommodationHoldExpired || !hasActivePendingAccommodationHold);
+        (!normalizedAccommodation ||
+          (accommodationHoldExpired && !hasActivePendingAccommodationHold));
 
       const promoSpacesCount = (() => {
         const hostelCap = availabilitySummary.hostel?.totalCapacity ?? 0;
@@ -845,8 +842,6 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
       };
 
       const handleAccommodationComplete = (data: AccommodationData) => {
-        // Save selection snapshot for UI, then close modal.
-        // NOTE: attendee type is NOT upgraded here — that only happens after payment is confirmed.
         const snapshot: DashboardAccommodation = {
           accommodationType: data.type,
           facility: data.facilityId ?? "",
@@ -1320,7 +1315,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           </div>
         )}
 
-        {normalizedAccommodation && (paidForAccommodation || (!accommodationHoldExpired && hasActivePendingAccommodationHold)) ? (
+        {normalizedAccommodation && (paidForAccommodation || !accommodationHoldExpired) ? (
             <div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-2">

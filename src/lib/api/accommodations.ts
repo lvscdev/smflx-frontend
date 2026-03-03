@@ -140,7 +140,7 @@ export async function getAccommodations(params: {
   try {
     console.log(`🏨 Fetching ${params.type} accommodations...`);
     
-    const categoriesResp = await apiRequest<any>(`/accommodation/categories/${encodeURIComponent(params.eventId)}`, { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
+    const categoriesResp = await apiRequest<any>(`/accommodation/categories/${encodeURIComponent(params.eventId)}`, { method: 'GET' });
     const rawCategories: any[] = categoriesResp?.data || (categoriesResp?.categories as any[]) || (categoriesResp as any[]) || [];
     const categories: AccommodationCategory[] = (rawCategories || []).map((c) => ({
       id: String((c as any)?.id || (c as any)?.categoryId || ''),

@@ -1,7 +1,8 @@
 "use client";
 
-import type { Dependent as ModalDependent } from "./DependentsModal";
-import { useState, useEffect, useRef, useMemo, type ComponentProps } from "react";
+import { useEffect } from "react";
+import{ Dependent as ModalDependent } from "./DependentsModal";
+import { useState, useRef, useMemo, type ComponentProps } from "react";
 import { Home, Tent, User, LogOut, X, Building2, Hotel, Users, Facebook, Instagram, Twitter, Youtube, Radio, Loader2, RefreshCcw } from "lucide-react";
 import { InlineAlert } from "./InlineAlert";
 import Image from "next/image";
@@ -199,6 +200,35 @@ export function Dashboard({
   onRegistrationUpdate,
   onProfileUpdate,
 }: DashboardProps) {
+
+    useEffect(() => {
+    async function enterpriseReconcile() {
+      try {
+        if (
+          registration?.paymentStatus === "pending" &&
+          registration?.paymentReference
+        ) {
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_BASE_URL}/payment/verify/${registration.paymentReference}`,
+            { method: "GET" }
+          );
+
+          const data = await res.json();
+
+          if (data?.status === "success") {
+            onRegistrationUpdate?.({
+              ...registration,
+              paymentStatus: "paid",
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Enterprise reconcile failed:", err);
+      }
+    }
+
+    enterpriseReconcile();
+  }, [registration, onRegistrationUpdate]);
 
   const resolvedEventId = (() => {
     if (activeEventId) return activeEventId;

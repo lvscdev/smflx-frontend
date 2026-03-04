@@ -164,3 +164,27 @@ export async function apiRequest<T>(
 
   return json as T;
 }
+
+/**
+ * Enterprise Fetch Wrapper
+ * - Redirects to login on 401
+ * - Throws special error on 409 (capacity conflict)
+ */
+export async function enterpriseFetch(input: RequestInfo, init?: RequestInit) {
+  const res = await fetch(input, init);
+
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/?session=expired";
+    }
+    throw new Error("SESSION_EXPIRED");
+  }
+
+  if (res.status === 409) {
+    const error: any = new Error("CAPACITY_CONFLICT");
+    error.code = 409;
+    throw error;
+  }
+
+  return res;
+}

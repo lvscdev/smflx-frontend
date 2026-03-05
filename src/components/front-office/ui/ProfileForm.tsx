@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Check, User, Users, Briefcase, Home as HomeIcon, Heart, Search, ChevronDown, X} from "lucide-react";
 import iso3166_2 from "iso-3166-2.json";
-import { updateMe } from "@/lib/api";
+import { updateMe, getMe } from "@/lib/api";
 import { toUserMessage } from "@/lib/errors";
 import { normalizeDialCode, sanitizeLocalPhone, validateProfileBasics } from "@/lib/validation/profile";
 import { getStatesForCountry, ALL_DIAL_CODES, ALL_COUNTRIES } from "@/lib/data/countryStates";
@@ -265,30 +265,38 @@ export function ProfileForm({
     const code = validated.normalized.phoneCountryCode;
     const local = validated.normalized.phoneNumber;
     const full = validated.normalized.phoneFull;
-
-    // Map UI model to backend user update payload
     const firstName = validated.normalized.firstName;
     const lastName = validated.normalized.lastName;
-
-    if (!email || !email.includes("@")) {
-      setSubmitError("Your email is missing. Please verify your email again.");
-      return;
-    }
-
-    
     const normalizeEmploymentStatus = (v?: string) => {
       const x = (v ?? "").toString().trim().toLowerCase();
       if (!x) return undefined;
       if (x === "employed") return "EMPLOYED";
       if (x === "self-employed" || x === "self_employed" || x === "self employed") return "SELF_EMPLOYED";
       if (x === "unemployed") return "UNEMPLOYED";
-      if (x === "student") return "UNEMPLOYED"; 
+      if (x === "student") return "UNEMPLOYED";
       const up = x.toUpperCase().replace(/[\s-]+/g, "_");
       if (up === "EMPLOYED" || up === "UNEMPLOYED" || up === "SELF_EMPLOYED") return up;
       return undefined;
     };
 
-const payload = {
+    let resolvedEmail = typeof email === "string" ? email.trim() : "";
+    if (!resolvedEmail || !resolvedEmail.includes("@")) {
+      try {
+        const me = await getMe();
+        resolvedEmail = (me as any)?.email?.trim() ?? "";
+      } catch {
+        // ignore — will fail validation below
+      }
+    }
+
+    if (!resolvedEmail || !resolvedEmail.includes("@")) {
+      setSubmitError("Your email could not be resolved. Please log out and log in again.");
+      setSubmitLoading(false);
+      return;
+    }
+
+    const payload = {
+      email: resolvedEmail,
       ...(firstName ? { firstName } : {}),
       ...(lastName ? { lastName } : {}),
       ...(full ? { phoneNumber: full } : {}),

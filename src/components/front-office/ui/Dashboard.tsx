@@ -477,7 +477,7 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [isAccommodationModalOpen, modalStep, registration?.eventId, availabilitySummary.hostel, availabilitySummary.hotel]);
+  }, [isAccommodationModalOpen, modalStep, registration?.eventId]);
 
       // Fetch accommodation categories when modal opens
     useEffect(() => {
@@ -775,9 +775,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
 
     const startedAtMs = getStartedAtMs();
     if (!startedAtMs) {
-      // No timestamp available — treat as expired
-      setAccommodationHold({ startedAtMs: null, expiresAtMs: null, remainingMs: null, expired: true });
-      onAccommodationUpdateRef.current?.(null);
+      setAccommodationHold({ startedAtMs: null, expiresAtMs: null, remainingMs: null, expired: false });
       return;
     }
 

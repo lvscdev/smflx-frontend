@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { UserProfile } from "@/lib/api/dashboardTypes";
-import { ArrowLeft, Check, AlertCircle, Loader2, MapPin } from "lucide-react";
+import { ArrowLeft, Check, AlertCircle, Loader2, MapPin, Phone, X, MessageCircle } from "lucide-react";
 import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
-import { initiateHostelAllocation, initiateHotelAllocation } from "@/lib/api";
+import { initiateHostelAllocation } from "@/lib/api";
 import { ApiError } from "@/lib/api/client";
 import { getHotelRooms, listFacilitiesByDemographics } from "@/lib/api/accommodation";
 import { Facility, HotelRoom } from "@/lib/api/accommodation/types";
@@ -123,6 +123,7 @@ export function AccommodationSelection({
   const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
   const isHostel = accommodationType.toLowerCase() === "hostel";
   const isHotel = accommodationType.toLowerCase() === "hotel";
+  const [showHotelContactModal, setShowHotelContactModal] = useState(false);
 
   const isSelectionComplete = isHostel
     ? !!selectedFacility
@@ -252,6 +253,13 @@ export function AccommodationSelection({
 
       let response;
 
+    if (isHotel) {
+      // Hotel payments are handled offline. Show contact modal instead of Korapay.
+      setSubmitting(false);
+      setShowHotelContactModal(true);
+      return;
+    }
+
     if (isHostel) {
       const facilityIdResolved =
         (selectedFacility as any)?.facilityId ||
@@ -272,15 +280,7 @@ export function AccommodationSelection({
         userId: resolvedUserId,
         facilityid: facilityIdResolved,
       });
-      } else {
-        response = await initiateHotelAllocation({
-          registrationId: resolvedRegId,
-          eventId: eventId,
-          userId: resolvedUserId,
-          facilityId: selectedFacility?.facilityId || "",
-          roomTypeId: selectedRoom?.roomTypeId || "",
-        });
-      }
+    }
 
       if (response?.checkoutUrl) {
         // Mark pending accommodation payment so dashboard can auto-refresh/poll after return.
@@ -617,6 +617,54 @@ export function AccommodationSelection({
 
   return (
     <div className="flex-1 overflow-auto px-4 lg:px-8 py-8">
+
+      {/* Hotel Offline Contact Modal */}
+      {showHotelContactModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl">
+            <div className="p-6 border-b flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Complete Your Hotel Booking</h2>
+              <button
+                onClick={() => setShowHotelContactModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <p className="text-gray-700 text-sm leading-relaxed">
+                Hotel bookings are completed offline. Please contact our accommodation coordinator to confirm your booking and arrange payment.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <p className="text-sm font-semibold text-amber-900 mb-1">Accommodation Coordinator</p>
+                <p className="text-base font-bold text-amber-900">Sis. Damilola Olawuni</p>
+                <p className="text-sm text-amber-800 mt-1">+234 708 950 9539</p>
+              </div>
+              <div className="flex flex-col gap-3">
+                <a
+                  href="tel:+2347089509539"
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gray-900 text-white font-medium hover:bg-gray-700 transition-colors"
+                >
+                  <Phone className="w-4 h-4" />
+                  Call to Book
+                </a>
+                <a
+                  href="https://wa.me/2347089509539?text=Hi%20Sis.%20Damilola%2C%20I%20would%20like%20to%20complete%20my%20hotel%20booking%20for%20the%20event."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  WhatsApp
+                </a>
+              </div>
+              <p className="text-xs text-gray-500 text-center">
+                Your booking will show as <span className="font-medium">Pending</span> on your dashboard until confirmed.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 lg:mb-8">
           <h1 className="text-2xl lg:text-3xl mb-2">

@@ -429,6 +429,29 @@ export default function DashboardPage() {
         if (accForEvent) setAccommodation(accForEvent);
         setEventCache((prev) => ({ ...prev, [eventId]: dashboardData }));
 
+        if (dashboardData.dependents && dashboardData.dependents.length > 0) {
+          const freshDependents = dashboardData.dependents.map((d: any) => {
+            const id = d.id ?? d.dependantId ?? d.dependentId ?? "";
+            const paymentStatusRaw = (d.paymentStatus ?? d.payment_state ?? d.paymentState ?? d.status ?? "").toUpperCase();
+            const paid =
+              d.isPaid === true ||
+              d.paid === true ||
+              ["PAID", "SUCCESS", "COMPLETED", "CONFIRMED"].includes(paymentStatusRaw);
+            return {
+              id,
+              name: d.name ?? d.dependantName ?? d.dependentName ?? "Dependent",
+              age: String(d.age ?? d.dependantAge ?? d.dependentAge ?? ""),
+              gender: d.gender ?? d.dependantGender ?? "",
+              isRegistered: typeof d.isRegistered === "boolean" ? d.isRegistered : true,
+              isPaid: paid,
+            };
+          });
+          // Dispatch to Dashboard via a custom event so the component can update its local state
+          try {
+            window.dispatchEvent(new CustomEvent("smflx:dependents:refresh", { detail: freshDependents }));
+          } catch {}
+        }
+
         if (isPaid || pollCount >= MAX_POLLS) {
           if (!isPaid && pollCount >= MAX_POLLS) {
             toast.warning("Payment is still being confirmed", {

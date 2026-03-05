@@ -282,15 +282,13 @@ export function ProfileForm({
       if (x === "employed") return "EMPLOYED";
       if (x === "self-employed" || x === "self_employed" || x === "self employed") return "SELF_EMPLOYED";
       if (x === "unemployed") return "UNEMPLOYED";
-      if (x === "student") return "UNEMPLOYED"; // backend limitation: STUDENT not supported yet
-      // fallback: keep legacy behavior but ensure enum style
+      if (x === "student") return "UNEMPLOYED"; 
       const up = x.toUpperCase().replace(/[\s-]+/g, "_");
       if (up === "EMPLOYED" || up === "UNEMPLOYED" || up === "SELF_EMPLOYED") return up;
       return undefined;
     };
 
 const payload = {
-      email: email.trim(),
       ...(firstName ? { firstName } : {}),
       ...(lastName ? { lastName } : {}),
       ...(full ? { phoneNumber: full } : {}),

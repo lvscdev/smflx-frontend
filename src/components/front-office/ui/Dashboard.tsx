@@ -399,8 +399,8 @@ export function Dashboard({
 
   const [availabilitySummary, setAvailabilitySummary] = useState<{
     loading: boolean;
-    hostel?: { availableFacilities: number; totalCapacity: number };
-    hotel?: { availableFacilities: number; totalCapacity: number };
+    hostel?: { availableFacilities: number; totalCapacity: number; availableSpaces: number };
+    hotel?: { availableFacilities: number; totalCapacity: number; availableSpaces: number };
     error?: string | null;
   }>({ loading: false, error: null });
 
@@ -450,7 +450,12 @@ export function Dashboard({
           return sum + cap;
         }, 0);
 
-        return { availableFacilities, totalCapacity };
+        const availableSpaces = items.reduce((sum, i) => {
+          const avail = Number(i?.availableSpaces ?? 0) || 0;
+          return sum + avail;
+        }, 0);
+
+        return { availableFacilities, totalCapacity, availableSpaces };
       };
 
         setAvailabilitySummary({
@@ -720,6 +725,19 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
     onAccommodationUpdateRef.current = onAccommodationUpdate;
   }, [onAccommodationUpdate]);
 
+  // Listen for post-payment dependents refresh dispatched by the dashboard page polling loop.
+  // This updates local dependents state to show isPaid:true after returning from checkout.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const fresh = (e as CustomEvent).detail;
+      if (Array.isArray(fresh) && fresh.length > 0) {
+        setDependents(fresh);
+      }
+    };
+    window.addEventListener("smflx:dependents:refresh", handler);
+    return () => window.removeEventListener("smflx:dependents:refresh", handler);
+  }, []);
+
   useEffect(() => {
     const HOLD_MS = 60 * 60 * 1000;
     const hasPendingAccommodation = !!normalizedAccommodation && !paidForAccommodation;
@@ -850,15 +868,16 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         "";
 
       const showAccommodationPromo =
-        !paidForAccommodation &&
-        (!normalizedAccommodation ||
-          (accommodationHoldExpired && !hasActivePendingAccommodationHold));
+        // Only show promo/CTA when the user has no accommodation object from the API.
+        // If the API returned accommodation data (even unpaid), show the details card instead.
+        !normalizedAccommodation;
 
       const promoSpacesCount = (() => {
-        const hostelCap = availabilitySummary.hostel?.totalCapacity ?? 0;
-        const hotelCap = availabilitySummary.hotel?.totalCapacity ?? 0;
-        const cap = (Number(hostelCap) || 0) + (Number(hotelCap) || 0);
-        if (cap > 0) return cap;
+        // Use availableSpaces (unoccupied) — not totalCapacity (total beds)
+        const hostelAvail = availabilitySummary.hostel?.availableSpaces ?? 0;
+        const hotelAvail = availabilitySummary.hotel?.availableSpaces ?? 0;
+        const avail = (Number(hostelAvail) || 0) + (Number(hotelAvail) || 0);
+        if (avail > 0) return avail;
 
         const hostelFac = availabilitySummary.hostel?.availableFacilities ?? 0;
         const hotelFac = availabilitySummary.hotel?.availableFacilities ?? 0;
@@ -1345,7 +1364,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
           </div>
         )}
 
-        {normalizedAccommodation && (paidForAccommodation || !accommodationHoldExpired) ? (
+        {normalizedAccommodation ? (
             <div className="bg-white rounded-3xl p-6 lg:p-8 mb-6">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-2">

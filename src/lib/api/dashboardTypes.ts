@@ -14,6 +14,7 @@ export interface UserProfile {
   stateOfResidence?: string | null;
   country?: string | null;
   residentialAddress?: string | null;
+  isMinister?: string | null;
   [key: string]: unknown;
 }
 

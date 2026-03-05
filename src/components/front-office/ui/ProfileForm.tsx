@@ -157,6 +157,13 @@ export function ProfileForm({
           initialData.state ||
           (initialData as any).stateOfResidence ||
           "",
+        isMinister: (() => {
+          const raw = (initialData as any).isMinister ?? (initialData as any).is_minister ?? (initialData as any).minister;
+          if (raw === true  || raw === 1 || raw === "true"  || String(raw ?? "").toLowerCase() === "yes") return "yes";
+          if (raw === false || raw === 0 || raw === "false" || String(raw ?? "").toLowerCase() === "no")  return "no";
+          if (typeof raw === "string" && raw.trim()) return raw.trim().toLowerCase();
+          return "";
+        })(),
       };
     }
     return {
@@ -273,7 +280,8 @@ export function ProfileForm({
       if (x === "employed") return "EMPLOYED";
       if (x === "self-employed" || x === "self_employed" || x === "self employed") return "SELF_EMPLOYED";
       if (x === "unemployed") return "UNEMPLOYED";
-      if (x === "student") return "UNEMPLOYED";
+      if (x === "student") return "UNEMPLOYED"; // backend limitation: STUDENT not supported yet
+      // fallback: keep legacy behavior but ensure enum style
       const up = x.toUpperCase().replace(/[\s-]+/g, "_");
       if (up === "EMPLOYED" || up === "UNEMPLOYED" || up === "SELF_EMPLOYED") return up;
       return undefined;
@@ -317,6 +325,9 @@ export function ProfileForm({
       ...(profile.state ? { stateOfResidence: profile.state } : {}),
       ...(profile.country ? { country: profile.country } : {}),
       ...(profile.address ? { residentialAddress: profile.address } : {}),
+      ...(profile.isMinister === "yes" || profile.isMinister === "no"
+        ? { isMinister: profile.isMinister }
+        : {}),
     };
     let ok = true;
 

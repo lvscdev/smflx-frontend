@@ -83,6 +83,7 @@ export type UserProfile = {
   maritalStatus?: string;
   employmentStatus?: string;
   stateOfResidence?: string | null;
+  isMinister?: string | null;
   createdAt?: string;
   updatedAt?: string | null;
 };
@@ -334,6 +335,13 @@ export async function getUserDashboard(eventId: string): Promise<NormalizedDashb
     maritalStatus:    (pSrc["maritalStatus"]    as string | undefined),
     employmentStatus: (pSrc["employmentStatus"] as string | undefined),
     stateOfResidence: (pSrc["stateOfResidence"] as string | undefined),
+    isMinister: (() => {
+      const raw = pSrc["isMinister"] ?? pSrc["is_minister"] ?? pSrc["minister"];
+      if (raw === true  || raw === 1 || raw === "true"  || String(raw ?? "").toLowerCase() === "yes") return "yes";
+      if (raw === false || raw === 0 || raw === "false" || String(raw ?? "").toLowerCase() === "no")  return "no";
+      if (typeof raw === "string" && raw.trim()) return raw.trim().toLowerCase();
+      return null;
+    })() as string | null | undefined,
   };
 
   // ── Registrations ────────────────────────────────────────────────────────

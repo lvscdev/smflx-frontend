@@ -83,6 +83,7 @@ interface AccommodationSelectionProps {
   userId?: string;
   onComplete: (data: AccommodationData) => Promise<void> | void;
   onBack: () => void;
+  onClose?: () => void;
   initialData?: AccommodationData | null;
   profile?: UserProfile | null;
   isSubmitting?: boolean;
@@ -104,6 +105,7 @@ export function AccommodationSelection({
   isSubmitting: externalSubmitting,
   serverError: externalError,
   attendTeensEvent = false,
+  onClose,
 }: AccommodationSelectionProps) {
   if (process.env.NODE_ENV !== "production") {
     console.log("userId", userId);
@@ -628,7 +630,7 @@ export function AccommodationSelection({
                 <p className="text-sm text-gray-500 mt-0.5">Contact our coordinator to confirm &amp; pay</p>
               </div>
               <button
-                onClick={() => { setShowHotelContactModal(false); onBack(); }}
+                onClick={() => { setShowHotelContactModal(false); (onClose ?? onBack)(); }}
                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
                 aria-label="Close"
               >
@@ -674,7 +676,7 @@ export function AccommodationSelection({
 
               <div className="border-t pt-4">
                 <button
-                  onClick={() => { setShowHotelContactModal(false); onBack(); }}
+                  onClick={() => { setShowHotelContactModal(false); (onClose ?? onBack)(); }}
                   className="w-full py-3 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 transition-colors text-sm"
                 >
                   Go to My Dashboard

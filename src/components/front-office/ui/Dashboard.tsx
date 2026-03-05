@@ -1895,6 +1895,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
                     profile={localProfile}
                     onComplete={handleAccommodationComplete}
                     onBack={handleModalBack}
+                    onClose={resetModal}
                   />
                 );
               })()}

@@ -425,6 +425,18 @@ export default function HomePage() {
             initialData={accommodation}
             profile={profile}
             onBack={() => setView("event-registration")}
+            onClose={() => {
+              safeSaveFlowState({
+                view: "dashboard",
+                email,
+                profile,
+                selectedEvent,
+                activeEventId: selectedEvent?.eventId ?? null,
+                registration,
+              });
+              if (selectedEvent?.eventId) setActiveEventCookie(selectedEvent.eventId);
+              router.push("/dashboard");
+            }}
             onComplete={async (data) => {
               setAccommodation(data);
               safeSaveFlowState({
@@ -432,7 +444,7 @@ export default function HomePage() {
                 email,
                 profile,
                 selectedEvent,
-      activeEventId: selectedEvent?.eventId ?? null,
+                activeEventId: selectedEvent?.eventId ?? null,
                 registration,
                 accommodation: data,
               });

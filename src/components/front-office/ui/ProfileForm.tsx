@@ -125,7 +125,6 @@ export function ProfileForm({
         if (typeof raw === "string" && raw.trim()) return raw.trim().toLowerCase();
         return "";
       };
-
       const toLower = (v?: string) => (v || "").toLowerCase() || "";
 
       return {
@@ -290,6 +289,7 @@ export function ProfileForm({
     }
 
     const payload = {
+      email: resolvedEmail,
       ...(firstName ? { firstName } : {}),
       ...(lastName ? { lastName } : {}),
       ...(full ? { phoneNumber: full } : {}),

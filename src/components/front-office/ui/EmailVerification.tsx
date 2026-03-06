@@ -120,6 +120,7 @@ export function EmailVerification({
     setIsVerifying(true);
     try {
       const trimmed = email.trim();
+
       const { token, userDetails } = await validateOtp({
         email: trimmed,
         otp: verificationCode,
@@ -130,6 +131,9 @@ export function EmailVerification({
       setAuthToken(token);
       setTokenCookie(token);
 
+      // allow axios/fetch interceptors to pick up token
+      await new Promise((r) => setTimeout(r, 50));
+
       try {
         localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(userDetails));
       } catch {
@@ -137,6 +141,7 @@ export function EmailVerification({
       }
 
       onVerified(trimmed);
+
     } catch (err: any) {
       setError(toUserMessage(err, { feature: "otp", action: "verify" }));
     } finally {

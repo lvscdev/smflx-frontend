@@ -304,7 +304,6 @@ export function ProfileForm({
     }
 
     const payload = {
-      email: resolvedEmail,
       ...(firstName ? { firstName } : {}),
       ...(lastName ? { lastName } : {}),
       ...(full ? { phoneNumber: full } : {}),

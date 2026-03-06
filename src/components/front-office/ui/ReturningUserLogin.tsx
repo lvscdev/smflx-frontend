@@ -26,29 +26,34 @@ export function ReturningUserLogin({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const sendCode = async () => {
-    setError("");
-    const trimmed = email.trim();
+    const sendCode = async () => {
+      setError("");
+      const trimmed = email.trim();
 
-    if (!trimmed || !trimmed.includes("@")) {
-      setError("Please enter a valid email address");
-      return;
-    }
+      if (!trimmed || !trimmed.includes("@")) {
+        setError("Please enter a valid email address");
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const { reference } = await generateLoginOtp(trimmed);
-      setOtpReference(reference);
+      setLoading(true);
+      try {
+        const { reference } = await generateLoginOtp(trimmed);
 
-      setOtpCookie(trimmed);
+        // store in component state
+        setOtpReference(reference);
 
-      setStep("code");
-    } catch (err: any) {
-      setError(toUserMessage(err, { feature: "otp", action: "send" }));
-    } finally {
-      setLoading(false);
-    }
-  };
+        // persist for verification step
+        sessionStorage.setItem("otpReference", reference);
+
+        setOtpCookie(trimmed);
+
+        setStep("code");
+      } catch (err: any) {
+        setError(toUserMessage(err, { feature: "otp", action: "send" }));
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const handleEmailSubmit = (e: FormEvent) => {
     e.preventDefault();

@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useRef, useMemo, type ComponentProps } from "react";
 import{ Dependent as ModalDependent } from "./DependentsModal";
-import { useState, useRef, useMemo, type ComponentProps } from "react";
 import { Home, Tent, User, LogOut, X, Building2, Hotel, Users, Facebook, Instagram, Twitter, Youtube, Radio, Loader2, RefreshCcw } from "lucide-react";
 import { InlineAlert } from "./InlineAlert";
 import Image from "next/image";
@@ -53,7 +52,7 @@ type Dependent = {
 
 const isDependentProcessing = (dependentId: string): boolean => {
   if (!dependentId) return false;
-  clearOldPendingDependentsPayments(3 * 60 * 60 * 1000);
+  clearOldPendingDependentsPayments(3 * 60 * 1000);
 
   const list = loadPendingDependentsPayments();
   const now = Date.now();
@@ -80,7 +79,9 @@ const toDependent = (d: DashboardDependent): Dependent => {
         ? rec.dependantId
         : typeof rec.dependentId === "string" && rec.dependentId
           ? rec.dependentId
-          : crypto.randomUUID();
+          : (typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID()
+              : Math.random().toString(36).slice(2));
 
   const rawName =
     typeof rec.name === "string" && rec.name ? rec.name :
@@ -233,7 +234,7 @@ export function Dashboard({
   const resolvedEventId = (() => {
     if (activeEventId) return activeEventId;
 
-    if (registration?.eventId) return registration.eventId;
+    if (registration?.eventId) return String(registration.eventId);
 
     try {
       const flowRaw = localStorage.getItem("smflx_flow_state_v1");
@@ -307,7 +308,12 @@ export function Dashboard({
       try {
         const flowRaw = localStorage.getItem("smflx_flow_state_v1");
         if (flowRaw) {
-          const flow = JSON.parse(flowRaw) as Record<string, unknown>;
+          let flow: Record<string, unknown> = {};
+            try {
+              flow = JSON.parse(flowRaw);
+            } catch {
+              flow = {};
+            }
           const se = flow["selectedEvent"] as Record<string, unknown> | undefined;
           const id = se?.["eventId"] ?? flow["activeEventId"] ?? flow["eventId"];
           if (typeof id === "string" && id) return id;

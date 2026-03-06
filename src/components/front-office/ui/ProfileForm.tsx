@@ -111,6 +111,8 @@ export function ProfileForm({
   const [profile, setProfile] = useState<ProfileData>(() => {
     if (initialData) {
       const src = initialData as any;
+
+      // Resolve phone parts from either split fields or a single E.164 string
       const rawPhone: string = src.phoneNumber || src.phone || "";
       const resolvedCode: string =
         src.phoneCountryCode ||
@@ -119,12 +121,16 @@ export function ProfileForm({
       const resolvedLocal: string = rawPhone.startsWith("+")
         ? rawPhone.replace(/^\+\d{1,4}/, "")
         : rawPhone;
+
+      // Normalise backend boolean/string minister → UI "yes"/"no"
       const resolveMinister = (raw: unknown): string => {
         if (raw === true  || raw === 1 || raw === "true"  || String(raw ?? "").toLowerCase() === "yes") return "yes";
         if (raw === false || raw === 0 || raw === "false" || String(raw ?? "").toLowerCase() === "no")  return "no";
         if (typeof raw === "string" && raw.trim()) return raw.trim().toLowerCase();
         return "";
       };
+
+      // Normalise backend UPPERCASE enum values → UI lowercase
       const toLower = (v?: string) => (v || "").toLowerCase() || "";
 
       return {
@@ -272,14 +278,15 @@ export function ProfileForm({
       return undefined;
     };
 
-    let resolvedEmail = typeof email === "string" ? email.trim() : "";
+    let resolvedEmail = "";
+    try {
+      const me = await getMe();
+      resolvedEmail = (me as any)?.email?.trim() ?? "";
+    } catch {
+      // fall back to prop only if getMe fails
+    }
     if (!resolvedEmail || !resolvedEmail.includes("@")) {
-      try {
-        const me = await getMe();
-        resolvedEmail = (me as any)?.email?.trim() ?? "";
-      } catch {
-        // ignore — will fail validation below
-      }
+      resolvedEmail = typeof email === "string" ? email.trim() : "";
     }
 
     if (!resolvedEmail || !resolvedEmail.includes("@")) {
@@ -319,7 +326,6 @@ export function ProfileForm({
     setSubmitLoading(true);
 
     try {
-      // Update profile server-side (token required)
       await updateMe(payload);
       snapshotRef.current = serializeProfile(profile, isYAT);
       setLastSavedAt(new Date().toISOString());

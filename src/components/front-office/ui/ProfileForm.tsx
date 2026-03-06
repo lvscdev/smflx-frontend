@@ -281,7 +281,7 @@ export function ProfileForm({
     let resolvedEmail = "";
     try {
       const me = await getMe();
-      resolvedEmail = (me as any)?.email?.trim() ?? "";
+      resolvedEmail = (me as any)?.email?.trim().toLowerCase() ?? "";
     } catch {
       // fall back to prop only if getMe fails
     }

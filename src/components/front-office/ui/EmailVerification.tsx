@@ -57,14 +57,12 @@ export function EmailVerification({
 
     setIsVerifying(true);
     try {
-      const { reference } = await generateRegistrantOtp(trimmed);
+      const { reference } = await generateRegistrantOtp(trimmed.toLowerCase());
       setOtpReference(reference);
-      // Keep a short-lived (7d) hint so dashboard landing can prefill ReturningUser
       setOtpCookie(trimmed);
       setVerificationSent(true);
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {
-      // ✅ FIX: Check for duplicate user error
       const isUserExists = 
         err?.status === 409 || 
         err?.code === "USER_ALREADY_EXISTS" ||
@@ -122,7 +120,7 @@ export function EmailVerification({
       const trimmed = email.trim().toLowerCase();
 
       const { token, userDetails } = await validateOtp({
-        email: trimmed,
+        email: email.trim().toLowerCase(),
         otp: verificationCode,
         otpReference,
       });

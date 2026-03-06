@@ -83,6 +83,9 @@ export type UserProfile = {
   maritalStatus?: string;
   employmentStatus?: string;
   stateOfResidence?: string | null;
+  country?: string;
+  residentialAddress?: string;
+  minister?: boolean;
   isMinister?: string | null;
   createdAt?: string;
   updatedAt?: string | null;

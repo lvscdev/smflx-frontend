@@ -110,60 +110,45 @@ export function ProfileForm({
 }: ProfileFormProps) {
   const [profile, setProfile] = useState<ProfileData>(() => {
     if (initialData) {
+      const src = initialData as any;
+      const rawPhone: string = src.phoneNumber || src.phone || "";
+      const resolvedCode: string =
+        src.phoneCountryCode ||
+        (rawPhone.startsWith("+") ? rawPhone.match(/^\+\d{1,4}/)?.[0] : undefined) ||
+        "+234";
+      const resolvedLocal: string = rawPhone.startsWith("+")
+        ? rawPhone.replace(/^\+\d{1,4}/, "")
+        : rawPhone;
+
+      const resolveMinister = (raw: unknown): string => {
+        if (raw === true  || raw === 1 || raw === "true"  || String(raw ?? "").toLowerCase() === "yes") return "yes";
+        if (raw === false || raw === 0 || raw === "false" || String(raw ?? "").toLowerCase() === "no")  return "no";
+        if (typeof raw === "string" && raw.trim()) return raw.trim().toLowerCase();
+        return "";
+      };
+      const toLower = (v?: string) => (v || "").toLowerCase() || "";
+
       return {
         ...initialData,
         firstName:
-          initialData.firstName ||
-          (typeof (initialData as any).fullName === "string"
-            ? ((initialData as any).fullName as string)
-                .trim()
-                .split(/\s+/)
-                .filter(Boolean)[0] || ""
+          src.firstName ||
+          (typeof src.fullName === "string"
+            ? src.fullName.trim().split(/\s+/).filter(Boolean)[0] || ""
             : ""),
         lastName:
-          initialData.lastName ||
-          (typeof (initialData as any).fullName === "string"
-            ? ((initialData as any).fullName as string)
-                .trim()
-                .split(/\s+/)
-                .filter(Boolean)
-                .slice(1)
-                .join(" ")
+          src.lastName ||
+          (typeof src.fullName === "string"
+            ? src.fullName.trim().split(/\s+/).filter(Boolean).slice(1).join(" ")
             : ""),
-        phoneCountryCode:
-          initialData.phoneCountryCode ||
-          (typeof initialData.phone === "string" &&
-          initialData.phone.startsWith("+")
-            ? initialData.phone.match(/^\+\d{1,4}/)?.[0]
-            : undefined) ||
-          "+234",
-        phoneNumber: initialData.phoneNumber
-          ? initialData.phoneNumber.startsWith("+")
-            ? initialData.phoneNumber.replace(/^\+\d{1,4}/, "")
-            : initialData.phoneNumber
-          : typeof initialData.phone === "string"
-            ? initialData.phone.replace(/^\+\d{1,4}/, "")
-            : "",
-        // Map backend field names → UI field names
-        country:
-          initialData.country ||
-          (initialData as any).countryOfResidence ||
-          "",
-        address:
-          initialData.address ||
-          (initialData as any).residentialAddress ||
-          "",
-        state:
-          initialData.state ||
-          (initialData as any).stateOfResidence ||
-          "",
-        isMinister: (() => {
-          const raw = (initialData as any).isMinister ?? (initialData as any).is_minister ?? (initialData as any).minister;
-          if (raw === true  || raw === 1 || raw === "true"  || String(raw ?? "").toLowerCase() === "yes") return "yes";
-          if (raw === false || raw === 0 || raw === "false" || String(raw ?? "").toLowerCase() === "no")  return "no";
-          if (typeof raw === "string" && raw.trim()) return raw.trim().toLowerCase();
-          return "";
-        })(),
+        phoneCountryCode: resolvedCode,
+        phoneNumber: resolvedLocal,
+        gender: toLower(src.gender),
+        maritalStatus: toLower(src.maritalStatus),
+        employmentStatus: toLower(src.employmentStatus),
+        country: src.country || src.countryOfResidence || "",
+        state: src.state || src.stateOfResidence || "",
+        address: src.address || src.residentialAddress || "",
+        isMinister: resolveMinister(src.isMinister ?? src.is_minister ?? src.minister),
       };
     }
     return {
@@ -277,13 +262,10 @@ export function ProfileForm({
     const normalizeEmploymentStatus = (v?: string) => {
       const x = (v ?? "").toString().trim().toLowerCase();
       if (!x) return undefined;
-      if (x === "employed") return "EMPLOYED";
-      if (x === "self-employed" || x === "self_employed" || x === "self employed") return "SELF_EMPLOYED";
-      if (x === "unemployed") return "UNEMPLOYED";
-      if (x === "student") return "UNEMPLOYED"; // backend limitation: STUDENT not supported yet
-      // fallback: keep legacy behavior but ensure enum style
-      const up = x.toUpperCase().replace(/[\s-]+/g, "_");
-      if (up === "EMPLOYED" || up === "UNEMPLOYED" || up === "SELF_EMPLOYED") return up;
+      if (x === "employed" || x === "self-employed" || x === "self_employed" || x === "self employed") return "EMPLOYED";
+      if (x === "unemployed" || x === "student") return "UNEMPLOYED";
+      const up = x.toUpperCase();
+      if (up === "EMPLOYED" || up === "UNEMPLOYED") return up;
       return undefined;
     };
 
@@ -325,7 +307,7 @@ export function ProfileForm({
       ...(profile.country ? { country: profile.country } : {}),
       ...(profile.address ? { residentialAddress: profile.address } : {}),
       ...(profile.isMinister === "yes" || profile.isMinister === "no"
-        ? { isMinister: profile.isMinister }
+        ? { minister: profile.isMinister === "yes" }
         : {}),
     };
     let ok = true;

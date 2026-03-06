@@ -160,8 +160,13 @@ export default function HomePage() {
   useEffect(() => {
     if (view === "verify" || view === "login") return;
 
-    safeSaveFlowState({
-      view,
+    const persistableView =
+  view === "accommodation" || view === "payment"
+    ? "event-registration"
+    : view;
+
+  safeSaveFlowState({
+      view: persistableView,
       email,
       profile,
       selectedEvent,
@@ -396,7 +401,7 @@ export default function HomePage() {
                   email,
                   profile,
                   selectedEvent,
-      activeEventId: selectedEvent?.eventId ?? null,
+                  activeEventId: selectedEvent?.eventId ?? null,
                   registration: next,
                   accommodation,
                 });

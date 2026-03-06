@@ -48,36 +48,42 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileSaveError, setProfileSaveError] = useState('');
   const [editingDependentId, setEditingDependentId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    firstName: profile?.firstName || '',
-    lastName: profile?.lastName || '',
-    phoneCountryCode:
-      profile?.phoneCountryCode ||
-      (typeof profile?.phone === "string" && profile.phone.startsWith("+")
-        ? profile.phone.match(/^\+\d{1,4}/)?.[0]
-        : undefined) ||
-      "+234",
-    phoneNumber:
-      profile?.phoneNumber
-        ? profile.phoneNumber.startsWith("+")
-          ? profile.phoneNumber.replace(/^\+\d{1,4}/, "")
-          : profile.phoneNumber
-        : typeof profile?.phone === "string"
-          ? profile.phone.replace(/^\+\d{1,4}/, "")
-          : "",
+  const normaliseProfileToForm = (p: any) => {
+    const rawPhone: string = p?.phoneNumber || p?.phone || "";
+    const resolvedCode: string =
+      p?.phoneCountryCode ||
+      (rawPhone.startsWith("+") ? rawPhone.match(/^\+\d{1,4}/)?.[0] : undefined) ||
+      "+234";
+    const resolvedLocal: string = rawPhone.startsWith("+")
+      ? rawPhone.replace(/^\+\d{1,4}/, "")
+      : rawPhone;
+    const resolveMinister = (src: any): string => {
+      const raw = src?.isMinister ?? src?.is_minister ?? src?.minister;
+      if (raw === true  || raw === 1 || raw === "true"  || String(raw ?? "").toLowerCase() === "yes") return "yes";
+      if (raw === false || raw === 0 || raw === "false" || String(raw ?? "").toLowerCase() === "no")  return "no";
+      if (typeof raw === "string" && raw.trim()) return raw.trim().toLowerCase();
+      return "";
+    };
 
-    gender: profile?.gender || '',
-    ageRange: profile?.ageRange || '',
-    country: profile?.country || '',
-    state: (profile as any)?.state || (profile as any)?.stateOfResidence || '',
-    localAssembly: profile?.localAssembly || '',
-    address: (profile as any)?.address || (profile as any)?.residentialAddress || '',
-    isMinister: (profile as any)?.isMinister || '',
-    employmentStatus: profile?.employmentStatus || '',
-    maritalStatus: profile?.maritalStatus || '',
-    spouseName: (profile as any)?.spouseName || '',
-  });
+    return {
+      firstName: p?.firstName || '',
+      lastName: p?.lastName || '',
+      phoneCountryCode: resolvedCode,
+      phoneNumber: resolvedLocal,
+      gender: (p?.gender || '').toLowerCase(),
+      ageRange: p?.ageRange || '',
+      country: p?.country || '',
+      state: p?.state || p?.stateOfResidence || '',
+      localAssembly: p?.localAssembly || '',
+      address: p?.address || p?.residentialAddress || '',
+      isMinister: resolveMinister(p),
+      employmentStatus: (p?.employmentStatus || '').toLowerCase(),
+      maritalStatus: (p?.maritalStatus || '').toLowerCase(),
+      spouseName: p?.spouseName || '',
+    };
+  };
 
+  const [formData, setFormData] = useState(() => normaliseProfileToForm(profile));
   const [dependentsList, setDependentsList] = useState(dependents);
   const [editingDependentData, setEditingDependentData] = useState<any>(null);
   const [isDependentsModalOpen, setIsDependentsModalOpen] = useState(false);
@@ -147,35 +153,7 @@ export function UserProfile({ profile, userEmail, userPhone, dependents, onBack,
   };
 
   const handleCancelProfile = () => {
-    setFormData({
-      firstName: profile?.firstName || '',
-    lastName: profile?.lastName || '',
-      phoneCountryCode:
-        profile?.phoneCountryCode ||
-        (typeof profile?.phone === "string" && profile.phone.startsWith("+")
-          ? profile.phone.match(/^\+\d{1,4}/)?.[0]
-          : undefined) ||
-        "+234",
-      phoneNumber:
-        profile?.phoneNumber
-          ? profile.phoneNumber.startsWith("+")
-            ? profile.phoneNumber.replace(/^\+\d{1,4}/, "")
-            : profile.phoneNumber
-          : typeof profile?.phone === "string"
-            ? profile.phone.replace(/^\+\d{1,4}/, "")
-            : "",
-
-      gender: profile?.gender || '',
-      ageRange: profile?.ageRange || '',
-      country: profile?.country || '',
-      state: (profile as any)?.state || (profile as any)?.stateOfResidence || '',
-      localAssembly: profile?.localAssembly || '',
-      address: (profile as any)?.address || (profile as any)?.residentialAddress || '',
-      isMinister: (profile as any)?.isMinister || '',
-      employmentStatus: profile?.employmentStatus || '',
-      maritalStatus: profile?.maritalStatus || '',
-      spouseName: (profile as any)?.spouseName || '',
-    });
+    setFormData(normaliseProfileToForm(profile));
     setIsEditingProfile(false);
   };
 

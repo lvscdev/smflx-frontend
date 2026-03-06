@@ -47,7 +47,7 @@ export function EmailVerification({
   const sendVerificationCode = async () => {
     setError("");
 
-    const trimmed = email.trim();
+    const trimmed = email.trim().toLowerCase();
     if (!isValidEmail(trimmed)) {
       setError("Please enter a valid email address");
       return;
@@ -119,7 +119,7 @@ export function EmailVerification({
 
     setIsVerifying(true);
     try {
-      const trimmed = email.trim();
+      const trimmed = email.trim().toLowerCase();
 
       const { token, userDetails } = await validateOtp({
         email: trimmed,

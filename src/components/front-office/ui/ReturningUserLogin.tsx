@@ -26,34 +26,29 @@ export function ReturningUserLogin({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-    const sendCode = async () => {
-      setError("");
-      const trimmed = email.trim();
+  const sendCode = async () => {
+    setError("");
+    const trimmed = email.trim().toLowerCase();
 
-      if (!trimmed || !trimmed.includes("@")) {
-        setError("Please enter a valid email address");
-        return;
-      }
+    if (!trimmed || !trimmed.includes("@")) {
+      setError("Please enter a valid email address");
+      return;
+    }
 
-      setLoading(true);
-      try {
-        const { reference } = await generateLoginOtp(trimmed);
+    setLoading(true);
+    try {
+      const { reference } = await generateLoginOtp(trimmed);
 
-        // store in component state
-        setOtpReference(reference);
-
-        // persist for verification step
-        sessionStorage.setItem("otpReference", reference);
-
-        setOtpCookie(trimmed);
-
-        setStep("code");
-      } catch (err: any) {
-        setError(toUserMessage(err, { feature: "otp", action: "send" }));
-      } finally {
-        setLoading(false);
-      }
-    };
+      setOtpReference(reference);
+      sessionStorage.setItem("otpReference", reference);
+      setOtpCookie(trimmed);
+      setStep("code");
+    } catch (err: any) {
+      setError(toUserMessage(err, { feature: "otp", action: "send" }));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEmailSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -63,7 +58,7 @@ export function ReturningUserLogin({
   const handleCodeSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    const trimmed = email.trim();
+    const trimmed = email.trim().toLowerCase();
 
     if (code.length !== 6) {
       setError("Please enter a valid 6-digit code");
@@ -83,7 +78,6 @@ export function ReturningUserLogin({
         otpReference,
       });
 
-      // Persist session (localStorage + cookie)
       setAuthToken(token);
       setTokenCookie(token);
 
@@ -93,7 +87,6 @@ export function ReturningUserLogin({
         // ignore
       }
 
-      // hand back to parent to resume the flow (parent decides routing)
       onLoginSuccess(trimmed);
     } catch (err: any) {
       setError(toUserMessage(err, { feature: "otp", action: "verify" }));
@@ -102,9 +95,8 @@ export function ReturningUserLogin({
     }
   };
 
-return (
+  return (
     <div className="flex-1 flex flex-col bg-white relative">
-      {/* Centered Content */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md">
           <div className="text-center mb-6 lg:mb-8">
@@ -137,7 +129,7 @@ return (
               </div>
 
               {error && (
-                <InlineAlert variant="error" title="Couldn’t continue">
+                <InlineAlert variant="error" title="Couldn't continue">
                   {error}
                 </InlineAlert>
               )}
@@ -191,7 +183,7 @@ return (
               </div>
 
               {error && (
-                <InlineAlert variant="error" title="Couldn’t continue">
+                <InlineAlert variant="error" title="Couldn't continue">
                   {error}
                 </InlineAlert>
               )}
@@ -233,6 +225,5 @@ return (
     </div>
   );
 }
-
 
 export default ReturningUserLogin;

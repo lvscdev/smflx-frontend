@@ -286,7 +286,7 @@ export function ProfileForm({
       // fall back to prop only if getMe fails
     }
     if (!resolvedEmail || !resolvedEmail.includes("@")) {
-      resolvedEmail = typeof email === "string" ? email.trim() : "";
+      resolvedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
     }
 
     if (!resolvedEmail || !resolvedEmail.includes("@")) {
@@ -326,6 +326,7 @@ export function ProfileForm({
     setSubmitLoading(true);
 
     try {
+      // Update profile server-side (token required)
       await updateMe(payload);
       snapshotRef.current = serializeProfile(profile, isYAT);
       setLastSavedAt(new Date().toISOString());

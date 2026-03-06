@@ -119,17 +119,16 @@ export function ProfileForm({
       const resolvedLocal: string = rawPhone.startsWith("+")
         ? rawPhone.replace(/^\+\d{1,4}/, "")
         : rawPhone;
-
       const resolveMinister = (raw: unknown): string => {
         if (raw === true  || raw === 1 || raw === "true"  || String(raw ?? "").toLowerCase() === "yes") return "yes";
         if (raw === false || raw === 0 || raw === "false" || String(raw ?? "").toLowerCase() === "no")  return "no";
         if (typeof raw === "string" && raw.trim()) return raw.trim().toLowerCase();
         return "";
       };
+
       const toLower = (v?: string) => (v || "").toLowerCase() || "";
 
       return {
-        ...initialData,
         firstName:
           src.firstName ||
           (typeof src.fullName === "string"
@@ -149,6 +148,11 @@ export function ProfileForm({
         state: src.state || src.stateOfResidence || "",
         address: src.address || src.residentialAddress || "",
         isMinister: resolveMinister(src.isMinister ?? src.is_minister ?? src.minister),
+        ageRange: src.ageRange || "",
+        localAssembly: src.localAssembly || "",
+        spouseName: src.spouseName || "",
+        isYAT: src.isYAT ?? false,
+        phone: src.phone || "",
       };
     }
     return {
@@ -317,7 +321,6 @@ export function ProfileForm({
     try {
       // Update profile server-side (token required)
       await updateMe(payload);
-      // Mark current state as saved for UX feedback
       snapshotRef.current = serializeProfile(profile, isYAT);
       setLastSavedAt(new Date().toISOString());
       setIsDirty(false);

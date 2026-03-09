@@ -4,8 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { markDependentsPaymentReturned } from "@/lib/storage/pendingDependentsPayments";
+import { safeLoadFlowState, safeSaveFlowState } from "@/lib/constants/flowState";
 
-const FLOW_STATE_KEY = "smflx_flow_state_v1";
 const PENDING_CTX_KEY = "smflx_pending_payment_ctx";
 
 export type PaymentProps = {
@@ -22,17 +22,6 @@ export type PaymentProps = {
 };
 
 
-function safeLoadFlowState(): Record<string, any> | null {
-
-  try {
-    const raw = localStorage.getItem(FLOW_STATE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-
 function safeLoadPendingCtx(): Record<string, any> | null {
   try {
     const raw = localStorage.getItem(PENDING_CTX_KEY);
@@ -42,13 +31,6 @@ function safeLoadPendingCtx(): Record<string, any> | null {
   }
 }
 
-function safeSaveFlowState(state: Record<string, any>) {
-  try {
-    localStorage.setItem(FLOW_STATE_KEY, JSON.stringify(state));
-  } catch {
-    // ignore
-  }
-}
 
 function clearPendingCtx() {
   try {

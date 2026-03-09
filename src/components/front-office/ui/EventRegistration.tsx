@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { validateEventRegistration } from "@/lib/validation/eventRegistration";
 import { toUserMessage } from "@/lib/errors";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Wifi, ArrowLeft, Tent, Users, Monitor, Building2, Home, Check, Radio, Youtube, Facebook } from "lucide-react";
-import { listAccommodationCategories } from "@/lib/api/accommodation";
+import { MapPin, Wifi, ArrowLeft, Tent, Monitor, Check, Radio, Youtube, Facebook } from "lucide-react";
 import { AccommodationCategories } from "@/lib/api/accommodation/types";
+import { useAccommodationCategories } from "@/hooks/useAccommodationCategories";
 
 interface RegistrationData {
   eventId:string;
@@ -93,11 +90,8 @@ export function EventRegistration({
   isSubmitting,
   serverError,
 }: EventRegistrationProps) {
-  const [loadError, setLoadError] = useState<string>("");
-  const [loadingAccommodations, setLoadingAccommodations] = useState(false);
-  const [accommodationCategories, setAccommodationCategories] = useState<
-    AccommodationCategories[]
-  >([]);
+  const { accommodationCategories, loadingAccommodations, loadError } =
+    useAccommodationCategories(eventId);
   const [registration, setRegistration] = useState<RegistrationData>(
     initialData || {
       eventId:"",
@@ -110,22 +104,6 @@ export function EventRegistration({
   const [localSubmitting, setLocalSubmitting] = useState(false);
 
   const submitting = !!isSubmitting || localSubmitting;
-
-  const loadAccommodations = async () => {
-    setLoadingAccommodations(true);
-    try {
-      if (!eventId) {
-          throw new Error("Missing eventId for accommodation categories");
-        }
-        const data = await listAccommodationCategories({ eventId });
-
-      setAccommodationCategories(data);
-    } catch (error) {
-      setLoadError(toUserMessage(error, { feature: "events", action: "list" }));
-    } finally {
-      setLoadingAccommodations(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,11 +137,7 @@ export function EventRegistration({
     return true;
   };
 
-  useEffect(() => {
-    loadAccommodations();
-  }, []);
-
-  const getButtonText = () => {
+const getButtonText = () => {
     if (registration.attendeeType === "camper") {
       return "Continue to Accommodation";
     }
@@ -354,7 +328,7 @@ export function EventRegistration({
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {accommodationCategories &&
                     accommodationCategories.length > 0 &&
-                    accommodationCategories.map((category) => (
+                    accommodationCategories.map((category: AccommodationCategories) => (
                       <GridOption
                         key={category.categoryId}
                         value={category?.name?.toLowerCase()}
@@ -378,34 +352,6 @@ export function EventRegistration({
                 </div>
               )}
 
-              {/* <GridOption
-                  value="hotel"
-                  selected={registration.accommodationType === "hotel"}
-                  onClick={() => {
-                    setFormError(null);
-                    setRegistration({
-                      ...registration,
-                      accommodationType: "hotel",
-                    });
-                  }}
-                  icon={<Building2 className="w-5 h-5" />}
-                  label="Hotel"
-                  description="Availability shown on next step"
-                />
-                <GridOption
-                  value="shared"
-                  selected={registration.accommodationType === "shared"}
-                  onClick={() => {
-                    setFormError(null);
-                    setRegistration({
-                      ...registration,
-                      accommodationType: "shared",
-                    });
-                  }}
-                  icon={<Users className="w-5 h-5" />}
-                  label="Shared Apartment"
-                  description="Availability shown on next step"
-                /> */}
             </div>
           )}
 

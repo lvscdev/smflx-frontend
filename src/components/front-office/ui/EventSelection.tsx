@@ -101,7 +101,7 @@ export function EventSelection({
   const userRange = normRange(userProfile?.ageRange);
   const isYAT = !!userProfile?.isYAT;
 
-  const filteredEvents = events.filter((ev) => {
+  const filteredEvents = events.filter((ev: Event) => {
     if (userRange === "13-19") return hasRange(ev.ageRanges, "13-19");
 
     if (userRange === "20-22") {
@@ -206,7 +206,7 @@ export function EventSelection({
         )}
 
         <div className="grid gap-6 md:grid-cols-2">
-          {filteredEvents.map((event) => (
+          {filteredEvents.map((event: Event) => (
             <div
               key={event.id}
               className={`p-6 rounded-2xl border-2 transition-all duration-300 ${

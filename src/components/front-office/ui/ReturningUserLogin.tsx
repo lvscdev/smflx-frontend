@@ -121,7 +121,7 @@ export function ReturningUserLogin({
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
                   disabled={loading}
@@ -168,7 +168,7 @@ export function ReturningUserLogin({
                   id="code"
                   type="text"
                   value={code}
-                  onChange={(e) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
                   }
                   placeholder="000000"

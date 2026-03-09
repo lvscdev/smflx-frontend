@@ -13,8 +13,8 @@ import { getHostelUnoccupiedCapacity } from "@/lib/api/accommodations";
 import { AccommodationSelection } from "@/components/front-office/ui/AccommodationSelection";
 import { Payment } from "@/components/front-office/ui/Payment";
 import { getAuthToken } from "@/lib/api/client";
-import { createUserRegistration } from "@/lib/api";
 import { setActiveEventCookie } from "@/lib/auth/session";
+import { useRegistrationSubmit } from "@/hooks/useRegistrationSubmit";
 
 type View =
   | "verify"
@@ -25,35 +25,7 @@ type View =
   | "accommodation"
   | "payment";
 
-const FLOW_STATE_KEY = "smflx_flow_state_v1";
-
-function safeLoadFlowState() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(FLOW_STATE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function safeSaveFlowState(state: any) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(FLOW_STATE_KEY, JSON.stringify(state));
-  } catch {
-    // ignore
-  }
-}
-
-function safeClearFlowState() {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.removeItem(FLOW_STATE_KEY);
-  } catch {
-    // ignore
-  }
-}
+import { safeLoadFlowState, safeSaveFlowState, safeClearFlowState } from "@/lib/constants/flowState";
 
 export default function HomePage() {
   const router = useRouter();
@@ -94,14 +66,27 @@ export default function HomePage() {
   } | null>(null);
 
   const [registration, setRegistration] = useState<any>(null);
-  const [registrationSubmitting, setRegistrationSubmitting] = useState(false);
-  const [registrationPersistError, setRegistrationPersistError] = useState<
-    string | null
-  >(null);
   const [accommodation, setAccommodation] = useState<any>(null);
   const [hostelSpacesLeft, setHostelSpacesLeft] = useState<number | undefined>(
     undefined,
   );
+
+  const {
+    registrationSubmitting,
+    registrationPersistError,
+    setRegistrationPersistError,
+    handleRegistrationComplete,
+  } = useRegistrationSubmit({
+    email,
+    profile,
+    selectedEvent,
+    accommodation,
+    onSuccess: (next) => setRegistration(next),
+    onCamper: (next) => {
+      setRegistration(next);
+      setView("accommodation");
+    },
+  });
 
   useEffect(() => {
     const token = getAuthToken();
@@ -345,78 +330,7 @@ export default function HomePage() {
             onBack={() => setView("event-selection")}
             isSubmitting={registrationSubmitting}
             serverError={registrationPersistError}
-            onComplete={async (data) => {
-              setRegistrationPersistError(null);
-              setRegistrationSubmitting(true);
-
-              try {
-                if (!selectedEvent?.eventId) {
-                  throw new Error(
-                    "No event selected. Please go back and select an event.",
-                  );
-                }
-
-                const participationMode =
-                  data.attendeeType === "camper"
-                    ? "CAMPER"
-                    : data.attendeeType === "online"
-                      ? "ONLINE"
-                      : "ATTENDEE";
-
-                const accommodationType =
-                  participationMode === "CAMPER"
-                    ? data.accommodationType === "hostel"
-                      ? "HOSTEL"
-                      : data.accommodationType === "hotel"
-                        ? "HOTEL"
-                        : "NONE"
-                    : "NONE";
-
-                const created = await createUserRegistration({
-                  eventId: selectedEvent.eventId,
-                  participationMode,
-                  accommodationType,
-                });
-
-                const next = {
-                  ...data,
-                  eventId: selectedEvent.eventId,
-                  eventName: selectedEvent.eventName,
-                  email,
-                  participationMode,
-                  accommodationType,
-                  registrationId: (created as any)?.regId,
-                  userId: (created as any)?.userId,
-                };
-
-                setRegistration(next);
-
-                if (data.attendeeType === "camper") {
-                  setView("accommodation");
-                  return;
-                }
-
-                safeSaveFlowState({
-                  view: "dashboard",
-                  email,
-                  profile,
-                  selectedEvent,
-                  activeEventId: selectedEvent?.eventId ?? null,
-                  registration: next,
-                  accommodation,
-                });
-                if (selectedEvent?.eventId)
-                  setActiveEventCookie(selectedEvent.eventId);
-                router.push("/dashboard");
-              } catch (e: any) {
-                setRegistrationPersistError(
-                  e?.message ||
-                    "Unable to save registration. Please try again.",
-                );
-              } finally {
-                setRegistrationSubmitting(false);
-              }
-            }}
+            onComplete={handleRegistrationComplete}
           />
         )}
 

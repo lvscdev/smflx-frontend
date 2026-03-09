@@ -84,7 +84,7 @@ export function DependentsModal({
   };
 
   const handleRemoveDependent = (id: string) => {
-    const dependent = dependents.find((d) => d.id === id);
+    const dependent = dependents.find((d: Dependent) => d.id === id);
     if (!dependent) return;
 
     // Open confirmation dialog
@@ -102,7 +102,7 @@ export function DependentsModal({
     setRemoveError(null);
 
     const prev = dependents;
-    setDependents((ds) => ds.filter((d) => d.id !== id));
+    setDependents((ds: Dependent[]) => ds.filter((d: Dependent) => d.id !== id));
 
     try {
       await Promise.resolve(onRemoveDependent?.(id));
@@ -138,15 +138,15 @@ export function DependentsModal({
   };
 
   const handleRegisterAndPay = () => {
-    const toRegister = dependents.filter(d => !d.isRegistered);
+    const toRegister = dependents.filter((d: Dependent) => !d.isRegistered);
     
     if (toRegister.length === 0) return;
     
     onRegisterAndPay?.(toRegister);
   };
 
-  const unregisteredDependents = dependents.filter(d => !d.isRegistered);
-  const registeredDependents = dependents.filter(d => d.isRegistered);
+  const unregisteredDependents = dependents.filter((d: Dependent) => !d.isRegistered);
+  const registeredDependents = dependents.filter((d: Dependent) => d.isRegistered);
   const selectedCount = unregisteredDependents.length;
   const DEPENDENT_PRICE = Number(process.env.NEXT_PUBLIC_DEPENDENT_PRICE) || 7000;
   const totalAmount = selectedCount * DEPENDENT_PRICE;
@@ -197,7 +197,7 @@ export function DependentsModal({
                   <Input
                     type="text"
                     value={currentDependent.name}
-                    onChange={(e) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, name: e.target.value }); }}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, name: e.target.value }); }}
                     placeholder="Enter full name"
                   />
                 </div>
@@ -209,7 +209,7 @@ export function DependentsModal({
                   <Input
                     type="text"
                     value={currentDependent.age}
-                    onChange={(e) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, age: sanitizeDependentAge(e.target.value) }); }}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setCurrentFormError(null); setCurrentDependent({ ...currentDependent, age: sanitizeDependentAge(e.target.value) }); }}
                     placeholder="Enter age (3–12)"
                     inputMode="numeric"
                     min="0"
@@ -282,7 +282,7 @@ export function DependentsModal({
               <div>
                 <h3 className="font-semibold mb-3 text-gray-900">Your Dependents</h3>
                 <div className="space-y-2">
-                  {dependents.map((dependent) => (
+                  {dependents.map((dependent: Dependent) => (
                     <div
                       key={dependent.id}
                       className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-xl"

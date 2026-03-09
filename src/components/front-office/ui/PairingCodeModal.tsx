@@ -11,7 +11,6 @@ interface PairingCodeModalProps {
   onClose: () => void;
   onProceedToPayment: () => void;
   onCodeVerified: () => void;
-  /** Context needed to call the hotel-allocation endpoint */
   registrationId?: string;
   eventId?: string;
   userId?: string;
@@ -131,7 +130,7 @@ export function PairingCodeModal({
             <Input
               type="text"
               value={pairingCode}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 const value = e.target.value.replace(/\D/g, "").slice(0, 5);
                 setPairingCode(value);
                 setVerificationError("");

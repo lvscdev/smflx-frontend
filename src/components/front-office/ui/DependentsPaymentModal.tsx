@@ -51,13 +51,6 @@ const origin = window.location.origin;
 const notification_url = `${origin}/api/billing/verify`;
 const redirect_url = `${origin}/payment`;
 
-
-      console.log("💳 Starting dependent payment:", {
-        parentRegId: resolvedParentRegId,
-        dependents: dependents.map(d => ({ id: d.id, name: d.name })),
-        totalAmount
-      });
-
       if (!resolvedParentRegId) {
         console.error("❌ Missing parentRegId for payment!");
         throw new Error("Missing parentRegId (owner regId). Please refresh your dashboard and try again.");
@@ -85,8 +78,6 @@ const resp =
         redirect_url,
       });
 
-      console.log("🟢 Payment API response:", resp);
-
       const checkoutUrl =
         resp?.checkoutUrl ||
         resp?.data?.checkoutUrl ||
@@ -99,8 +90,6 @@ const resp =
           "Payment initiation succeeded but checkoutUrl was not returned."
         );
       }
-
-      console.log("✅ Redirecting to checkout:", checkoutUrl);
 
       try {
         localStorage.setItem(

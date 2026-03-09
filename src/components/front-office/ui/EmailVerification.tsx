@@ -34,7 +34,7 @@ export function EmailVerification({
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const t = window.setInterval(() => {
-      setResendCooldown((s) => Math.max(0, s - 1));
+      setResendCooldown((s: number) => Math.max(0, s - 1));
     }, 1000);
     return () => window.clearInterval(t);
   }, [resendCooldown]);
@@ -201,7 +201,7 @@ export function EmailVerification({
                   type="email"
                   placeholder="Enter your email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
                 />
               </div>
@@ -249,7 +249,7 @@ export function EmailVerification({
                   type="text"
                   placeholder="Enter 6-digit code"
                   value={verificationCode}
-                  onChange={(e) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setVerificationCode(
                       e.target.value.replace(/\D/g, "").slice(0, 6)
                     )

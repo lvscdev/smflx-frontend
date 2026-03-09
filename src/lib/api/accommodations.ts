@@ -3,6 +3,7 @@
 
 import { apiRequest } from './client';
 import { API_BASE_URL } from "./client";
+import { normalizeAgeRange } from "../utils/ageRange";
 
 // ============================================================================
 // Types
@@ -105,40 +106,10 @@ export async function getAccommodations(params: {
   ageRange?: string;
 }): Promise<GetAccommodationsResponse> {
 
-  const normalizeAgeRange = (input?: string): string => {
-    const v = (input ?? "").toString().trim().replace(/[–—]/g, "-");
-    if (!v) return "";
-
-    const allowed = new Set(["0-12", "13-19", "20-22", "23-29", "30-39", "40+"]);
-    if (allowed.has(v)) return v;
-
-    // UI sometimes stores dependents age range as 5-12, backend expects 0-12.
-    if (/^\s*5\s*-\s*12\s*$/i.test(v)) return "0-12";
-
-    const lower = v.toLowerCase();
-    if (lower.includes("40")) return "40+";
-
-    // Legacy/variant buckets
-    if (v === "20-29" || v === "20 - 29") return "23-29";
-
-    const asNum = Number(v);
-    if (Number.isFinite(asNum) && asNum >= 0) {
-      if (asNum <= 12) return "0-12";
-      if (asNum <= 19) return "13-19";
-      if (asNum <= 22) return "20-22";
-      if (asNum <= 29) return "23-29";
-      if (asNum <= 39) return "30-39";
-      return "40+";
-    }
-
-    return "";
-  };
-
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = params.type === 'HOSTEL' ? 'hostel' : 'hotel';
 
   try {
-    console.log(`🏨 Fetching ${params.type} accommodations...`);
     
     const categoriesResp = await apiRequest<any>(`/accommodation/categories/${encodeURIComponent(params.eventId)}`, { method: 'GET' });
     const rawCategories: any[] = categoriesResp?.data || (categoriesResp?.categories as any[]) || (categoriesResp as any[]) || [];
@@ -160,8 +131,6 @@ export async function getAccommodations(params: {
       ageRange: normalizeAgeRange((params as any).ageRange ?? params.age) || "23-29"
     };
 
-    console.log(`🏨 POST /accommodation/facilities for ${params.type}:`, payload);
-    
     const facilitiesResp = await apiRequest<any>('/accommodation/facilities', { 
       method: 'POST',
       body: payload
@@ -180,14 +149,14 @@ export async function getAccommodations(params: {
           location: undefined,
           images: undefined,
           totalSpaces: Number(f?.totalSpaces ?? f?.totalCapacity ?? 0) || 0,
-          availableSpaces: Number(f?.availableSpaces ?? f?.availableCapacity ?? f?.freeSpaces ?? (f?.available === false ? 0 : (f?.totalSpaces ?? f?.totalCapacity ?? 0)) ) || 0,
+          // Use explicit availability fields only. Do NOT fall back to totalSpaces/totalCapacity
+          // as that would incorrectly report all spaces as available when the API omits the field.
+          availableSpaces: Number(f?.availableSpaces ?? f?.availableCapacity ?? f?.freeSpaces ?? 0) || 0,
           rooms: [],
           amenities: undefined,
         };
       })
       .filter((f) => f.facilityId);
-
-    console.log(`✅ ${params.type} facilities loaded:`, facilities.length);
 
     return {
       facilities,

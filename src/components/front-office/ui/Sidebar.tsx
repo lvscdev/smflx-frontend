@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { getHostelUnoccupiedCapacity } from "@/lib/api/accommodations";
+import { getSpacesLeft, type SpacesLeftSummary } from "@/lib/api/accommodations";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const backgroundImage = "/assets/images/sidebar-bg.png";
@@ -20,25 +20,28 @@ interface SidebarProps {
   currentStep: number;
   steps: Step[];
   onAlreadyRegistered: () => void;
+  /** @deprecated Pass spacesLeft instead for the full breakdown */
   hostelSpacesLeft?: number;
+  spacesLeft?: SpacesLeftSummary;
 }
 
 
 
-export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesLeft }: SidebarProps) {
-  const [hostelSpacesLeftFallback, setHostelSpacesLeftFallback] = useState< number | undefined  >(undefined);
-    const [mobileOpen, setMobileOpen] = useState(false);
+export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesLeft, spacesLeft: spacesLeftProp }: SidebarProps) {
+  const [spacesLeftFallback, setSpacesLeftFallback] = useState<SpacesLeftSummary | undefined>(undefined);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    if (typeof hostelSpacesLeft === "number") return;
+    // Skip fetch if parent already provided the breakdown
+    if (spacesLeftProp) return;
 
     let cancelled = false;
 
     (async () => {
       try {
-        const left = await getHostelUnoccupiedCapacity();
-        if (!cancelled && typeof left === "number") {
-          setHostelSpacesLeftFallback(left);
+        const summary = await getSpacesLeft();
+        if (!cancelled) {
+          setSpacesLeftFallback(summary);
         }
       } catch {
         // ignore
@@ -48,12 +51,13 @@ export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesL
     return () => {
       cancelled = true;
     };
-  }, [hostelSpacesLeft]);
+  }, [spacesLeftProp]);
 
-  const hostelLeft =
-    typeof hostelSpacesLeft === "number"
-      ? hostelSpacesLeft
-      : hostelSpacesLeftFallback;
+  const resolvedSpaces: SpacesLeftSummary | undefined = spacesLeftProp ?? spacesLeftFallback;
+  const hostelLeft = resolvedSpaces?.hostelSpacesLeft ?? (typeof hostelSpacesLeft === "number" ? hostelSpacesLeft : null);
+  const yatLeft = resolvedSpaces?.yatHostelSpacesLeft ?? null;
+  const hotelLeft = resolvedSpaces?.hotelsLeft ?? null;
+  const hasBreakdown = resolvedSpaces !== undefined;
 
   // Calculate progress percentage
   const completedSteps = steps.filter((step) => step.completed).length;
@@ -211,10 +215,46 @@ export function Sidebar({ currentStep, steps, onAlreadyRegistered, hostelSpacesL
         {/* Hostel Availability Info at Bottom */}
         <div className="mt-auto hidden lg:block">
           <div className="bg-white/10 backdrop-blur-sm rounded-xl px-5 py-4 border border-white/20">
-            <p className="text-white text-sm font-light">
-              <span className="font-semibold text-[64px]">{hostelLeft ?? 'Limited'}</span> Hostel Spaces left.<br />
-              Book your space now.
-            </p>
+            {hasBreakdown ? (
+              /* 3-column breakdown: Hostel / YAT Hostel / Hotels */
+              <div>
+                <div className="flex items-stretch divide-x divide-white/20 mb-3">
+                  <div className="flex-1 pr-4 text-center">
+                    <p className="text-white text-4xl font-bold leading-none">
+                      {hostelLeft ?? "—"}
+                    </p>
+                    <p className="text-white text-xs font-light opacity-70 mt-1">
+                      Hostel Spaces left
+                    </p>
+                  </div>
+                  <div className="flex-1 px-4 text-center">
+                    <p className="text-white text-4xl font-bold leading-none">
+                      {yatLeft ?? "—"}
+                    </p>
+                    <p className="text-white text-xs font-light opacity-70 mt-1">
+                      YAT Hostel left
+                    </p>
+                  </div>
+                  <div className="flex-1 pl-4 text-center">
+                    <p className="text-white text-4xl font-bold leading-none">
+                      {hotelLeft ?? "—"}
+                    </p>
+                    <p className="text-white text-xs font-light opacity-70 mt-1">
+                      Hotels Left
+                    </p>
+                  </div>
+                </div>
+                <p className="text-white text-xs font-light opacity-70 text-center">
+                  Book your space now.
+                </p>
+              </div>
+            ) : (
+              /* Legacy single-value fallback */
+              <p className="text-white text-sm font-light">
+                <span className="font-semibold text-[64px]">{hostelLeft ?? "Limited"}</span> Hostel Spaces left.<br />
+                Book your space now.
+              </p>
+            )}
           </div>
         </div>
       </div>

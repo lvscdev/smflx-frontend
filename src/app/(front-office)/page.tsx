@@ -9,7 +9,7 @@ import { ReturningUserLogin } from "@/components/front-office/ui/ReturningUserLo
 import { ProfileForm } from "@/components/front-office/ui/ProfileForm";
 import { EventSelection } from "@/components/front-office/ui/EventSelection";
 import { EventRegistration } from "@/components/front-office/ui/EventRegistration";
-import { getHostelUnoccupiedCapacity } from "@/lib/api/accommodations";
+import { getSpacesLeft } from "@/lib/api/accommodations";
 import { AccommodationSelection } from "@/components/front-office/ui/AccommodationSelection";
 import { Payment } from "@/components/front-office/ui/Payment";
 import { getAuthToken } from "@/lib/api/client";
@@ -99,9 +99,7 @@ export default function HomePage() {
     string | null
   >(null);
   const [accommodation, setAccommodation] = useState<any>(null);
-  const [hostelSpacesLeft, setHostelSpacesLeft] = useState<number | undefined>(
-    undefined,
-  );
+  const [spacesLeft, setSpacesLeft] = useState<import("@/lib/api/accommodations").SpacesLeftSummary | undefined>(undefined);
 
   useEffect(() => {
     const token = getAuthToken();
@@ -143,19 +141,15 @@ export default function HomePage() {
   useEffect(() => {
     async function fetchHostelAvailability() {
       try {
-        if (!selectedEvent?.eventId) return;
-
-        const left = await getHostelUnoccupiedCapacity();
-        if (typeof left === "number") {
-          setHostelSpacesLeft(left);
-        }
+        const summary = await getSpacesLeft();
+        setSpacesLeft(summary);
       } catch (err) {
-        console.error("Failed to fetch hostel availability:", err);
+        console.error("Failed to fetch accommodation availability:", err);
       }
     }
 
     fetchHostelAvailability();
-  }, [selectedEvent?.eventId]);
+  }, []);
 
   useEffect(() => {
     if (view === "verify" || view === "login") return;
@@ -254,7 +248,8 @@ export default function HomePage() {
           currentStep={currentStep}
           steps={steps}
           onAlreadyRegistered={() => setView("login")}
-          hostelSpacesLeft={hostelSpacesLeft}
+          hostelSpacesLeft={undefined}
+          spacesLeft={spacesLeft}
         />
       )}
 

@@ -255,21 +255,58 @@ export async function cancelAccommodationBooking(bookingId: string) {
 }
 
 /**
- * Get remaining hostel capacity (unoccupied bed spaces).
+ * Accommodation spaces summary returned by /accommodation/spaces-left
+ */
+export type SpacesLeftSummary = {
+  hostelSpacesLeft: number | null;
+  yatHostelSpacesLeft: number | null;
+  hotelsLeft: number | null;
+};
+
+/**
+ * Get remaining accommodation spaces broken down by category.
+ * Uses the new /accommodation/spaces-left endpoint.
  *
- * @returns capacityLeft (number) or null when unavailable
+ * @returns SpacesLeftSummary with per-category counts, or nulls when unavailable
+ */
+export async function getSpacesLeft(): Promise<SpacesLeftSummary> {
+  const url = `${API_BASE_URL}/accommodation/spaces-left`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { accept: '*/*' },
+    });
+
+    const json = (await res.json().catch(() => null)) as any;
+    const data = json?.data ?? json ?? {};
+
+    const toNum = (v: unknown): number | null => {
+      const n = typeof v === 'number' ? v : Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    return {
+      hostelSpacesLeft:
+        toNum(data?.nonYatSpacesLeft ?? data?.hostelSpacesLeft ?? data?.hostel ?? data?.hostelLeft ?? null),
+      yatHostelSpacesLeft:
+        toNum(data?.totalYatSpacesLeft ?? data?.yatHostelSpacesLeft ?? data?.yatHostel ?? data?.yatLeft ?? null),
+      hotelsLeft:
+        toNum(data?.totalHotelSpacesLeft ?? data?.hotelsLeft ?? data?.hotel ?? data?.hotelLeft ?? null),
+    };
+  } catch {
+    return { hostelSpacesLeft: null, yatHostelSpacesLeft: null, hotelsLeft: null };
+  }
+}
+
+/**
+ * @deprecated Use getSpacesLeft() instead.
+ * Kept for backward compatibility — returns total hostel spaces left.
  */
 export async function getHostelUnoccupiedCapacity(): Promise<number | null> {
-  const url =
-    `${API_BASE_URL}/accommodation/hostel/unoccupied`;
-
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: { accept: '*/*' },
-  });
-
-  const json = (await res.json().catch(() => null)) as any;
-  const raw = json?.data?.capacityLeft;
-  const left = typeof raw === 'number' ? raw : Number(raw);
-  return Number.isFinite(left) ? left : null;
+  const summary = await getSpacesLeft();
+  const hostel = summary.hostelSpacesLeft ?? 0;
+  const yat = summary.yatHostelSpacesLeft ?? 0;
+  const total = hostel + yat;
+  return total > 0 ? total : summary.hostelSpacesLeft;
 }

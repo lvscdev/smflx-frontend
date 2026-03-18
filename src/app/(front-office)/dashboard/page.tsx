@@ -280,11 +280,29 @@ export default function DashboardPage() {
             // Accommodation — API is source of truth
             accForEvent = null;
             if (dashboardData.accommodations.length > 0) {
-              accForEvent =
+              const raw =
                 dashboardData.accommodations.find((a) => a.eventId === eventId) ??
                 (dashboardData.accommodations.length === 1 ? dashboardData.accommodations[0] : null) ??
                 (isCamper ? dashboardData.accommodations[0] : null) ??
                 null;
+
+              if (raw) {
+                const rawStatus = String(
+                  (raw as any)?.status ??
+                  (raw as any)?.paymentStatus ??
+                  (raw as any)?.payment_status ??
+                  (raw as any)?.accommodationPaymentStatus ??
+                  ""
+                ).toLowerCase();
+                const rawPaid =
+                  (raw as any)?.paidForAccommodation === true ||
+                  (raw as any)?.isPaid === true ||
+                  (raw as any)?.paid === true ||
+                  (raw as any)?.isConfirmed === true ||
+                  ["paid", "success", "completed", "confirmed", "active"].includes(rawStatus);
+
+                accForEvent = rawPaid ? { ...raw, paidForAccommodation: true } : raw;
+              }
             }
 
             setRegistration(normalizedRegistration);
@@ -381,15 +399,20 @@ export default function DashboardPage() {
           dashboardData.accommodations[0] ??
           null;
 
-        // Determine if accommodation payment confirmed
+        // Determine if accommodation payment confirmed — must match normalizeAccommodation() logic
         const accStatus = String(
           (accForEvent as any)?.status ??
           (accForEvent as any)?.paymentStatus ??
+          (accForEvent as any)?.payment_status ??
+          (accForEvent as any)?.accommodationPaymentStatus ??
           ""
         ).toLowerCase();
         const accPaid =
           (accForEvent as any)?.paidForAccommodation === true ||
-          ["paid", "success", "completed", "confirmed"].includes(accStatus);
+          (accForEvent as any)?.isPaid === true ||
+          (accForEvent as any)?.paid === true ||
+          (accForEvent as any)?.isConfirmed === true ||
+          ["paid", "success", "completed", "confirmed", "active"].includes(accStatus);
 
         // Determine if registration payment confirmed
         const regStatus = String(
@@ -426,7 +449,13 @@ export default function DashboardPage() {
           }
         }
 
-        if (accForEvent) setAccommodation(accForEvent);
+        if (accForEvent) {
+          setAccommodation(
+            accPaid
+              ? { ...accForEvent, paidForAccommodation: true }
+              : accForEvent
+          );
+        }
         setEventCache((prev) => ({ ...prev, [eventId]: dashboardData }));
 
         if (dashboardData.dependents && dashboardData.dependents.length > 0) {

@@ -161,16 +161,63 @@ function normalizeAttendeeType(reg: any): "camper" | "physical" | "online" | und
 
 function normalizeAccommodation(acc: any) {
   if (!acc) return null;
-  const status = String(acc?.status ?? acc?.paymentStatus ?? "").toLowerCase();
+
+  const status = String(
+    acc?.status ??
+    acc?.paymentStatus ??
+    acc?.payment_status ??
+    acc?.accommodationPaymentStatus ??
+    ""
+  ).toLowerCase();
+
   const paid =
     acc?.paidForAccommodation === true ||
     acc?.isPaid === true ||
+    acc?.paid === true ||
+    acc?.isConfirmed === true ||
     status === "paid" ||
     status === "success" ||
+    status === "completed" ||
+    status === "confirmed" ||
+    status === "active" ||
     status.includes("paid");
+
+  // Normalize facility/room fields so Dashboard display logic works regardless of shape
+  const facilityName =
+    acc?.facilityName ??
+    acc?.facility?.facilityName ??
+    acc?.facility?.name ??
+    (typeof acc?.facility === "string" ? acc.facility : null) ??
+    acc?.hostelName ??
+    acc?.hotelName ??
+    null;
+
+  const roomIdentifier =
+    acc?.room?.roomIdentifier ??
+    acc?.room?.roomCode ??
+    acc?.room?.roomNumber ??
+    acc?.roomIdentifier ??
+    acc?.roomCode ??
+    acc?.roomNumber ??
+    (typeof acc?.room === "string" ? acc.room : null) ??
+    null;
+
+  const bedspaceName =
+    acc?.bedspace?.bedspaceName ??
+    acc?.bedspace?.name ??
+    acc?.bedspaceName ??
+    acc?.bedNumber ??
+    (typeof acc?.bed === "string" ? acc.bed : null) ??
+    (typeof acc?.bedspace === "string" ? acc.bedspace : null) ??
+    null;
 
   return {
     ...acc,
+    // Ensure nested room object always carries facilityName for display
+    room: acc?.room && typeof acc.room === "object"
+      ? { ...acc.room, facilityName: acc.room.facilityName ?? facilityName }
+      : acc?.room ?? null,
+    facilityName: acc?.facilityName ?? facilityName,
     bed: acc?.bed ?? acc?.bedspace ?? acc?.bedSpace ?? acc?.bed_space ?? null,
     paidForAccommodation: paid,
   };
@@ -300,8 +347,9 @@ export function Dashboard({
     setDashboardHydrating(true);
     setDashboardLoadError(null);
 
-    // Resolve eventId (registration → flow state → legacy)
+    // Resolve eventId (prop → registration → flow state)
     const resolvedEventId: string | undefined = (() => {
+      if (activeEventId) return activeEventId;
       if (registration?.eventId) return registration.eventId;
       if (typeof window === "undefined") return undefined;
 
@@ -374,10 +422,28 @@ export function Dashboard({
         data.registrations[0] ??
         null;
 
-      const accForEvent =
+      const rawAcc =
         data.accommodations.find((a) => a.eventId === resolvedEventId) ??
         data.accommodations[0] ??
         null;
+
+      const accForEvent = (() => {
+        if (!rawAcc) return null;
+        const st = String(
+          (rawAcc as any)?.status ??
+          (rawAcc as any)?.paymentStatus ??
+          (rawAcc as any)?.payment_status ??
+          (rawAcc as any)?.accommodationPaymentStatus ??
+          ""
+        ).toLowerCase();
+        const paid =
+          (rawAcc as any)?.paidForAccommodation === true ||
+          (rawAcc as any)?.isPaid === true ||
+          (rawAcc as any)?.paid === true ||
+          (rawAcc as any)?.isConfirmed === true ||
+          ["paid", "success", "completed", "confirmed", "active"].includes(st);
+        return paid ? { ...rawAcc, paidForAccommodation: true } : rawAcc;
+      })();
 
       onRegistrationUpdate?.(regForEvent);
       onAccommodationUpdate?.(accForEvent);
@@ -1044,6 +1110,7 @@ const isNonCamper = attendeeTypeNorm === "physical" || attendeeTypeNorm === "onl
         } finally {
           setRemovingDependentId(null);
           setDependentToDelete(null);
+          setConfirmDeleteOpen(false);
         }
       };
 

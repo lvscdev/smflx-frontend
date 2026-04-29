@@ -6,9 +6,12 @@ import { toUserMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Wifi, ArrowLeft, Tent, Users, Monitor, Building2, Home, Check, Radio, Youtube, Facebook } from "lucide-react";
+import { MapPin, Wifi, ArrowLeft, Tent, Users, Monitor, Building2, Home, Check, Radio, Youtube, Facebook, X, BedDouble } from "lucide-react";
 import { listAccommodationCategories } from "@/lib/api/accommodation";
 import { AccommodationCategories } from "@/lib/api/accommodation/types";
+
+/** Set to true to close accommodation booking site-wide for new registrations */
+const ACCOMMODATION_BOOKING_CLOSED = true;
 
 interface RegistrationData {
   eventId:string;
@@ -108,6 +111,7 @@ export function EventRegistration({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [localSubmitting, setLocalSubmitting] = useState(false);
+  const [showAccommodationClosedModal, setShowAccommodationClosedModal] = useState(false);
 
   const submitting = !!isSubmitting || localSubmitting;
 
@@ -172,6 +176,47 @@ export function EventRegistration({
 
   return (
     <div className="w-full px-4 lg:px-8 py-8 lg:py-[60.32px] lg:pt-18 lg:pr-8 lg:pb-8 lg:pl-8">
+
+      {/* Accommodation Closed Modal */}
+      {showAccommodationClosedModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <BedDouble className="w-5 h-5 text-amber-700" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Accommodation Booking Closed</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">Online booking is no longer available</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAccommodationClosedModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-gray-700 text-sm leading-relaxed">
+                Online accommodation booking for this event is now closed. However, a limited number of spaces are still available and can be obtained directly at the{" "}
+                <span className="font-semibold text-gray-900">Accommodation Stand</span> at the venue during the programme.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800">
+                If you still wish to attend without accommodation, please select <span className="font-semibold">Physical Attendance</span> or <span className="font-semibold">Online Participant</span> instead.
+              </div>
+              <button
+                onClick={() => setShowAccommodationClosedModal(false)}
+                className="w-full py-3 rounded-xl bg-gray-900 text-white font-medium hover:bg-gray-700 transition-colors text-sm"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-2xl mx-auto">
         <div className="mb-6 lg:mb-8">
           <h1 className="text-2xl lg:text-3xl mb-2">Event Registration</h1>
@@ -201,6 +246,10 @@ export function EventRegistration({
                 value="camper"
                 selected={registration.attendeeType === "camper"}
                 onClick={() => {
+                  if (ACCOMMODATION_BOOKING_CLOSED) {
+                    setShowAccommodationClosedModal(true);
+                    return;
+                  }
                   setFormError(null);
                   setRegistration({
                     ...registration,

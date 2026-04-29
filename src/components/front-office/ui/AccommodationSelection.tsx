@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { UserProfile } from "@/lib/api/dashboardTypes";
-import { ArrowLeft, Check, AlertCircle, Loader2, MapPin, Phone, X, MessageCircle } from "lucide-react";
+import { ArrowLeft, Check, AlertCircle, Loader2, MapPin, Phone, X, MessageCircle, BedDouble } from "lucide-react";
 import { ImageWithFallback } from "@/components/front-office/figma/ImageWithFallback";
 import { initiateHostelAllocation } from "@/lib/api";
 import { ApiError } from "@/lib/api/client";
@@ -92,6 +92,9 @@ interface AccommodationSelectionProps {
   attendTeensEvent?: boolean;
 }
 
+/** Set to true to hard-block all accommodation booking site-wide */
+const ACCOMMODATION_BOOKING_CLOSED = true;
+
 export function AccommodationSelection({
   accommodationType,
   eventId,
@@ -112,6 +115,30 @@ export function AccommodationSelection({
     console.log("registrationId", registrationId);
     console.log("eventId", eventId);
     console.log("profile", profile);
+  }
+
+  // Hard-block: accommodation booking is closed
+  if (ACCOMMODATION_BOOKING_CLOSED) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-sm border p-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+            <BedDouble className="w-7 h-7 text-amber-700" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Accommodation Booking Closed</h2>
+          <p className="text-gray-600 text-sm leading-relaxed mb-6">
+            Online accommodation booking for this event is now closed. A limited number of spaces are still available at the{" "}
+            <span className="font-semibold text-gray-900">Accommodation Stand</span> at the venue during the programme.
+          </p>
+          <button
+            onClick={onBack}
+            className="w-full py-3 rounded-xl bg-gray-900 text-white font-medium hover:bg-gray-700 transition-colors text-sm"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const [facilities, setFacilities] = useState<Facility[]>([]);

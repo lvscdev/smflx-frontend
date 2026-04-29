@@ -1886,12 +1886,10 @@ export function Dashboard({
                     </>
                   )}
                 </p>
-                <button
-                  onClick={() => setIsAccommodationModalOpen(true)}
-                  className="px-6 py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
-                >
-                  Book Accommodation
-                </button>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 leading-relaxed">
+                  <span className="font-semibold block mb-0.5">Accommodation booking is now closed.</span>
+                  A limited number of spaces may still be available at the <span className="font-semibold">Accommodation Stand</span> at the venue during the programme.
+                </div>
               </div>
 
               <div className="w-full lg:w-48 h-32 lg:h-40 rounded-2xl overflow-hidden shrink-0">
